@@ -1,5 +1,4 @@
 import { Feather, Ionicons, MaterialIcons } from "@expo/vector-icons";
-import React from "react";
 import { Image, StyleSheet, TouchableOpacity, View } from "react-native";
 
 export default function BottomNav({ onOrderPress, onTabPress, activeTab }: {
@@ -7,18 +6,53 @@ export default function BottomNav({ onOrderPress, onTabPress, activeTab }: {
   onTabPress?: (tab: string) => void;
   activeTab?: string;
 }) {
+  const fabStyle = {
+    position: 'absolute',
+    bottom: 0,
+    left: '50%',
+    transform: [{ translateX: -25 }], // Adjust this value to center the FAB
+  };
   return (
     <View style={styles.wrapper}>
+      <View style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: 24,
+        zIndex: 101,
+        borderTopLeftRadius: 0,
+        borderTopRightRadius: 0,
+        backgroundColor: 'transparent',
+      }} pointerEvents="none">
+        <View style={{
+          flex: 1,
+          backgroundColor: 'transparent',
+          borderTopLeftRadius: 0,
+          borderTopRightRadius: 0,
+          overflow: 'hidden',
+        }}>
+          <View style={{
+            flex: 1,
+            backgroundColor: 'rgba(255,255,255,0.18)',
+            opacity: 0.7,
+            borderTopLeftRadius: 0,
+            borderTopRightRadius: 0,
+          }} />
+        </View>
+      </View>
       <View style={styles.navBar}>
-        {/* Home */}
-        <TouchableOpacity style={styles.iconBtn} onPress={() => onTabPress && onTabPress('home')}>
-          <Ionicons name="home" size={28} color={activeTab === 'home' ? "#3b82f6" : "#ccc"} />
-        </TouchableOpacity>
-        {/* Shop */}
-        <TouchableOpacity style={styles.iconBtn} onPress={() => onTabPress && onTabPress('shop')}>
-          <Feather name="shopping-bag" size={28} color={activeTab === 'shop' ? "#3b82f6" : "#ccc"} />
-        </TouchableOpacity>
-        {/* Center FAB (Order) */}
+        {/* Left side - Home and Shop */}
+        <View style={styles.leftSide}>
+          <TouchableOpacity style={styles.iconBtn} onPress={() => onTabPress && onTabPress('home')}>
+            <Ionicons name="home" size={28} color={activeTab === 'home' ? "#3b82f6" : "#ccc"} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.iconBtn} onPress={() => onTabPress && onTabPress('shop')}>
+            <Feather name="shopping-bag" size={28} color={activeTab === 'shop' ? "#3b82f6" : "#ccc"} />
+          </TouchableOpacity>
+        </View>
+
+        {/* Center FAB (Order) - properly centered */}
         <View style={styles.fabWrapper} pointerEvents="box-none">
           <TouchableOpacity style={styles.fab} onPress={onOrderPress} activeOpacity={0.85}>
             <Image
@@ -28,10 +62,16 @@ export default function BottomNav({ onOrderPress, onTabPress, activeTab }: {
             />
           </TouchableOpacity>
         </View>
-        {/* Team */}
-        <TouchableOpacity style={styles.iconBtn} onPress={() => onTabPress && onTabPress('team')}>
-          <MaterialIcons name="people-outline" size={28} color={activeTab === 'team' ? "#3b82f6" : "#ccc"} />
-        </TouchableOpacity>
+
+        {/* Right side - Profile and Team */}
+        <View style={styles.rightSide}>
+          <TouchableOpacity style={styles.iconBtn} onPress={() => onTabPress && onTabPress('profile')}>
+            <Ionicons name="person" size={28} color={activeTab === 'profile' ? "#3b82f6" : "#ccc"} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.iconBtn} onPress={() => onTabPress && onTabPress('team')}>
+            <MaterialIcons name="people-outline" size={28} color={activeTab === 'team' ? "#3b82f6" : "#ccc"} />
+          </TouchableOpacity>
+        </View>
       </View>
       {/* Home indicator */}
       <View style={styles.homeIndicatorWrapper}>
@@ -46,31 +86,52 @@ const styles = StyleSheet.create({
     width: "100%",
     backgroundColor: "transparent",
     alignItems: "center",
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 100,
   },
   navBar: {
     flexDirection: "row",
-    backgroundColor: "#0a0a16",
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
+    backgroundColor: "rgba(10, 10, 22, 0.85)", // semi-transparent
     paddingTop: 28,
     paddingBottom: 12,
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     alignItems: "flex-end",
     justifyContent: "space-between",
     width: "100%",
-    position: "relative",
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 100,
+  },
+  leftSide: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 30, // מרווח שווה בין האייקונים
+    flex: 1,
+    justifyContent: "flex-start",
+  },
+  rightSide: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 30, // מרווח שווה בין האייקונים
+    flex: 1,
+    justifyContent: "flex-end",
   },
   iconBtn: {
-    flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 4,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
   },
   fabWrapper: {
     position: "absolute",
     left: "50%",
-    top: -32,
-    transform: [{ translateX: -32 }],
+    top: -25, // הורדנו עוד קצת למטה
+    transform: [{ translateX: -36 }], // הגדלנו את הרוחב
     zIndex: 10,
     shadowColor: "#3b82f6",
     shadowOffset: { width: 0, height: 0 },
@@ -80,9 +141,9 @@ const styles = StyleSheet.create({
     pointerEvents: "box-none",
   },
   fab: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 72, // הגדלנו את העיגול
+    height: 72, // הגדלנו את העיגול
+    borderRadius: 36,
     backgroundColor: "#0b0518",
     alignItems: "center",
     justifyContent: "center",
@@ -90,9 +151,9 @@ const styles = StyleSheet.create({
     borderColor: "#181828",
   },
   fabIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44, // הגדלנו את האייקון
+    height: 44, // הגדלנו את האייקון
+    borderRadius: 22,
   },
   homeIndicatorWrapper: {
     alignItems: "center",

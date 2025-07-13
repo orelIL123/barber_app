@@ -1,7 +1,8 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { colors } from '../../app/constants/colors';
+import TopNav from '../components/TopNav';
 
 export default function HomeScreen() {
   const [userName, setUserName] = useState('אוראל');
@@ -9,6 +10,7 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <TopNav title="TURGI" onBellPress={() => {}} onMenuPress={() => {}} />
       <LinearGradient
         colors={[colors.background, colors.primary]}
         style={styles.gradient}
@@ -77,6 +79,7 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
     padding: 20,
+    paddingBottom: 120, // מרווח לטאב התחתון
   },
   header: {
     marginBottom: 40,

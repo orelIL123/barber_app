@@ -1,6 +1,6 @@
-import { useColorScheme } from '@/hooks/useColorScheme';
 import { Tabs, useRouter, useSegments } from 'expo-router';
 import React from 'react';
+import { useColorScheme } from '../../hooks/useColorScheme';
 import BottomNav from '../components/BottomNav';
 
 export default function TabLayout() {
@@ -11,9 +11,10 @@ export default function TabLayout() {
   // קביעת הטאב הפעיל לפי ה־route
   const activeTab = React.useMemo(() => {
     const last = segments[segments.length - 1];
-    if (last === 'index') return 'home';
-    if (last === 'profile') return 'profile';
-    if (last === 'explore') return 'shop';
+    if (String(last) === 'index') return 'home';
+    if (String(last) === 'profile') return 'profile';
+    if (String(last) === 'explore') return 'shop';
+    if (String(last) === 'team') return 'team';
     return 'home';
   }, [segments]);
 
@@ -22,6 +23,7 @@ export default function TabLayout() {
     if (tab === 'home') router.replace('/');
     else if (tab === 'profile') router.replace('/profile');
     else if (tab === 'shop') router.replace('/explore');
+    else if (tab === 'team') router.replace('/team');
   };
 
   // ניווט מהיר מה־FAB (אפשר להחליף ל־explore או לכל מסך אחר קיים)
@@ -40,6 +42,7 @@ export default function TabLayout() {
         <Tabs.Screen name="index" options={{ title: 'בית' }} />
         <Tabs.Screen name="profile" options={{ title: 'פרופיל' }} />
         <Tabs.Screen name="explore" options={{ title: 'חנות' }} />
+        <Tabs.Screen name="team" options={{ title: 'צוות' }} />
       </Tabs>
       <BottomNav
         onOrderPress={handleOrderPress}

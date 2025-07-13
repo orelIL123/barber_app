@@ -6,7 +6,7 @@ import 'nativewind';
 import 'react-native-reanimated';
 import '../app/globals.css';
 
-import { useColorScheme } from '@/hooks/useColorScheme';
+import { useColorScheme } from '../hooks/useColorScheme';
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();

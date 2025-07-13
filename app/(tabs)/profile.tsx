@@ -1,5 +1,4 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import React from 'react';
 import { SafeAreaView, StyleSheet, Text, View } from 'react-native';
 import { colors } from '../../app/constants/colors';
 
@@ -31,6 +30,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
+    paddingBottom: 120, // מרווח לטאב התחתון
   },
   title: {
     fontSize: 32,
