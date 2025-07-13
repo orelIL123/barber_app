@@ -1,19 +1,52 @@
-import { LinearGradient } from 'expo-linear-gradient';
-import { collection, doc, getDoc, getDocs } from 'firebase/firestore';
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Image, ImageBackground, Linking, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { CustomCard } from '../components/CustomCard';
-import { NeonButton } from '../components/NeonButton';
-import { collections, db, Settings, Treatment } from '../config/firebase';
-import { colors } from '../constants/colors';
+import {
+  Animated,
+  Image,
+  ImageBackground,
+  Linking,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+  Dimensions,
+  Alert,
+} from 'react-native';
+
+const { width, height } = Dimensions.get('window');
 
 interface HomeScreenProps {
   onNavigate: (screen: string) => void;
 }
 
+// Simple NeonButton component
+const NeonButton: React.FC<{
+  title: string;
+  onPress: () => void;
+  variant?: 'primary' | 'secondary';
+  style?: any;
+}> = ({ title, onPress, variant = 'primary', style }) => {
+  return (
+    <TouchableOpacity
+      style={[
+        styles.neonButton,
+        variant === 'primary' ? styles.neonButtonPrimary : styles.neonButtonSecondary,
+        style,
+      ]}
+      onPress={onPress}
+    >
+      <Text style={[
+        styles.neonButtonText,
+        variant === 'primary' ? styles.neonButtonTextPrimary : styles.neonButtonTextSecondary,
+      ]}>
+        {title}
+      </Text>
+    </TouchableOpacity>
+  );
+};
+
 export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
-  const [treatments, setTreatments] = useState<Treatment[]>([]);
-  const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(true);
   const [imageLoaded, setImageLoaded] = useState(false);
 
@@ -25,7 +58,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
   const cardsFade = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    loadData();
+    // Simulate loading
+    setTimeout(() => {
+      setLoading(false);
+    }, 1000);
   }, []);
 
   useEffect(() => {
@@ -63,40 +99,47 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
     }
   }, [loading, imageLoaded]);
 
-  const loadData = async () => {
-    try {
-      // Load treatments
-      const treatmentsSnapshot = await getDocs(collection(db, collections.treatments));
-      const treatmentsData = treatmentsSnapshot.docs.map(doc => ({
-        ...doc.data(),
-        treatmentId: doc.id,
-      })) as Treatment[];
-      setTreatments(treatmentsData);
-
-      // Load settings
-      const settingsDoc = await getDoc(doc(db, collections.settings, 'main'));
-      if (settingsDoc.exists()) {
-        setSettings(settingsDoc.data() as Settings);
-      }
-
-      setLoading(false);
-    } catch (error) {
-      console.error('Error loading data:', error);
-      setLoading(false);
-    }
+  const handlePhoneCall = () => {
+    Linking.openURL('tel:+972501234567').catch(() => {
+      Alert.alert('שגיאה', 'לא ניתן לפתוח את אפליקציית הטלפון');
+    });
   };
 
-  const quickActions = [
-    { title: 'הזמנת תור', subtitle: 'קבע תור חדש', action: () => onNavigate('booking') },
-    { title: 'התורים שלי', subtitle: 'צפה בתורים הקיימים', action: () => onNavigate('appointments') },
-    { title: 'הספרים שלנו', subtitle: 'הכר את הצוות', action: () => onNavigate('barbers') },
-  ];
+  const handleWhatsApp = () => {
+    Linking.openURL('https://wa.me/972501234567').catch(() => {
+      Alert.alert('שגיאה', 'לא ניתן לפתוח את WhatsApp');
+    });
+  };
+
+  const handleWaze = () => {
+    Linking.openURL('https://waze.com/ul?ll=32.0853,34.7818&navigate=yes').catch(() => {
+      Alert.alert('שגיאה', 'לא ניתן לפתוח את Waze');
+    });
+  };
+
+  const handleSocialMedia = (platform: string) => {
+    let url = '';
+    switch (platform) {
+      case 'facebook':
+        url = 'https://www.facebook.com/turgibarber';
+        break;
+      case 'instagram':
+        url = 'https://www.instagram.com/turgibarber';
+        break;
+      default:
+        return;
+    }
+    
+    Linking.openURL(url).catch(() => {
+      Alert.alert('שגיאה', 'לא ניתן לפתוח את הקישור');
+    });
+  };
 
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <Text style={{ color: '#222', fontSize: 18 }}>טוען...</Text>
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>טוען...</Text>
         </View>
       </SafeAreaView>
     );
@@ -106,16 +149,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
     <SafeAreaView style={styles.container}>
       <View style={styles.backgroundWrapper}>
         <ImageBackground
-          source={{ uri: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=800&q=80' }}
+          source={require('../../assets/images/atmosphere/atmosphere.png')}
           style={styles.atmosphereImage}
           resizeMode="cover"
+          onLoad={() => setImageLoaded(true)}
+          onError={() => setImageLoaded(true)}
         >
           <View style={styles.overlay} />
-          <LinearGradient
-            colors={['transparent', 'rgba(0,0,0,0.18)', 'rgba(0,0,0,0.38)']}
-            style={styles.gradientOverlay}
-            pointerEvents="none"
-          />
           <View style={styles.designElements}>
             <View style={styles.circle1} />
             <View style={styles.circle2} />
@@ -124,115 +164,169 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
           </View>
         </ImageBackground>
       </View>
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingTop: 220, paddingBottom: 32 }}>
-        {/* Main Card */}
-        <View style={styles.mainCard}>
-          <View style={styles.header}>
-            <Text style={styles.greeting}>שלום, אוראל</Text>
-            <Text style={styles.subtitle}>מוכן לתספורת חדשה?</Text>
-          </View>
-          <View style={styles.ctaSection}>
+      
+      <ScrollView 
+        style={styles.scrollView} 
+        showsVerticalScrollIndicator={false} 
+        contentContainerStyle={styles.scrollContent}
+      >
+        <View style={styles.contentWrapper}>
+          {/* Greeting and CTA Section */}
+          <Animated.View 
+            style={[
+              styles.greetingCtaContainer, 
+              { 
+                opacity: fadeAnim,
+                transform: [{ translateY: slideAnim }]
+              }
+            ]}
+          >
+            <View style={styles.greetingContainer}>
+              <Text style={styles.greeting}>שלום, ברוכים הבאים</Text>
+              <Text style={styles.subtitle}>ל-TURGI ברברשופ</Text>
+            </View>
             <NeonButton
               title="הזמן תור"
               onPress={() => onNavigate('booking')}
               variant="primary"
               style={styles.ctaButton}
             />
-          </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.galleryCarousel}>
-            <View style={[styles.galleryCard, { transform: [{ rotate: '-7deg' }, { scale: 0.96 }] }]}> 
-              <Image source={{uri: 'https://images.unsplash.com/photo-1519125323398-675f0ddb6308?auto=format&fit=crop&w=400&q=80'}} style={styles.galleryImage} />
-            </View>
-            <View style={[styles.galleryCard, { transform: [{ rotate: '-2deg' }, { scale: 1.04 }] }]}> 
-              <Image source={{uri: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=400&q=80'}} style={styles.galleryImage} />
-            </View>
-            <View style={[styles.galleryCard, { transform: [{ rotate: '6deg' }, { scale: 0.98 }] }]}> 
-              <Image source={{uri: 'https://images.unsplash.com/photo-1465101046530-73398c7f28ca?auto=format&fit=crop&w=400&q=80'}} style={styles.galleryImage} />
-            </View>
-          </ScrollView>
-        </View>
-        {/* About Us Section */}
-        <View style={styles.aboutCard}>
-          <Image source={{uri: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=400&q=80'}} style={styles.aboutImage} />
-          <View style={styles.aboutContent}>
-            <Text style={styles.aboutTitle}>קצת עלינו</Text>
-            <Text style={styles.aboutText}>ברוכים הבאים ל-TURGI ברברשופ! אנחנו צוות מקצועי עם תשוקה לאסתטיקה, שירות וחוויה. בואו להתרענן, להרגיש בבית ולצאת עם חיוך.</Text>
-            <TouchableOpacity style={styles.wazeButton} onPress={() => Linking.openURL('https://waze.com/ul?ll=32.0853,34.7818&navigate=yes')}>
-              <Text style={styles.wazeButtonText}>נווט עם Waze</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-        {/* Quick Actions */}
-        <Animated.View style={[styles.section, { opacity: cardsFade }]}>
-          <Text style={styles.sectionTitle}>פעולות מהירות</Text>
-          {quickActions.map((action, index) => (
-            <CustomCard
-              key={index}
-              title={action.title}
-              subtitle={action.subtitle}
-              onPress={action.action}
-              style={styles.actionCard}
-            />
-          ))}
-        </Animated.View>
-        {/* Featured Treatments */}
-        <Animated.View style={[styles.section, { opacity: cardsFade }]}>
-          <Text style={styles.sectionTitle}>השירותים שלנו</Text>
-          <View style={styles.treatmentsGrid}>
-            {treatments.slice(0, 4).map((treatment) => (
-              <CustomCard
-                key={treatment.treatmentId}
-                title={treatment.title}
-                subtitle={`₪${treatment.price} • ${treatment.duration} דקות`}
-                onPress={() => onNavigate('select-treatment')}
-                style={styles.treatmentCard}
-              >
-                {treatment.image && (
-                  <Image 
-                    source={{ uri: treatment.image }}
-                    style={styles.treatmentImage}
-                    resizeMode="cover"
-                  />
-                )}
-              </CustomCard>
-            ))}
-          </View>
-        </Animated.View>
-        {/* User Info Card */}
-        <Animated.View style={[styles.userCard, { opacity: cardsFade }]}>
-          <CustomCard title="הפרופיל שלי" subtitle="אוראל כהן">
-            <View style={styles.userInfo}>
-              <Text style={styles.userText}>התור הבא: יום שלישי, 15:30</Text>
-              <NeonButton
-                title="הזמן שוב"
+          </Animated.View>
+
+          {/* Quick Actions */}
+          <Animated.View style={[styles.quickActionsSection, { opacity: ctaFade }]}>
+            <Text style={styles.sectionTitle}>פעולות מהירות</Text>
+            <View style={styles.quickActionsGrid}>
+              <TouchableOpacity 
+                style={styles.quickActionCard}
                 onPress={() => onNavigate('booking')}
-                variant="secondary"
-                style={styles.rebookButton}
-              />
+              >
+                <Text style={styles.quickActionIcon}>📅</Text>
+                <Text style={styles.quickActionTitle}>הזמנת תור</Text>
+                <Text style={styles.quickActionSubtitle}>קבע תור חדש</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.quickActionCard}
+                onPress={() => onNavigate('appointments')}
+              >
+                <Text style={styles.quickActionIcon}>📋</Text>
+                <Text style={styles.quickActionTitle}>התורים שלי</Text>
+                <Text style={styles.quickActionSubtitle}>צפה בתורים</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.quickActionCard}
+                onPress={() => onNavigate('barbers')}
+              >
+                <Text style={styles.quickActionIcon}>✂️</Text>
+                <Text style={styles.quickActionTitle}>הספרים שלנו</Text>
+                <Text style={styles.quickActionSubtitle}>הכר את הצוות</Text>
+              </TouchableOpacity>
             </View>
-          </CustomCard>
-        </Animated.View>
-        {/* Footer */}
-        <View style={styles.footerCard}>
-          <View style={styles.socialRow}>
-            <TouchableOpacity onPress={() => Linking.openURL('https://www.instagram.com/')}> 
-              <Text style={styles.socialIcon}>📸</Text>
+          </Animated.View>
+
+          {/* Gallery Section */}
+          <Animated.View style={[styles.gallerySection, { opacity: cardsFade }]}>
+            <Text style={styles.sectionTitle}>הגלריה שלנו</Text>
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false} 
+              contentContainerStyle={styles.galleryCarouselContent}
+            >
+              <View style={[styles.galleryCard, { transform: [{ rotate: '-3deg' }] }]}>
+                <Image
+                  source={require('../../assets/images/gallery/1.jpg')}
+                  style={styles.galleryImage}
+                  resizeMode="cover"
+                />
+              </View>
+              <View style={[styles.galleryCard, { transform: [{ rotate: '2deg' }] }]}>
+                <Image
+                  source={require('../../assets/images/gallery/2.jpg')}
+                  style={styles.galleryImage}
+                  resizeMode="cover"
+                />
+              </View>
+              <View style={[styles.galleryCard, { transform: [{ rotate: '-1deg' }] }]}>
+                <Image
+                  source={require('../../assets/images/gallery/3.jpg')}
+                  style={styles.galleryImage}
+                  resizeMode="cover"
+                />
+              </View>
+              <View style={[styles.galleryCard, { transform: [{ rotate: '1deg' }] }]}>
+                <Image
+                  source={require('../../assets/images/gallery/4.jpg')}
+                  style={styles.galleryImage}
+                  resizeMode="cover"
+                />
+              </View>
+            </ScrollView>
+          </Animated.View>
+
+          {/* About Us Section */}
+          <Animated.View style={[styles.aboutSection, { opacity: cardsFade }]}>
+            <Text style={styles.sectionTitle}>קצת עלינו</Text>
+            <View style={styles.aboutCard}>
+              <Image
+                source={require('../../assets/images/ABOUT US/aboutus.png')}
+                style={styles.aboutImageWide}
+                resizeMode="cover"
+              />
+              <View style={styles.aboutContent}>
+                <Text style={styles.aboutText}>
+                  ברוכים הבאים ל-TURGI ברברשופ! אנחנו צוות מקצועי עם תשוקה לאסתטיקה, שירות וחוויה. 
+                  בואו להתרענן, להרגיש בבית ולצאת עם חיוך.
+                </Text>
+                <TouchableOpacity 
+                  style={styles.wazeButton} 
+                  onPress={handleWaze}
+                >
+                  <Text style={styles.wazeButtonText}>נווט עם Waze</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Animated.View>
+
+          {/* Contact Section */}
+          <Animated.View style={[styles.contactSection, { opacity: cardsFade }]}>
+            <Text style={styles.sectionTitle}>צרו קשר</Text>
+            <View style={styles.contactGrid}>
+              <TouchableOpacity style={styles.contactCard} onPress={handlePhoneCall}>
+                <Text style={styles.contactIcon}>📞</Text>
+                <Text style={styles.contactTitle}>התקשרו</Text>
+                <Text style={styles.contactSubtitle}>050-123-4567</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity style={styles.contactCard} onPress={handleWhatsApp}>
+                <Text style={styles.contactIcon}>💬</Text>
+                <Text style={styles.contactTitle}>WhatsApp</Text>
+                <Text style={styles.contactSubtitle}>שלחו הודעה</Text>
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.socialRow}>
+              <TouchableOpacity onPress={() => handleSocialMedia('facebook')}>
+                <Text style={styles.socialIcon}>📘</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => handleSocialMedia('instagram')}>
+                <Text style={styles.socialIcon}>📸</Text>
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+
+          {/* Footer */}
+          <View style={styles.footerCard}>
+            <Text style={styles.footerText}>רח׳ הדוגמא 1, תל אביב</Text>
+            <TouchableOpacity onPress={handleWaze}>
+              <Text style={styles.footerWaze}>נווט עם Waze</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => Linking.openURL('https://www.facebook.com/')}> 
-              <Text style={styles.socialIcon}>📘</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => Linking.openURL('https://wa.me/123456789')}> 
-              <Text style={styles.socialIcon}>💬</Text>
+            <Text style={styles.footerCredit}>Powered by Orel Aharon</Text>
+            <TouchableOpacity onPress={() => Alert.alert('תנאי שימוש', 'תנאי השימוש יוצגו כאן')}>
+              <Text style={styles.footerTerms}>תנאי שימוש</Text>
             </TouchableOpacity>
           </View>
-          <Text style={styles.footerText}>רח׳ הדוגמא 1, תל אביב</Text>
-          <TouchableOpacity onPress={() => Linking.openURL('https://waze.com/ul?ll=32.0853,34.7818&navigate=yes')}>
-            <Text style={styles.footerWaze}>נווט עם Waze</Text>
-          </TouchableOpacity>
-          <Text style={styles.footerCredit}>Powered by orel aharon</Text>
-          <TouchableOpacity onPress={() => Linking.openURL('https://example.com/terms')}>
-            <Text style={styles.footerTerms}>תנאי שימוש</Text>
-          </TouchableOpacity>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -242,150 +336,24 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f7f7fa', // Light, modern background
+    backgroundColor: '#f8f9fa',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
+  },
+  loadingText: {
+    fontSize: 18,
+    color: '#333',
+    fontWeight: '500',
   },
   scrollView: {
     flex: 1,
-    padding: 0,
   },
-  cardWrapper: {
-    paddingHorizontal: 0,
-    marginTop: 0,
-    alignItems: 'center',
-  },
-  heroCard: {
-    backgroundColor: '#fff',
-    borderRadius: 32,
-    marginTop: 16,
-    marginBottom: 16,
-    width: '95%',
-    alignSelf: 'center',
-    padding: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.12,
-    shadowRadius: 24,
-    elevation: 8,
-  },
-  greeting: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#222',
-    marginBottom: 8,
-    textAlign: 'right',
-    fontFamily: 'Heebo',
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#444',
-    textAlign: 'right',
-    marginBottom: 18,
-    fontFamily: 'Heebo',
-  },
-  ctaSection: {
-    marginBottom: 18,
-    alignItems: 'flex-end',
-  },
-  ctaButton: {
-    width: '100%',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 8,
-    borderRadius: 16,
-    marginBottom: 8,
-  },
-  ctaButtonBlack: {
-    backgroundColor: '#111',
-    borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.35,
-    shadowRadius: 16,
-    elevation: 10,
-    paddingHorizontal: 36,
-    paddingVertical: 14,
-    minWidth: 140,
-  },
-  ctaButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 18,
-    fontFamily: 'Heebo',
-  },
-  galleryCarousel: {
-    flexDirection: 'row',
-    marginTop: 8,
-    marginBottom: 24,
-    paddingHorizontal: 4,
-  },
-  galleryCard: {
-    width: 110,
-    height: 140,
-    borderRadius: 18,
-    marginRight: 14,
-    backgroundColor: '#eee',
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.13,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  galleryImage: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 18,
-  },
-  section: {
-    marginBottom: 32,
-    paddingHorizontal: 24,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#222',
-    marginBottom: 16,
-    textAlign: 'right',
-    fontFamily: 'Heebo',
-  },
-  actionCard: {
-    marginBottom: 12,
-  },
-  treatmentsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  treatmentCard: {
-    width: '48%',
-    marginBottom: 12,
-    alignItems: 'center',
-  },
-  treatmentImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 8,
-    marginTop: 8,
-  },
-  userCard: {
-    marginBottom: 24,
-  },
-  userInfo: {
-    alignItems: 'center',
-  },
-  userText: {
-    color: colors.textSecondary,
-    fontSize: 14,
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  rebookButton: {
-    width: '100%',
+  scrollContent: {
+    paddingBottom: 32,
   },
   backgroundWrapper: {
     position: 'absolute',
@@ -393,22 +361,20 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 0,
-    height: 220, // Only top hero
+    height: height * 0.4,
     width: '100%',
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    overflow: 'hidden',
   },
   atmosphereImage: {
     width: '100%',
-    height: 220,
+    height: '100%',
     justifyContent: 'flex-end',
   },
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  gradientOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    // backgroundColor: 'transparent',
-    // backgroundGradient: { ... } // removed, replaced with LinearGradient above
+    backgroundColor: 'rgba(0,0,0,0.4)',
   },
   designElements: {
     position: 'absolute',
@@ -416,7 +382,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    zIndex: -1,
+    zIndex: 1,
   },
   circle1: {
     position: 'absolute',
@@ -452,137 +418,302 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
   },
-  header: {
-    paddingHorizontal: 24,
-    marginBottom: 16,
+  contentWrapper: {
+    paddingTop: height * 0.35,
   },
-  gradient: {
+  greetingCtaContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+    marginHorizontal: 16,
+    marginBottom: 24,
+    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 5,
+  },
+  greetingContainer: {
     flex: 1,
-    paddingTop: 320, // Adjust based on image height
+    marginRight: 16,
+  },
+  greeting: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#222',
+    marginBottom: 4,
+    textAlign: 'right',
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'right',
+  },
+  ctaButton: {
+    minWidth: 100,
+  },
+  neonButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  neonButtonPrimary: {
+    backgroundColor: '#000',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  neonButtonSecondary: {
+    backgroundColor: '#fff',
+    borderWidth: 2,
+    borderColor: '#000',
+  },
+  neonButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  neonButtonTextPrimary: {
+    color: '#fff',
+  },
+  neonButtonTextSecondary: {
+    color: '#000',
+  },
+  quickActionsSection: {
+    marginBottom: 24,
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    marginHorizontal: 16,
+    borderRadius: 20,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 5,
+  },
+  quickActionsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  quickActionCard: {
+    flex: 1,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 16,
+    marginHorizontal: 4,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  quickActionIcon: {
+    fontSize: 32,
+    marginBottom: 8,
+  },
+  quickActionTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#222',
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  quickActionSubtitle: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
+  },
+  gallerySection: {
+    marginBottom: 24,
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    marginHorizontal: 16,
+    borderRadius: 20,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 5,
+  },
+  galleryCarouselContent: {
+    paddingHorizontal: 4,
+  },
+  galleryCard: {
+    width: 120,
+    height: 160,
+    borderRadius: 20,
+    marginRight: 16,
+    backgroundColor: '#eee',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  galleryImage: {
+    width: '100%',
+    height: '100%',
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#222',
+    marginBottom: 16,
+    textAlign: 'right',
   },
   aboutSection: {
-    marginBottom: 32,
-    paddingHorizontal: 12,
+    marginBottom: 24,
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    marginHorizontal: 16,
+    borderRadius: 20,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 5,
   },
   aboutCard: {
     backgroundColor: '#fff',
-    borderRadius: 24,
-    flexDirection: 'row',
+    borderRadius: 16,
     alignItems: 'center',
     padding: 18,
-    marginHorizontal: 16,
-    marginBottom: 24,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.10,
-    shadowRadius: 16,
-    elevation: 6,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 3,
   },
-  aboutImage: {
-    width: 90,
-    height: 90,
-    borderRadius: 18,
-    marginRight: 18,
+  aboutImageWide: {
+    width: '100%',
+    height: 150,
+    borderRadius: 12,
+    marginBottom: 12,
   },
   aboutContent: {
     flex: 1,
-  },
-  aboutTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: colors.textHebrew,
-    marginBottom: 6,
-    textAlign: 'right',
+    alignItems: 'center',
   },
   aboutText: {
     fontSize: 15,
-    color: colors.textSecondary,
-    marginBottom: 10,
-    textAlign: 'right',
+    color: '#555',
+    marginBottom: 16,
+    textAlign: 'center',
+    lineHeight: 22,
   },
   wazeButton: {
-    backgroundColor: '#1db7f6',
+    backgroundColor: '#50C878',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
     borderRadius: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 18,
-    alignSelf: 'flex-start',
-    shadowColor: '#1db7f6',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.18,
-    shadowRadius: 6,
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
     elevation: 3,
   },
   wazeButtonText: {
     color: '#fff',
     fontWeight: 'bold',
-    fontSize: 15,
+    fontSize: 14,
   },
-  footer: {
-    marginTop: 24,
-    paddingVertical: 24,
+  contactSection: {
+    marginBottom: 24,
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    marginHorizontal: 16,
+    borderRadius: 20,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 5,
+  },
+  contactGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  contactCard: {
+    flex: 1,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 16,
+    marginHorizontal: 4,
     alignItems: 'center',
-    borderTopWidth: 1,
-    borderColor: '#e0e0e0',
-    backgroundColor: 'rgba(255,255,255,0.92)',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  contactIcon: {
+    fontSize: 32,
+    marginBottom: 8,
+  },
+  contactTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#222',
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  contactSubtitle: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
   },
   socialRow: {
     flexDirection: 'row',
-    marginBottom: 10,
-    gap: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   socialIcon: {
-    fontSize: 26,
-    marginHorizontal: 8,
-  },
-  footerText: {
-    color: '#222',
-    fontSize: 15,
-    marginBottom: 4,
-  },
-  footerWaze: {
-    color: '#1db7f6',
-    fontWeight: 'bold',
-    fontSize: 15,
-    marginBottom: 4,
-  },
-  footerCredit: {
-    color: '#888',
-    fontSize: 13,
-    marginBottom: 2,
-  },
-  footerTerms: {
-    color: '#1db7f6',
-    fontSize: 14,
-    textDecorationLine: 'underline',
-    marginTop: 2,
-  },
-  mainCard: {
-    backgroundColor: '#fff',
-    borderRadius: 32,
-    marginHorizontal: 16,
-    marginBottom: 24,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.13,
-    shadowRadius: 24,
-    elevation: 10,
+    fontSize: 32,
+    marginHorizontal: 15,
   },
   footerCard: {
-    backgroundColor: 'rgba(255,255,255,0.92)',
-    borderRadius: 24,
+    backgroundColor: 'rgba(240,240,240,0.95)',
     marginHorizontal: 16,
-    marginTop: 8,
-    paddingVertical: 24,
+    borderRadius: 20,
+    padding: 24,
     alignItems: 'center',
-    borderTopWidth: 1,
-    borderColor: '#e0e0e0',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.1,
     shadowRadius: 12,
-    elevation: 4,
+    elevation: 5,
   },
-}); 
+  footerText: {
+    fontSize: 14,
+    color: '#555',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  footerWaze: {
+    fontSize: 14,
+    color: '#007bff',
+    textDecorationLine: 'underline',
+    marginBottom: 8,
+  },
+  footerCredit: {
+    fontSize: 12,
+    color: '#888',
+    marginTop: 16,
+  },
+  footerTerms: {
+    fontSize: 12,
+    color: '#007bff',
+    textDecorationLine: 'underline',
+    marginTop: 4,
+  },
+});

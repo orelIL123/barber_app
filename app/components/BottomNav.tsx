@@ -45,10 +45,10 @@ export default function BottomNav({ onOrderPress, onTabPress, activeTab }: {
         {/* Left side - Home and Shop */}
         <View style={styles.leftSide}>
           <TouchableOpacity style={styles.iconBtn} onPress={() => onTabPress && onTabPress('home')}>
-            <Ionicons name="home" size={28} color={activeTab === 'home' ? "#3b82f6" : "#ccc"} />
+            <Ionicons name="home" size={32} color={activeTab === 'home' ? "#3b82f6" : "#ccc"} />
           </TouchableOpacity>
           <TouchableOpacity style={styles.iconBtn} onPress={() => onTabPress && onTabPress('shop')}>
-            <Feather name="shopping-bag" size={28} color={activeTab === 'shop' ? "#3b82f6" : "#ccc"} />
+            <Feather name="shopping-bag" size={32} color={activeTab === 'shop' ? "#3b82f6" : "#ccc"} />
           </TouchableOpacity>
         </View>
 
@@ -65,11 +65,11 @@ export default function BottomNav({ onOrderPress, onTabPress, activeTab }: {
 
         {/* Right side - Profile and Team */}
         <View style={styles.rightSide}>
-          <TouchableOpacity style={styles.iconBtn} onPress={() => onTabPress && onTabPress('profile')}>
-            <Ionicons name="person" size={28} color={activeTab === 'profile' ? "#3b82f6" : "#ccc"} />
-          </TouchableOpacity>
           <TouchableOpacity style={styles.iconBtn} onPress={() => onTabPress && onTabPress('team')}>
-            <MaterialIcons name="people-outline" size={28} color={activeTab === 'team' ? "#3b82f6" : "#ccc"} />
+            <MaterialIcons name="people-outline" size={32} color={activeTab === 'team' ? "#3b82f6" : "#ccc"} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.iconBtn} onPress={() => onTabPress && onTabPress('profile')}>
+            <Ionicons name="person" size={32} color={activeTab === 'profile' ? "#3b82f6" : "#ccc"} />
           </TouchableOpacity>
         </View>
       </View>
@@ -94,7 +94,7 @@ const styles = StyleSheet.create({
   },
   navBar: {
     flexDirection: "row",
-    backgroundColor: "rgba(10, 10, 22, 0.85)", // semi-transparent
+    backgroundColor: "rgba(0, 0, 0, 0.91)", // Black with 91% opacity
     paddingTop: 28,
     paddingBottom: 12,
     paddingHorizontal: 20,
@@ -131,7 +131,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: "50%",
     top: -25, // הורדנו עוד קצת למטה
-    transform: [{ translateX: -36 }], // הגדלנו את הרוחב
+    transform: [{ translateX: -36 }], // מרכז את הכפתור
     zIndex: 10,
     shadowColor: "#3b82f6",
     shadowOffset: { width: 0, height: 0 },

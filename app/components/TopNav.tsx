@@ -43,19 +43,23 @@ const TopNav: React.FC<TopNavProps> = ({ title, onBellPress, onMenuPress }) => {
 const styles = StyleSheet.create({
   container: {
     width: '100%',
-    height: 64,
-    backgroundColor: '#111',
+    height: 84, // Increased height to accommodate the black bar
+    backgroundColor: '#000',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingTop: 16,
+    paddingTop: 36, // Adjusted for the black bar
     elevation: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
     shadowRadius: 8,
     zIndex: 200,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
   },
   title: {
     flex: 1,
@@ -69,6 +73,7 @@ const styles = StyleSheet.create({
     width: 40,
     alignItems: 'flex-start',
     justifyContent: 'center',
+    zIndex: 3, // Ensure the menu button is on top
   },
   iconRight: {
     width: 40,
