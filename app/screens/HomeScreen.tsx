@@ -58,10 +58,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
   const cardsFade = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Simulate loading
+    // Simulate loading (splash) for 3 seconds
     setTimeout(() => {
       setLoading(false);
-    }, 1000);
+    }, 3000);
   }, []);
 
   useEffect(() => {
