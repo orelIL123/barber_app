@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
+  Alert,
   Animated,
+  Dimensions,
   Image,
   ImageBackground,
   Linking,
@@ -10,8 +12,6 @@ import {
   Text,
   TouchableOpacity,
   View,
-  Dimensions,
-  Alert,
 } from 'react-native';
 
 const { width, height } = Dimensions.get('window');
@@ -208,7 +208,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
               
               <TouchableOpacity 
                 style={styles.quickActionCard}
-                onPress={() => onNavigate('appointments')}
+                onPress={() => onNavigate('profile')}
               >
                 <Text style={styles.quickActionIcon}>📋</Text>
                 <Text style={styles.quickActionTitle}>התורים שלי</Text>
@@ -217,7 +217,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
               
               <TouchableOpacity 
                 style={styles.quickActionCard}
-                onPress={() => onNavigate('barbers')}
+                onPress={() => onNavigate('team')}
               >
                 <Text style={styles.quickActionIcon}>✂️</Text>
                 <Text style={styles.quickActionTitle}>הספרים שלנו</Text>
