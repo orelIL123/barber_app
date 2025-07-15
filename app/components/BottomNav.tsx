@@ -1,17 +1,33 @@
 import { Feather, Ionicons, MaterialIcons } from "@expo/vector-icons";
-import { Image, StyleSheet, TouchableOpacity, View } from "react-native";
+import { useRef } from "react";
+import { Animated, StyleSheet, TouchableOpacity, View } from "react-native";
 
 export default function BottomNav({ onOrderPress, onTabPress, activeTab }: {
   onOrderPress?: () => void;
   onTabPress?: (tab: string) => void;
   activeTab?: string;
 }) {
-  const fabStyle = {
-    position: 'absolute',
-    bottom: 0,
-    left: '50%',
-    transform: [{ translateX: -25 }], // Adjust this value to center the FAB
+  const spinValue = useRef(new Animated.Value(0)).current;
+
+  const handleOrderPress = () => {
+    // Start spinning animation
+    Animated.timing(spinValue, {
+      toValue: 1,
+      duration: 800,
+      useNativeDriver: true,
+    }).start(() => {
+      // Reset animation value for next tap
+      spinValue.setValue(0);
+    });
+    
+    // Call the original onOrderPress
+    onOrderPress?.();
   };
+
+  const spin = spinValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
   return (
     <View style={styles.wrapper}>
       <View style={{
@@ -54,10 +70,10 @@ export default function BottomNav({ onOrderPress, onTabPress, activeTab }: {
 
         {/* Center FAB (Order) - properly centered */}
         <View style={styles.fabWrapper} pointerEvents="box-none">
-          <TouchableOpacity style={styles.fab} onPress={onOrderPress} activeOpacity={0.85}>
-            <Image
+          <TouchableOpacity style={styles.fab} onPress={handleOrderPress} activeOpacity={0.85}>
+            <Animated.Image
               source={require("../../assets/images/TURGI.png")}
-              style={styles.fabIcon}
+              style={[styles.fabIcon, { transform: [{ rotate: spin }] }]}
               resizeMode="cover"
             />
           </TouchableOpacity>
@@ -129,9 +145,9 @@ const styles = StyleSheet.create({
   },
   fabWrapper: {
     position: "absolute",
-    left: "50%",
-    top: -25, // הורדנו עוד קצת למטה
-    transform: [{ translateX: -36 }], // מרכז את הכפתור
+    left: "57%", // היה 50%
+    top: -28,
+    transform: [{ translateX: -40 }], // היה -36, כדי לשמור על מרכזיות יחסית
     zIndex: 10,
     shadowColor: "#3b82f6",
     shadowOffset: { width: 0, height: 0 },
@@ -139,6 +155,8 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 10,
     pointerEvents: "box-none",
+    alignItems: "center",
+    justifyContent: "center",
   },
   fab: {
     width: 72, // הגדלנו את העיגול

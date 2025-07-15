@@ -1,114 +1,434 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { 
+  StyleSheet, 
+  SafeAreaView, 
+  ScrollView, 
+  View, 
+  Text, 
+  TouchableOpacity, 
+  Image, 
+  Alert,
+  Dimensions 
+} from 'react-native';
+import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import TopNav from '../components/TopNav';
 
-import { Collapsible } from '../../components/Collapsible';
-import { ExternalLink } from '../../components/ExternalLink';
-import ParallaxScrollView from '../../components/ParallaxScrollView';
-import { ThemedText } from '../../components/ThemedText';
-import { ThemedView } from '../../components/ThemedView';
-import { IconSymbol } from '../../components/ui/IconSymbol';
+const { width } = Dimensions.get('window');
 
-export default function TabTwoScreen() {
+interface Product {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  category: string;
+  image: string;
+  inStock: boolean;
+  rating: number;
+  reviews: number;
+}
+
+export default function ShopScreen() {
+  const router = useRouter();
+  const [products, setProducts] = useState<Product[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [loading, setLoading] = useState(true);
+
+  const handleBack = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/');
+    }
+  };
+
+  const handleClose = () => {
+    router.replace('/');
+  };
+
+  // Demo data - in real app this would come from Firebase
+  const demoProducts: Product[] = [
+    {
+      id: '1',
+      name: 'שמפו מקצועי לגברים',
+      description: 'שמפו איכותי לטיפוח השיער הגברי',
+      price: 89,
+      category: 'hair_care',
+      image: 'https://via.placeholder.com/200x200/007bff/ffffff?text=שמפו',
+      inStock: true,
+      rating: 4.5,
+      reviews: 32
+    },
+    {
+      id: '2',
+      name: 'קרם עיצוב שיער',
+      description: 'קרם עיצוב חזק להחזקה של 24 שעות',
+      price: 75,
+      category: 'hair_care',
+      image: 'https://via.placeholder.com/200x200/28a745/ffffff?text=קרם',
+      inStock: true,
+      rating: 4.8,
+      reviews: 45
+    },
+    {
+      id: '3',
+      name: 'שמן זקן פרימיום',
+      description: 'שמן זקן טבעי לטיפוח והזנה',
+      price: 120,
+      category: 'beard_care',
+      image: 'https://via.placeholder.com/200x200/fd7e14/ffffff?text=שמן',
+      inStock: true,
+      rating: 4.9,
+      reviews: 67
+    },
+    {
+      id: '4',
+      name: 'מברשת זקן מקצועית',
+      description: 'מברשת זקן מעץ עם זיפים טבעיים',
+      price: 65,
+      category: 'beard_care',
+      image: 'https://via.placeholder.com/200x200/6c757d/ffffff?text=מברשת',
+      inStock: false,
+      rating: 4.6,
+      reviews: 23
+    },
+    {
+      id: '5',
+      name: 'סט טיפוח מלא',
+      description: 'סט הכולל שמפו, קרם עיצוב ושמן זקן',
+      price: 199,
+      category: 'sets',
+      image: 'https://via.placeholder.com/200x200/e83e8c/ffffff?text=סט',
+      inStock: true,
+      rating: 4.7,
+      reviews: 89
+    },
+    {
+      id: '6',
+      name: 'תער בטיחות קלאסי',
+      description: 'תער בטיחות מתכת לגילוח מדויק',
+      price: 145,
+      category: 'shaving',
+      image: 'https://via.placeholder.com/200x200/17a2b8/ffffff?text=תער',
+      inStock: true,
+      rating: 4.4,
+      reviews: 28
+    }
+  ];
+
+  const categories = [
+    { id: 'all', name: 'הכל' },
+    { id: 'hair_care', name: 'טיפוח שיער' },
+    { id: 'beard_care', name: 'טיפוח זקן' },
+    { id: 'shaving', name: 'גילוח' },
+    { id: 'sets', name: 'סטים' }
+  ];
+
+  useEffect(() => {
+    // Simulate loading data
+    setTimeout(() => {
+      setProducts(demoProducts);
+      setLoading(false);
+    }, 1000);
+  }, []);
+
+  const filteredProducts = selectedCategory === 'all' 
+    ? products 
+    : products.filter(product => product.category === selectedCategory);
+
+  const handleAddToCart = (product: Product) => {
+    Alert.alert(
+      'נוסף לסל',
+      `${product.name} נוסף לסל הקניות`,
+      [{ text: 'אישור', style: 'default' }]
+    );
+  };
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#D0D0D0', dark: '#353636' }}
-      headerImage={
-        <IconSymbol
-          size={310}
-          color="#808080"
-          name="chevron.left.forwardslash.chevron.right"
-          style={styles.headerImage}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Explore</ThemedText>
-      </ThemedView>
-      <ThemedText>This app includes example code to help you get started.</ThemedText>
-      <Collapsible title="File-based routing">
-        <ThemedText>
-          This app has two screens:{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/explore.tsx</ThemedText>
-        </ThemedText>
-        <ThemedText>
-          The layout file in <ThemedText type="defaultSemiBold">app/(tabs)/_layout.tsx</ThemedText>{' '}
-          sets up the tab navigator.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/router/introduction">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Android, iOS, and web support">
-        <ThemedText>
-          You can open this project on Android, iOS, and the web. To open the web version, press{' '}
-          <ThemedText type="defaultSemiBold">w</ThemedText> in the terminal running this project.
-        </ThemedText>
-      </Collapsible>
-      <Collapsible title="Images">
-        <ThemedText>
-          For static images, you can use the <ThemedText type="defaultSemiBold">@2x</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">@3x</ThemedText> suffixes to provide files for
-          different screen densities
-        </ThemedText>
-        <Image source={require('../../assets/images/react-logo.png')} style={{ alignSelf: 'center' }} />
-        <ExternalLink href="https://reactnative.dev/docs/images">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Custom fonts">
-        <ThemedText>
-          Open <ThemedText type="defaultSemiBold">app/_layout.tsx</ThemedText> to see how to load{' '}
-          <ThemedText style={{ fontFamily: 'SpaceMono' }}>
-            custom fonts such as this one.
-          </ThemedText>
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/versions/latest/sdk/font">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Light and dark mode components">
-        <ThemedText>
-          This template has light and dark mode support. The{' '}
-          <ThemedText type="defaultSemiBold">useColorScheme()</ThemedText> hook lets you inspect
-          what the user&apos;s current color scheme is, and so you can adjust UI colors accordingly.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/develop/user-interface/color-themes/">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Animations">
-        <ThemedText>
-          This template includes an example of an animated component. The{' '}
-          <ThemedText type="defaultSemiBold">components/HelloWave.tsx</ThemedText> component uses
-          the powerful <ThemedText type="defaultSemiBold">react-native-reanimated</ThemedText>{' '}
-          library to create a waving hand animation.
-        </ThemedText>
-        {Platform.select({
-          ios: (
-            <ThemedText>
-              The <ThemedText type="defaultSemiBold">components/ParallaxScrollView.tsx</ThemedText>{' '}
-              component provides a parallax effect for the header image.
-            </ThemedText>
-          ),
-        })}
-      </Collapsible>
-    </ParallaxScrollView>
+    <SafeAreaView style={styles.container}>
+      <TopNav 
+        title="חנות" 
+        onBellPress={() => {}} 
+        onMenuPress={() => {}} 
+        showBackButton={true}
+        onBackPress={handleBack}
+        showCloseButton={true}
+        onClosePress={handleClose}
+      />
+      
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        <View style={styles.content}>
+          {/* Header */}
+          <View style={styles.header}>
+            <Text style={styles.title}>חנות TURGI</Text>
+            <Text style={styles.subtitle}>מוצרי טיפוח מקצועיים לגברים</Text>
+          </View>
+
+          {/* Categories */}
+          <View style={styles.categoriesContainer}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoriesScroll}>
+              {categories.map((category) => (
+                <TouchableOpacity
+                  key={category.id}
+                  style={[
+                    styles.categoryButton,
+                    selectedCategory === category.id && styles.categoryButtonActive
+                  ]}
+                  onPress={() => setSelectedCategory(category.id)}
+                >
+                  {selectedCategory === category.id && (
+                    <LinearGradient
+                      colors={['#333333', '#1a1a1a', '#000000']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.categoryGradient}
+                    />
+                  )}
+                  <Text style={[
+                    styles.categoryButtonText,
+                    selectedCategory === category.id && styles.categoryButtonTextActive
+                  ]}>
+                    {category.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+
+          {/* Products Grid */}
+          <View style={styles.productsGrid}>
+            {loading ? (
+              <Text style={styles.loadingText}>טוען מוצרים...</Text>
+            ) : filteredProducts.map((product) => (
+              <View key={product.id} style={styles.productCard}>
+                <Image source={{ uri: product.image }} style={styles.productImage} />
+                
+                <View style={styles.productInfo}>
+                  <Text style={styles.productName}>{product.name}</Text>
+                  <Text style={styles.productDescription}>{product.description}</Text>
+                  
+                  <View style={styles.ratingContainer}>
+                    <View style={styles.ratingRow}>
+                      <Ionicons name="star" size={16} color="#FFD700" />
+                      <Text style={styles.ratingText}>{product.rating}</Text>
+                      <Text style={styles.reviewsText}>({product.reviews} ביקורות)</Text>
+                    </View>
+                  </View>
+                  
+                  <View style={styles.priceContainer}>
+                    <Text style={styles.price}>₪{product.price}</Text>
+                    <View style={[styles.stockBadge, { backgroundColor: product.inStock ? '#4CAF50' : '#f44336' }]}>
+                      <Text style={styles.stockText}>
+                        {product.inStock ? 'במלאי' : 'אזל'}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+                
+                <TouchableOpacity
+                  style={[styles.addToCartButton, { opacity: product.inStock ? 1 : 0.5 }]}
+                  onPress={() => handleAddToCart(product)}
+                  disabled={!product.inStock}
+                >
+                  <LinearGradient
+                    colors={['#333333', '#1a1a1a', '#000000']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.addToCartGradient}
+                  />
+                  <Ionicons name="bag-add" size={20} color="#fff" />
+                  <Text style={styles.addToCartText}>הוסף לסל</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  headerImage: {
-    color: '#808080',
-    bottom: -90,
-    left: -35,
-    position: 'absolute',
-  },
-  titleContainer: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  // מרווח לטאב התחתון
   container: {
+    flex: 1,
+    backgroundColor: '#f8f9fa',
+  },
+  scrollView: {
+    flex: 1,
+    paddingTop: 90,
+  },
+  content: {
+    padding: 16,
     paddingBottom: 120,
+  },
+  header: {
+    marginBottom: 24,
+    alignItems: 'center',
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#222',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+  },
+  categoriesContainer: {
+    marginBottom: 24,
+  },
+  categoriesScroll: {
+    paddingHorizontal: 4,
+  },
+  categoryButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+    backgroundColor: '#fff',
+    marginRight: 12,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  categoryButtonActive: {
+    borderColor: '#333',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  categoryGradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 20,
+  },
+  categoryButtonText: {
+    fontSize: 14,
+    color: '#333',
+    fontWeight: '500',
+  },
+  categoryButtonTextActive: {
+    color: '#fff',
+  },
+  productsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: 16,
+  },
+  loadingText: {
+    textAlign: 'center',
+    fontSize: 16,
+    color: '#666',
+    marginTop: 40,
+  },
+  productCard: {
+    width: (width - 48) / 2,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  productImage: {
+    width: '100%',
+    height: 140,
+    backgroundColor: '#f0f0f0',
+  },
+  productInfo: {
+    padding: 12,
+  },
+  productName: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#222',
+    marginBottom: 4,
+    textAlign: 'right',
+  },
+  productDescription: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 8,
+    textAlign: 'right',
+  },
+  ratingContainer: {
+    marginBottom: 8,
+  },
+  ratingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+  },
+  ratingText: {
+    fontSize: 12,
+    color: '#333',
+    marginLeft: 4,
+    marginRight: 4,
+  },
+  reviewsText: {
+    fontSize: 11,
+    color: '#666',
+  },
+  priceContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  price: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#007bff',
+  },
+  stockBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  stockText: {
+    fontSize: 10,
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  addToCartButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    gap: 6,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  addToCartGradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  addToCartText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
 });

@@ -1,11 +1,33 @@
-// השתמש ב-db מתוך קובץ מרכזי
-const { collection, addDoc } = require('firebase/firestore');
-const { db } = require('../app/config/firebase');
+const { initializeApp } = require('firebase/app');
+const { getFirestore, collection, addDoc, getDocs } = require('firebase/firestore');
+
+// Firebase configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyBiDFQNbnExTE03YS_6xoNE6_RrX4HBN4Q",
+  authDomain: "barber-app-template.firebaseapp.com",
+  projectId: "barber-app-template",
+  storageBucket: "barber-app-template.firebasestorage.app",
+  messagingSenderId: "246646930767",
+  appId: "1:246646930767:web:d1bdd3b156eda443f2193a",
+  measurementId: "G-S6VSPNP5LH"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
 
 const seedData = async () => {
   try {
-    // Add barbers
-    const barbers = [
+    console.log('Starting to seed data...');
+    
+    // Check if data already exists
+    const barbersSnapshot = await getDocs(collection(db, 'barbers'));
+    const treatmentsSnapshot = await getDocs(collection(db, 'treatments'));
+    
+    // Add barbers only if they don't exist
+    if (barbersSnapshot.empty) {
+      console.log('Adding barbers...');
+      const barbers = [
       {
         name: "אלי כהן",
         experience: "8 שנות ניסיון",
@@ -32,12 +54,18 @@ const seedData = async () => {
       }
     ];
 
-    for (const barber of barbers) {
-      await addDoc(collection(db, 'barbers'), barber);
+      for (const barber of barbers) {
+        await addDoc(collection(db, 'barbers'), barber);
+        console.log(`Added barber: ${barber.name}`);
+      }
+    } else {
+      console.log('Barbers already exist, skipping...');
     }
 
-    // Add treatments
-    const treatments = [
+    // Add treatments only if they don't exist
+    if (treatmentsSnapshot.empty) {
+      console.log('Adding treatments...');
+      const treatments = [
       {
         name: "תספורת קלאסית",
         description: "תספורת גברים קלאסית עם גימור מושלם",
@@ -68,8 +96,12 @@ const seedData = async () => {
       }
     ];
 
-    for (const treatment of treatments) {
-      await addDoc(collection(db, 'treatments'), treatment);
+      for (const treatment of treatments) {
+        await addDoc(collection(db, 'treatments'), treatment);
+        console.log(`Added treatment: ${treatment.name}`);
+      }
+    } else {
+      console.log('Treatments already exist, skipping...');
     }
 
     // Add gallery images

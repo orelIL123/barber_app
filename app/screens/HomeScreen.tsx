@@ -1,3 +1,5 @@
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Alert,
@@ -13,6 +15,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import SideMenu from '../components/SideMenu';
+import TopNav from '../components/TopNav';
 
 const { width, height } = Dimensions.get('window');
 
@@ -49,6 +53,8 @@ const NeonButton: React.FC<{
 export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
   const [loading, setLoading] = useState(true);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [sideMenuVisible, setSideMenuVisible] = useState(false);
+  const [galleryIndex, setGalleryIndex] = useState(0);
 
   // Animation refs
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -56,6 +62,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
   const headerFade = useRef(new Animated.Value(0)).current;
   const ctaFade = useRef(new Animated.Value(0)).current;
   const cardsFade = useRef(new Animated.Value(0)).current;
+  const galleryScrollRef = useRef<ScrollView>(null);
 
   useEffect(() => {
     // Simulate loading (splash) for 3 seconds
@@ -98,6 +105,31 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
       ]).start();
     }
   }, [loading, imageLoaded]);
+
+  // Gallery auto-scroll effect
+  useEffect(() => {
+    const galleryImages = [
+      require('../../assets/images/gallery/1.jpg'),
+      require('../../assets/images/gallery/2.jpg'),
+      require('../../assets/images/gallery/3.jpg'),
+      require('../../assets/images/gallery/4.jpg'),
+    ];
+
+    const interval = setInterval(() => {
+      setGalleryIndex((prevIndex) => {
+        const nextIndex = (prevIndex + 1) % galleryImages.length;
+        if (galleryScrollRef.current) {
+          galleryScrollRef.current.scrollTo({
+            x: nextIndex * 200, // Card width + margin
+            animated: true,
+          });
+        }
+        return nextIndex;
+      });
+    }, 3000); // Change every 3 seconds
+
+    return () => clearInterval(interval);
+  }, []);
 
   const handlePhoneCall = () => {
     Linking.openURL('tel:+972501234567').catch(() => {
@@ -147,6 +179,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
 
   return (
     <SafeAreaView style={styles.container}>
+      <TopNav 
+        title="TURGI" 
+        onBellPress={() => {}} 
+        onMenuPress={() => setSideMenuVisible(true)} 
+      />
       <View style={styles.backgroundWrapper}>
         <ImageBackground
           source={require('../../assets/images/atmosphere/atmosphere.png')}
@@ -181,16 +218,22 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
               }
             ]}
           >
-            <View style={styles.greetingContainer}>
-              <Text style={styles.greeting}>שלום, ברוכים הבאים</Text>
-              <Text style={styles.subtitle}>ל-TURGI ברברשופ</Text>
-            </View>
+            <LinearGradient
+              colors={['rgba(59, 130, 246, 0.1)', 'rgba(59, 130, 246, 0.05)', 'rgba(3, 3, 3, 0.95)']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.cardGradient}
+            />
             <NeonButton
               title="הזמן תור"
               onPress={() => onNavigate('booking')}
               variant="primary"
               style={styles.ctaButton}
             />
+            <View style={styles.greetingContainer}>
+              <Text style={styles.greeting}>שלום, ברוכים הבאים</Text>
+              <Text style={styles.subtitle}>ל-TURGI ברברשופ</Text>
+            </View>
           </Animated.View>
 
           {/* Quick Actions */}
@@ -201,7 +244,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
                 style={styles.quickActionCard}
                 onPress={() => onNavigate('booking')}
               >
-                <Text style={styles.quickActionIcon}>📅</Text>
+                <Ionicons name="calendar" size={32} color="#007bff" />
                 <Text style={styles.quickActionTitle}>הזמנת תור</Text>
                 <Text style={styles.quickActionSubtitle}>קבע תור חדש</Text>
               </TouchableOpacity>
@@ -210,7 +253,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
                 style={styles.quickActionCard}
                 onPress={() => onNavigate('profile')}
               >
-                <Text style={styles.quickActionIcon}>📋</Text>
+                <Ionicons name="list" size={32} color="#007bff" />
                 <Text style={styles.quickActionTitle}>התורים שלי</Text>
                 <Text style={styles.quickActionSubtitle}>צפה בתורים</Text>
               </TouchableOpacity>
@@ -219,7 +262,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
                 style={styles.quickActionCard}
                 onPress={() => onNavigate('team')}
               >
-                <Text style={styles.quickActionIcon}>✂️</Text>
+                <Ionicons name="people" size={32} color="#007bff" />
                 <Text style={styles.quickActionTitle}>הספרים שלנו</Text>
                 <Text style={styles.quickActionSubtitle}>הכר את הצוות</Text>
               </TouchableOpacity>
@@ -230,38 +273,42 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
           <Animated.View style={[styles.gallerySection, { opacity: cardsFade }]}>
             <Text style={styles.sectionTitle}>הגלריה שלנו</Text>
             <ScrollView 
+              ref={galleryScrollRef}
               horizontal 
               showsHorizontalScrollIndicator={false} 
               contentContainerStyle={styles.galleryCarouselContent}
+              pagingEnabled={false}
+              decelerationRate="fast"
+              snapToInterval={200}
+              snapToAlignment="start"
             >
-              <View style={[styles.galleryCard, { transform: [{ rotate: '-3deg' }] }]}>
-                <Image
-                  source={require('../../assets/images/gallery/1.jpg')}
-                  style={styles.galleryImage}
-                  resizeMode="cover"
-                />
-              </View>
-              <View style={[styles.galleryCard, { transform: [{ rotate: '2deg' }] }]}>
-                <Image
-                  source={require('../../assets/images/gallery/2.jpg')}
-                  style={styles.galleryImage}
-                  resizeMode="cover"
-                />
-              </View>
-              <View style={[styles.galleryCard, { transform: [{ rotate: '-1deg' }] }]}>
-                <Image
-                  source={require('../../assets/images/gallery/3.jpg')}
-                  style={styles.galleryImage}
-                  resizeMode="cover"
-                />
-              </View>
-              <View style={[styles.galleryCard, { transform: [{ rotate: '1deg' }] }]}>
-                <Image
-                  source={require('../../assets/images/gallery/4.jpg')}
-                  style={styles.galleryImage}
-                  resizeMode="cover"
-                />
-              </View>
+              {[
+                require('../../assets/images/gallery/1.jpg'),
+                require('../../assets/images/gallery/2.jpg'),
+                require('../../assets/images/gallery/3.jpg'),
+                require('../../assets/images/gallery/4.jpg'),
+                require('../../assets/images/gallery/1.jpg'),
+                require('../../assets/images/gallery/2.jpg'),
+              ].map((imageSource, index) => (
+                <View key={index} style={[
+                  styles.galleryCard, 
+                  { 
+                    transform: [{ rotate: `${(index % 4 - 2) * 2}deg` }] 
+                  }
+                ]}>
+                  <Image
+                    source={imageSource}
+                    style={styles.galleryImage}
+                    resizeMode="cover"
+                  />
+                  <View style={styles.galleryOverlay}>
+                    <LinearGradient
+                      colors={['transparent', 'rgba(0,0,0,0.7)']}
+                      style={styles.galleryGradient}
+                    />
+                  </View>
+                </View>
+              ))}
             </ScrollView>
           </Animated.View>
 
@@ -294,24 +341,24 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
             <Text style={styles.sectionTitle}>צרו קשר</Text>
             <View style={styles.contactGrid}>
               <TouchableOpacity style={styles.contactCard} onPress={handlePhoneCall}>
-                <Text style={styles.contactIcon}>📞</Text>
+                <Ionicons name="call" size={32} color="#007bff" />
                 <Text style={styles.contactTitle}>התקשרו</Text>
                 <Text style={styles.contactSubtitle}>050-123-4567</Text>
               </TouchableOpacity>
               
               <TouchableOpacity style={styles.contactCard} onPress={handleWhatsApp}>
-                <Text style={styles.contactIcon}>💬</Text>
+                <Ionicons name="logo-whatsapp" size={32} color="#25d366" />
                 <Text style={styles.contactTitle}>WhatsApp</Text>
                 <Text style={styles.contactSubtitle}>שלחו הודעה</Text>
               </TouchableOpacity>
             </View>
             
             <View style={styles.socialRow}>
-              <TouchableOpacity onPress={() => handleSocialMedia('facebook')}>
-                <Text style={styles.socialIcon}>📘</Text>
+              <TouchableOpacity onPress={() => handleSocialMedia('facebook')} style={styles.socialButton}>
+                <Ionicons name="logo-facebook" size={28} color="#1877f2" />
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => handleSocialMedia('instagram')}>
-                <Text style={styles.socialIcon}>📸</Text>
+              <TouchableOpacity onPress={() => handleSocialMedia('instagram')} style={styles.socialButton}>
+                <Ionicons name="logo-instagram" size={28} color="#e4405f" />
               </TouchableOpacity>
             </View>
           </Animated.View>
@@ -329,6 +376,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
           </View>
         </View>
       </ScrollView>
+      
+      <SideMenu 
+        visible={sideMenuVisible}
+        onClose={() => setSideMenuVisible(false)}
+        onNavigate={onNavigate}
+      />
     </SafeAreaView>
   );
 };
@@ -419,16 +472,15 @@ const styles = StyleSheet.create({
     left: 0,
   },
   contentWrapper: {
-    paddingTop: height * 0.35,
+    paddingTop: height * 0.35 + 90,
   },
   greetingCtaContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: 'rgba(255,255,255,0.95)',
     paddingHorizontal: 24,
-    paddingVertical: 20,
-    marginHorizontal: 16,
+    paddingVertical: 32, // היה 20
+    marginHorizontal: 8, // היה 16
     marginBottom: 24,
     borderRadius: 20,
     shadowColor: '#000',
@@ -436,21 +488,30 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 12,
     elevation: 5,
+    overflow: 'hidden',
+  },
+  cardGradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 20,
   },
   greetingContainer: {
     flex: 1,
-    marginRight: 16,
+    marginLeft: 16,
   },
   greeting: {
-    fontSize: 24,
+    fontSize: 18, // היה 24
     fontWeight: 'bold',
-    color: '#222',
+    color: '#fff',
     marginBottom: 4,
     textAlign: 'right',
   },
   subtitle: {
     fontSize: 16,
-    color: '#666',
+    color: '#fff',
     textAlign: 'right',
   },
   ctaButton: {
@@ -515,15 +576,12 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 3,
   },
-  quickActionIcon: {
-    fontSize: 32,
-    marginBottom: 8,
-  },
   quickActionTitle: {
     fontSize: 14,
     fontWeight: 'bold',
     color: '#222',
     marginBottom: 4,
+    marginTop: 8,
     textAlign: 'center',
   },
   quickActionSubtitle: {
@@ -547,21 +605,33 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   galleryCard: {
-    width: 120,
-    height: 160,
-    borderRadius: 20,
-    marginRight: 16,
+    width: 180,
+    height: 240,
+    borderRadius: 24,
+    marginRight: 20,
     backgroundColor: '#eee',
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.2,
-    shadowRadius: 10,
-    elevation: 6,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
+    elevation: 12,
   },
   galleryImage: {
     width: '100%',
     height: '100%',
+  },
+  galleryOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 60,
+  },
+  galleryGradient: {
+    flex: 1,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
   },
   sectionTitle: {
     fontSize: 20,
@@ -656,15 +726,12 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 3,
   },
-  contactIcon: {
-    fontSize: 32,
-    marginBottom: 8,
-  },
   contactTitle: {
     fontSize: 14,
     fontWeight: 'bold',
     color: '#222',
     marginBottom: 4,
+    marginTop: 8,
     textAlign: 'center',
   },
   contactSubtitle: {
@@ -676,10 +743,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
+    gap: 20,
   },
-  socialIcon: {
-    fontSize: 32,
-    marginHorizontal: 15,
+  socialButton: {
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   footerCard: {
     backgroundColor: 'rgba(240,240,240,0.95)',

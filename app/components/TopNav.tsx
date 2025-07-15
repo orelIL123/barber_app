@@ -8,9 +8,21 @@ interface TopNavProps {
   title: string;
   onBellPress?: () => void;
   onMenuPress?: () => void;
+  showBackButton?: boolean;
+  onBackPress?: () => void;
+  showCloseButton?: boolean;
+  onClosePress?: () => void;
 }
 
-const TopNav: React.FC<TopNavProps> = ({ title, onBellPress, onMenuPress }) => {
+const TopNav: React.FC<TopNavProps> = ({ 
+  title, 
+  onBellPress, 
+  onMenuPress, 
+  showBackButton = false, 
+  onBackPress, 
+  showCloseButton = false, 
+  onClosePress 
+}) => {
   return (
     <View style={styles.container}>
       {/* Diagonal blue gradient accent */}
@@ -29,12 +41,25 @@ const TopNav: React.FC<TopNavProps> = ({ title, onBellPress, onMenuPress }) => {
         style={styles.rightAccent}
         pointerEvents="none"
       />
-      <TouchableOpacity style={styles.iconLeft} onPress={onMenuPress}>
-        <Feather name="menu" size={28} color="#fff" />
+      
+      {/* Left icon - shows back button, menu, or empty space */}
+      <TouchableOpacity style={styles.iconLeft} onPress={showBackButton ? onBackPress : onMenuPress}>
+        {showBackButton ? (
+          <Ionicons name="arrow-back" size={28} color="#fff" />
+        ) : (
+          <Feather name="menu" size={28} color="#fff" />
+        )}
       </TouchableOpacity>
+      
       <Text style={styles.title}>{title}</Text>
-      <TouchableOpacity style={styles.iconRight} onPress={onBellPress}>
-        <Ionicons name="notifications-outline" size={28} color="#fff" />
+      
+      {/* Right icon - shows close button, notification, or empty space */}
+      <TouchableOpacity style={styles.iconRight} onPress={showCloseButton ? onClosePress : onBellPress}>
+        {showCloseButton ? (
+          <Ionicons name="close" size={28} color="#fff" />
+        ) : (
+          <Ionicons name="notifications-outline" size={28} color="#fff" />
+        )}
       </TouchableOpacity>
     </View>
   );
@@ -43,13 +68,13 @@ const TopNav: React.FC<TopNavProps> = ({ title, onBellPress, onMenuPress }) => {
 const styles = StyleSheet.create({
   container: {
     width: '100%',
-    height: 84, // Increased height to accommodate the black bar
+    height: 90,
     backgroundColor: '#000',
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-end',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingTop: 36, // Adjusted for the black bar
+    paddingBottom: 12,
     elevation: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -65,43 +90,42 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'center',
     color: '#fff',
-    fontSize: 22,
-    fontWeight: '700',
-    letterSpacing: 1,
+    fontSize: 24,
+    fontWeight: '800',
+    letterSpacing: 2,
   },
   iconLeft: {
-    width: 40,
-    alignItems: 'flex-start',
+    width: 44,
+    height: 44,
+    alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 3, // Ensure the menu button is on top
+    zIndex: 3,
   },
   iconRight: {
-    width: 40,
-    alignItems: 'flex-end',
+    width: 44,
+    height: 44,
+    alignItems: 'center',
     justifyContent: 'center',
   },
   gradientAccent: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    width: 120,
-    height: 64,
-    borderTopLeftRadius: 16,
-    borderBottomRightRadius: 64,
-    opacity: 0.45,
+    top: 20,
+    left: -20,
+    width: 100,
+    height: 50,
+    borderRadius: 25,
+    opacity: 0.3,
     zIndex: 1,
-    transform: [{ rotate: '-12deg' }],
   },
   rightAccent: {
     position: 'absolute',
-    top: 0,
-    right: 0,
-    width: 16,
-    height: 64,
-    borderTopRightRadius: 12,
-    borderBottomRightRadius: 12,
-    opacity: 0.7,
-    zIndex: 2,
+    top: 20,
+    right: -20,
+    width: 100,
+    height: 50,
+    borderRadius: 25,
+    opacity: 0.3,
+    zIndex: 1,
   },
 });
 

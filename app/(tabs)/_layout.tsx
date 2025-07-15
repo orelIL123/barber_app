@@ -26,9 +26,9 @@ export default function TabLayout() {
     else if (tab === 'team') router.replace('/team');
   };
 
-  // ניווט מהיר מה־FAB (אפשר להחליף ל־explore או לכל מסך אחר קיים)
+  // ניווט מהיר מה־FAB - מנתב לספר בוקינג
   const handleOrderPress = () => {
-    router.replace('/explore');
+    router.push('/booking');
   };
 
   return (
@@ -43,6 +43,7 @@ export default function TabLayout() {
         <Tabs.Screen name="profile" options={{ title: 'פרופיל' }} />
         <Tabs.Screen name="explore" options={{ title: 'חנות' }} />
         <Tabs.Screen name="team" options={{ title: 'צוות' }} />
+        <Tabs.Screen name="booking" options={{ title: 'הזמנה' }} />
       </Tabs>
       <BottomNav
         onOrderPress={handleOrderPress}

@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import BookingScreen from '../screens/BookingScreen';
 import { HomeScreen } from '../screens/HomeScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import TeamScreen from '../screens/TeamScreen';
-import BookingScreen from '../screens/BookingScreen';
 
 export type Screen = 'home' | 'profile' | 'team' | 'booking';
 

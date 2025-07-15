@@ -1,24 +1,24 @@
-import { 
-  signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword,
-  signOut,
-  User,
-  onAuthStateChanged,
-  updateProfile
+import {
+    createUserWithEmailAndPassword,
+    onAuthStateChanged,
+    signInWithEmailAndPassword,
+    signOut,
+    updateProfile,
+    User
 } from 'firebase/auth';
-import { 
-  collection, 
-  doc, 
-  getDoc,
-  getDocs,
-  setDoc,
-  addDoc,
-  updateDoc,
-  deleteDoc,
-  query,
-  where,
-  orderBy,
-  Timestamp
+import {
+    addDoc,
+    collection,
+    deleteDoc,
+    doc,
+    getDoc,
+    getDocs,
+    orderBy,
+    query,
+    setDoc,
+    Timestamp,
+    updateDoc,
+    where
 } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
 
@@ -267,5 +267,30 @@ export const getGalleryImages = async () => {
   } catch (error) {
     console.error('Error getting gallery images:', error);
     return [];
+  }
+};
+
+// Add a new barber with availability
+export const addBarber = async ({ name, image, availableSlots, availabilityWindow }: {
+  name: string;
+  image: string;
+  availableSlots: string[];
+  availabilityWindow: { start: string; end: string };
+}) => {
+  try {
+    const barber = {
+      name,
+      image,
+      specialties: [],
+      experience: '',
+      rating: 5,
+      available: true,
+      availableSlots,
+      availabilityWindow,
+    };
+    const docRef = await addDoc(collection(db, 'barbers'), barber);
+    return docRef.id;
+  } catch (error) {
+    throw error;
   }
 };

@@ -6,7 +6,6 @@ import {
   SafeAreaView,
   ScrollView,
   TouchableOpacity,
-  Image,
   Dimensions,
   Alert,
   Modal
@@ -26,6 +25,8 @@ const { width, height } = Dimensions.get('window');
 
 interface BookingScreenProps {
   onNavigate: (screen: string) => void;
+  onBack?: () => void;
+  onClose?: () => void;
   route?: {
     params?: {
       barberId?: string;
@@ -33,7 +34,7 @@ interface BookingScreenProps {
   };
 }
 
-const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, route }) => {
+const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClose, route }) => {
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedBarber, setSelectedBarber] = useState<Barber | null>(null);
   const [selectedTreatment, setSelectedTreatment] = useState<Treatment | null>(null);
@@ -230,7 +231,15 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, route }) => {
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
-        <TopNav title="הזמנת תור" onBellPress={() => {}} onMenuPress={() => {}} />
+        <TopNav 
+          title="הזמנת תור" 
+          onBellPress={() => {}} 
+          onMenuPress={() => {}} 
+          showBackButton={true}
+          onBackPress={onBack}
+          showCloseButton={true}
+          onClosePress={onClose}
+        />
         <View style={styles.loadingContainer}>
           <Text style={styles.loadingText}>טוען...</Text>
         </View>
@@ -240,7 +249,15 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, route }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <TopNav title="הזמנת תור" onBellPress={() => {}} onMenuPress={() => {}} />
+      <TopNav 
+        title="הזמנת תור" 
+        onBellPress={() => {}} 
+        onMenuPress={() => {}} 
+        showBackButton={true}
+        onBackPress={onBack}
+        showCloseButton={true}
+        onClosePress={onClose}
+      />
       
       {/* Progress Bar */}
       <View style={styles.progressContainer}>

@@ -1,7 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(rm:*)",
+      "Bash(npm run lint)",
+      "Bash(npx expo start:*)",
+      "Bash(node:*)"
     ],
     "deny": []
   }

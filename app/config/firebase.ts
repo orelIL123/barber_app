@@ -4,14 +4,14 @@ import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
 // Your Firebase configuration
-// Replace with your actual Firebase config
 const firebaseConfig = {
-  apiKey: "your-api-key",
-  authDomain: "your-project.firebaseapp.com",
-  projectId: "your-project-id",
-  storageBucket: "your-project.appspot.com",
-  messagingSenderId: "your-sender-id",
-  appId: "your-app-id"
+  apiKey: "AIzaSyBiDFQNbnExTE03YS_6xoNE6_RrX4HBN4Q",
+  authDomain: "barber-app-template.firebaseapp.com",
+  projectId: "barber-app-template",
+  storageBucket: "barber-app-template.firebasestorage.app",
+  messagingSenderId: "246646930767",
+  appId: "1:246646930767:web:d1bdd3b156eda443f2193a",
+  measurementId: "G-S6VSPNP5LH"
 };
 
 // Initialize Firebase

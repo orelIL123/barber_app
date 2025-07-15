@@ -1,10 +1,35 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView, StyleSheet, Text, View } from 'react-native';
 import { colors } from '../../app/constants/colors';
+import TopNav from '../components/TopNav';
+import { useRouter } from 'expo-router';
 
 export default function ProfileScreen() {
+  const router = useRouter();
+
+  const handleBack = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/');
+    }
+  };
+
+  const handleClose = () => {
+    router.replace('/');
+  };
+
   return (
     <SafeAreaView style={styles.container}>
+      <TopNav 
+        title="פרופיל" 
+        onBellPress={() => {}} 
+        onMenuPress={() => {}} 
+        showBackButton={true}
+        onBackPress={handleBack}
+        showCloseButton={true}
+        onClosePress={handleClose}
+      />
       <LinearGradient
         colors={[colors.background, colors.primary]}
         style={styles.gradient}
