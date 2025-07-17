@@ -1,24 +1,26 @@
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  SafeAreaView,
-  ScrollView,
-  TouchableOpacity,
-  Dimensions,
-  Alert,
-  Modal
-} from 'react-native';
-import { 
-  getBarbers, 
-  getTreatments, 
-  createAppointment,
-  getCurrentUser,
-  Barber,
-  Treatment
-} from '../../services/firebase';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Timestamp } from 'firebase/firestore';
+import React, { useEffect, useState } from 'react';
+import {
+    Alert,
+    Dimensions,
+    Image,
+    Modal,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
+} from 'react-native';
+import {
+    Barber,
+    createAppointment,
+    getBarbers,
+    getCurrentUser,
+    getTreatments,
+    Treatment
+} from '../../services/firebase';
 import TopNav from '../components/TopNav';
 
 const { width, height } = Dimensions.get('window');
@@ -47,6 +49,7 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
   const [loading, setLoading] = useState(true);
   const [booking, setBooking] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [detailsBarber, setDetailsBarber] = useState<Barber | null>(null);
 
   const preSelectedBarberId = route?.params?.barberId;
 
@@ -153,7 +156,7 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
         barberId: selectedBarber.id,
         treatmentId: selectedTreatment.id,
         date: Timestamp.fromDate(appointmentDateTime),
-        status: 'pending'
+        status: 'confirmed' // Changed from 'pending' to 'confirmed' - auto-approve appointments
       });
 
       setShowConfirmModal(false);
@@ -292,16 +295,34 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
                   onPress={() => handleBarberSelect(barber)}
                   disabled={!barber.available}
                 >
-                  <View style={styles.barberImage}>
-                    <Text style={styles.barberPlaceholder}>✂️</Text>
-                  </View>
-                  <Text style={styles.barberName}>{barber.name}</Text>
-                  <Text style={styles.barberExperience}>{barber.experience}</Text>
-                  {!barber.available && (
-                    <View style={styles.unavailableBadge}>
-                      <Text style={styles.unavailableText}>לא זמין</Text>
+                  <LinearGradient
+                    colors={['#1a1a1a', '#000000', '#1a1a1a']}
+                    style={styles.barberGradient}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                  >
+                    <View style={styles.barberImage}>
+                      {barber.image ? (
+                        <Image
+                          source={{ uri: barber.image }}
+                          style={styles.barberPhoto}
+                          resizeMode="cover"
+                        />
+                      ) : (
+                        <Text style={styles.barberPlaceholder}>✂️</Text>
+                      )}
                     </View>
-                  )}
+                    <Text style={styles.barberName}>{barber.name}</Text>
+                    <Text style={styles.barberExperience}>{barber.experience}</Text>
+                    <TouchableOpacity style={styles.detailsButton} onPress={() => setDetailsBarber(barber)}>
+                      <Text style={styles.detailsButtonText}>לפרטים</Text>
+                    </TouchableOpacity>
+                    {!barber.available && (
+                      <View style={styles.unavailableBadge}>
+                        <Text style={styles.unavailableText}>לא זמין</Text>
+                      </View>
+                    )}
+                  </LinearGradient>
                 </TouchableOpacity>
               ))}
             </View>
@@ -321,17 +342,24 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
                   ]}
                   onPress={() => handleTreatmentSelect(treatment)}
                 >
-                  <View style={styles.treatmentImage}>
-                    <Text style={styles.treatmentPlaceholder}>💇</Text>
-                  </View>
-                  <View style={styles.treatmentInfo}>
-                    <Text style={styles.treatmentName}>{treatment.name}</Text>
-                    <Text style={styles.treatmentDescription}>{treatment.description}</Text>
-                    <View style={styles.treatmentDetails}>
-                      <Text style={styles.treatmentPrice}>₪{treatment.price}</Text>
-                      <Text style={styles.treatmentDuration}>{treatment.duration} דקות</Text>
+                  <LinearGradient
+                    colors={['#1a1a1a', '#000000', '#1a1a1a']}
+                    style={styles.treatmentGradient}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                  >
+                    <View style={styles.treatmentImage}>
+                      <Text style={styles.treatmentPlaceholder}>💇</Text>
                     </View>
-                  </View>
+                    <View style={styles.treatmentInfo}>
+                      <Text style={styles.treatmentName}>{treatment.name}</Text>
+                      <Text style={styles.treatmentDescription}>{treatment.description}</Text>
+                      <View style={styles.treatmentDetails}>
+                        <Text style={styles.treatmentPrice}>₪{treatment.price}</Text>
+                        <Text style={styles.treatmentDuration}>{treatment.duration} דקות</Text>
+                      </View>
+                    </View>
+                  </LinearGradient>
                 </TouchableOpacity>
               ))}
             </View>
@@ -351,8 +379,15 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
                   ]}
                   onPress={() => handleDateSelect(date)}
                 >
-                  <Text style={styles.dateText}>{formatDate(date)}</Text>
-                  <Text style={styles.dateNumber}>{date.getDate()}</Text>
+                  <LinearGradient
+                    colors={['#1a1a1a', '#000000', '#1a1a1a']}
+                    style={styles.dateGradient}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                  >
+                    <Text style={styles.dateText}>{formatDate(date)}</Text>
+                    <Text style={styles.dateNumber}>{date.getDate()}</Text>
+                  </LinearGradient>
                 </TouchableOpacity>
               ))}
             </View>
@@ -372,7 +407,14 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
                   ]}
                   onPress={() => handleTimeSelect(time)}
                 >
-                  <Text style={styles.timeText}>{time}</Text>
+                  <LinearGradient
+                    colors={['#1a1a1a', '#000000', '#1a1a1a']}
+                    style={styles.timeGradient}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                  >
+                    <Text style={styles.timeText}>{time}</Text>
+                  </LinearGradient>
                 </TouchableOpacity>
               ))}
             </View>
@@ -382,35 +424,42 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
         {/* Selected Summary */}
         {currentStep > 1 && (
           <View style={styles.summaryContainer}>
-            <Text style={styles.summaryTitle}>סיכום הזמנה</Text>
-            
-            {selectedBarber && (
-              <View style={styles.summaryItem}>
-                <Text style={styles.summaryLabel}>ספר:</Text>
-                <Text style={styles.summaryValue}>{selectedBarber.name}</Text>
-              </View>
-            )}
-            
-            {selectedTreatment && (
-              <View style={styles.summaryItem}>
-                <Text style={styles.summaryLabel}>טיפול:</Text>
-                <Text style={styles.summaryValue}>{selectedTreatment.name}</Text>
-              </View>
-            )}
-            
-            {selectedDate && (
-              <View style={styles.summaryItem}>
-                <Text style={styles.summaryLabel}>תאריך:</Text>
-                <Text style={styles.summaryValue}>{formatDate(selectedDate)}</Text>
-              </View>
-            )}
-            
-            {selectedTime && (
-              <View style={styles.summaryItem}>
-                <Text style={styles.summaryLabel}>שעה:</Text>
-                <Text style={styles.summaryValue}>{selectedTime}</Text>
-              </View>
-            )}
+            <LinearGradient
+              colors={['#1a1a1a', '#000000', '#1a1a1a']}
+              style={styles.summaryGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <Text style={styles.summaryTitle}>סיכום הזמנה</Text>
+              
+              {selectedBarber && (
+                <View style={styles.summaryItem}>
+                  <Text style={styles.summaryLabel}>ספר:</Text>
+                  <Text style={styles.summaryValue}>{selectedBarber.name}</Text>
+                </View>
+              )}
+              
+              {selectedTreatment && (
+                <View style={styles.summaryItem}>
+                  <Text style={styles.summaryLabel}>טיפול:</Text>
+                  <Text style={styles.summaryValue}>{selectedTreatment.name}</Text>
+                </View>
+              )}
+              
+              {selectedDate && (
+                <View style={styles.summaryItem}>
+                  <Text style={styles.summaryLabel}>תאריך:</Text>
+                  <Text style={styles.summaryValue}>{formatDate(selectedDate)}</Text>
+                </View>
+              )}
+              
+              {selectedTime && (
+                <View style={styles.summaryItem}>
+                  <Text style={styles.summaryLabel}>שעה:</Text>
+                  <Text style={styles.summaryValue}>{selectedTime}</Text>
+                </View>
+              )}
+            </LinearGradient>
           </View>
         )}
       </ScrollView>
@@ -463,6 +512,36 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
                 <Text style={styles.cancelButtonText}>ביטול</Text>
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Barber Details Modal */}
+      <Modal
+        visible={!!detailsBarber}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setDetailsBarber(null)}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center' }}>
+          <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 24, width: 320, alignItems: 'center' }}>
+            {detailsBarber?.image && (
+              <Image source={{ uri: detailsBarber.image }} style={{ width: 100, height: 100, borderRadius: 50, marginBottom: 12 }} />
+            )}
+            <Text style={{ fontSize: 22, fontWeight: 'bold', marginBottom: 6 }}>{detailsBarber?.name}</Text>
+            <Text style={{ fontSize: 16, color: '#666', marginBottom: 8 }}>{detailsBarber?.experience}</Text>
+            {detailsBarber?.phone && (
+              <Text style={{ fontSize: 16, color: '#3b82f6', marginBottom: 8 }}>טלפון: {detailsBarber.phone}</Text>
+            )}
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
+              {/* אייקון וואטסאפ */}
+              <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#25D366', alignItems: 'center', justifyContent: 'center', marginRight: 8 }}>
+                <Text style={{ color: '#fff', fontSize: 20 }}>🟢</Text>
+              </View>
+            </View>
+            <TouchableOpacity onPress={() => setDetailsBarber(null)} style={{ marginTop: 18 }}>
+              <Text style={{ color: '#3b82f6', fontWeight: 'bold' }}>סגור</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -545,21 +624,30 @@ const styles = StyleSheet.create({
   },
   barberCard: {
     width: (width - 48) / 2,
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: 20,
     marginBottom: 16,
-    alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 8,
     position: 'relative',
+    overflow: 'hidden',
+  },
+  barberGradient: {
+    padding: 16,
+    alignItems: 'center',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
   },
   selectedCard: {
     borderWidth: 2,
-    borderColor: '#007bff',
+    borderColor: '#FFD700',
+    shadowColor: '#FFD700',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 8,
   },
   barberImage: {
     width: 80,
@@ -568,22 +656,24 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f0f0f0',
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.2)',
   },
   barberPlaceholder: {
     fontSize: 30,
-    color: '#666',
+    color: '#fff',
   },
   barberName: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#222',
+    color: '#fff',
     marginBottom: 4,
     textAlign: 'center',
   },
   barberExperience: {
     fontSize: 14,
-    color: '#666',
+    color: 'rgba(255,255,255,0.8)',
     textAlign: 'center',
   },
   unavailableBadge: {
@@ -600,33 +690,47 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: 'bold',
   },
+  barberPhoto: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 2,
+    borderColor: '#fff',
+    marginBottom: 6,
+  },
   treatmentsContainer: {
     marginBottom: 16,
   },
   treatmentCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: 20,
     marginBottom: 16,
-    flexDirection: 'row',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 8,
+    overflow: 'hidden',
+  },
+  treatmentGradient: {
+    padding: 20,
+    flexDirection: 'row',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
   },
   treatmentImage: {
     width: 80,
     height: 80,
-    borderRadius: 12,
+    borderRadius: 16,
     marginRight: 16,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f0f0f0',
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.2)',
   },
   treatmentPlaceholder: {
     fontSize: 30,
-    color: '#666',
+    color: '#fff',
   },
   treatmentInfo: {
     flex: 1,
@@ -634,13 +738,13 @@ const styles = StyleSheet.create({
   treatmentName: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#222',
+    color: '#fff',
     marginBottom: 4,
     textAlign: 'right',
   },
   treatmentDescription: {
     fontSize: 14,
-    color: '#666',
+    color: 'rgba(255,255,255,0.8)',
     marginBottom: 8,
     textAlign: 'right',
   },
@@ -652,11 +756,11 @@ const styles = StyleSheet.create({
   treatmentPrice: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#007bff',
+    color: '#fff',
   },
   treatmentDuration: {
     fontSize: 14,
-    color: '#666',
+    color: 'rgba(255,255,255,0.7)',
   },
   datesContainer: {
     flexDirection: 'row',
@@ -665,26 +769,30 @@ const styles = StyleSheet.create({
   },
   dateCard: {
     width: (width - 48) / 2,
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: 20,
     marginBottom: 16,
-    alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 8,
+    overflow: 'hidden',
+  },
+  dateGradient: {
+    padding: 20,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
   },
   dateText: {
     fontSize: 14,
-    color: '#666',
+    color: 'rgba(255,255,255,0.8)',
     marginBottom: 4,
   },
   dateNumber: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#222',
+    color: '#fff',
   },
   timesContainer: {
     flexDirection: 'row',
@@ -693,37 +801,45 @@ const styles = StyleSheet.create({
   },
   timeCard: {
     width: (width - 60) / 3,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 16,
     marginBottom: 12,
-    alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 6,
+    overflow: 'hidden',
+  },
+  timeGradient: {
+    padding: 18,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
   },
   timeText: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#222',
+    color: '#fff',
   },
   summaryContainer: {
-    backgroundColor: '#fff',
     margin: 16,
-    padding: 16,
-    borderRadius: 16,
+    borderRadius: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 8,
+    overflow: 'hidden',
+  },
+  summaryGradient: {
+    padding: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
   },
   summaryTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#222',
+    color: '#fff',
     marginBottom: 16,
     textAlign: 'right',
   },
@@ -734,12 +850,12 @@ const styles = StyleSheet.create({
   },
   summaryLabel: {
     fontSize: 16,
-    color: '#666',
+    color: 'rgba(255,255,255,0.8)',
   },
   summaryValue: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#222',
+    color: '#fff',
   },
   modalOverlay: {
     flex: 1,
@@ -805,6 +921,18 @@ const styles = StyleSheet.create({
     color: '#666',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  detailsButton: {
+    backgroundColor: '#3b82f6',
+    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+    marginTop: 8,
+  },
+  detailsButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
   },
 });
 

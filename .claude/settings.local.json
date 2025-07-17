@@ -5,7 +5,10 @@
       "Bash(rm:*)",
       "Bash(npm run lint)",
       "Bash(npx expo start:*)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm run:*)",
+      "Bash(find:*)"
     ],
     "deny": []
   }

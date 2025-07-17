@@ -1,14 +1,18 @@
 import React from 'react';
-import ProfileScreen from '../screens/ProfileScreen';
+import SettingsScreen from './screens/SettingsScreen';
 import { useRouter } from 'expo-router';
 
-export default function ProfileTab() {
+export default function SettingsTab() {
   const router = useRouter();
 
   const handleNavigate = (screen: string) => {
+    console.log('Settings navigating to:', screen);
     switch (screen) {
       case 'home':
         router.replace('/');
+        break;
+      case 'profile':
+        router.replace('/profile');
         break;
       case 'team':
         router.replace('/team');
@@ -16,8 +20,8 @@ export default function ProfileTab() {
       case 'booking':
         router.replace('/booking');
         break;
-      case 'explore':
-        router.replace('/explore');
+      case 'admin-home':
+        router.replace('/admin-home');
         break;
       default:
         router.replace('/');
@@ -25,17 +29,13 @@ export default function ProfileTab() {
   };
 
   const handleBack = () => {
-    if (router.canGoBack()) {
-      router.back();
-    } else {
-      router.replace('/');
-    }
+    router.replace('/');
   };
 
   return (
-    <ProfileScreen 
+    <SettingsScreen 
       onNavigate={handleNavigate} 
       onBack={handleBack}
     />
   );
-} 
+}

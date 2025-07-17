@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 import SideMenu from '../components/SideMenu';
 import TopNav from '../components/TopNav';
+import NotificationPanel from '../components/NotificationPanel';
 
 const { width, height } = Dimensions.get('window');
 
@@ -54,6 +55,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
   const [loading, setLoading] = useState(true);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
+  const [notificationPanelVisible, setNotificationPanelVisible] = useState(false);
   const [galleryIndex, setGalleryIndex] = useState(0);
 
   // Animation refs
@@ -63,6 +65,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
   const ctaFade = useRef(new Animated.Value(0)).current;
   const cardsFade = useRef(new Animated.Value(0)).current;
   const galleryScrollRef = useRef<ScrollView>(null);
+  
+  // 3D Carousel refs
+  const carousel3DRef = useRef<ScrollView>(null);
+  const cardWidth = 140;
+  const cardHeight = 200;
+  const cardSpacing = 4;
+  const centerOffset = width / 2 - cardWidth / 2;
+  const scrollX = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     // Simulate loading (splash) for 3 seconds
@@ -106,30 +116,74 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
     }
   }, [loading, imageLoaded]);
 
-  // Gallery auto-scroll effect
-  useEffect(() => {
-    const galleryImages = [
-      require('../../assets/images/gallery/1.jpg'),
-      require('../../assets/images/gallery/2.jpg'),
-      require('../../assets/images/gallery/3.jpg'),
-      require('../../assets/images/gallery/4.jpg'),
+  // Remove auto-scroll for manual control
+  // useEffect(() => {
+  //   const galleryImages = [
+  //     require('../../assets/images/gallery/1.jpg'),
+  //     require('../../assets/images/gallery/2.jpg'),
+  //     require('../../assets/images/gallery/3.jpg'),
+  //     require('../../assets/images/gallery/4.jpg'),
+  //   ];
+
+  //   const interval = setInterval(() => {
+  //     setGalleryIndex((prevIndex) => {
+  //       const nextIndex = (prevIndex + 1) % galleryImages.length;
+  //       if (carousel3DRef.current) {
+  //         carousel3DRef.current.scrollTo({
+  //           x: nextIndex * (cardWidth + cardSpacing),
+  //           animated: true,
+  //         });
+  //       }
+  //       return nextIndex;
+  //     });
+  //   }, 4000); // Change every 4 seconds
+
+  //   return () => clearInterval(interval);
+  // }, []);
+
+  // Calculate 3D transform for each card
+  const getCardTransform = (index: number, scrollX: number) => {
+    const cardOffset = index * (cardWidth + cardSpacing);
+    const inputRange = [
+      cardOffset - cardWidth - cardSpacing,
+      cardOffset,
+      cardOffset + cardWidth + cardSpacing,
     ];
+    
+    const translateX = scrollX.interpolate({
+      inputRange,
+      outputRange: [cardWidth / 2, 0, -cardWidth / 2],
+      extrapolate: 'clamp',
+    });
+    
+    const scale = scrollX.interpolate({
+      inputRange,
+      outputRange: [0.8, 1, 0.8],
+      extrapolate: 'clamp',
+    });
+    
+    const rotateY = scrollX.interpolate({
+      inputRange,
+      outputRange: ['-45deg', '0deg', '45deg'],
+      extrapolate: 'clamp',
+    });
+    
+    const opacity = scrollX.interpolate({
+      inputRange,
+      outputRange: [0.5, 1, 0.5],
+      extrapolate: 'clamp',
+    });
 
-    const interval = setInterval(() => {
-      setGalleryIndex((prevIndex) => {
-        const nextIndex = (prevIndex + 1) % galleryImages.length;
-        if (galleryScrollRef.current) {
-          galleryScrollRef.current.scrollTo({
-            x: nextIndex * 200, // Card width + margin
-            animated: true,
-          });
-        }
-        return nextIndex;
-      });
-    }, 3000); // Change every 3 seconds
-
-    return () => clearInterval(interval);
-  }, []);
+    return {
+      transform: [
+        { translateX },
+        { scale },
+        { rotateY },
+        { perspective: 1000 },
+      ],
+      opacity,
+    };
+  };
 
   const handlePhoneCall = () => {
     Linking.openURL('tel:+972501234567').catch(() => {
@@ -181,7 +235,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
     <SafeAreaView style={styles.container}>
       <TopNav 
         title="TURGI" 
-        onBellPress={() => {}} 
+        onBellPress={() => setNotificationPanelVisible(true)} 
         onMenuPress={() => setSideMenuVisible(true)} 
       />
       <View style={styles.backgroundWrapper}>
@@ -269,47 +323,55 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
             </View>
           </Animated.View>
 
-          {/* Gallery Section */}
+          {/* 3D Gallery Carousel Section */}
           <Animated.View style={[styles.gallerySection, { opacity: cardsFade }]}>
             <Text style={styles.sectionTitle}>הגלריה שלנו</Text>
-            <ScrollView 
-              ref={galleryScrollRef}
-              horizontal 
-              showsHorizontalScrollIndicator={false} 
-              contentContainerStyle={styles.galleryCarouselContent}
-              pagingEnabled={false}
-              decelerationRate="fast"
-              snapToInterval={200}
-              snapToAlignment="start"
-            >
-              {[
-                require('../../assets/images/gallery/1.jpg'),
-                require('../../assets/images/gallery/2.jpg'),
-                require('../../assets/images/gallery/3.jpg'),
-                require('../../assets/images/gallery/4.jpg'),
-                require('../../assets/images/gallery/1.jpg'),
-                require('../../assets/images/gallery/2.jpg'),
-              ].map((imageSource, index) => (
-                <View key={index} style={[
-                  styles.galleryCard, 
-                  { 
-                    transform: [{ rotate: `${(index % 4 - 2) * 2}deg` }] 
-                  }
-                ]}>
-                  <Image
-                    source={imageSource}
-                    style={styles.galleryImage}
-                    resizeMode="cover"
-                  />
-                  <View style={styles.galleryOverlay}>
-                    <LinearGradient
-                      colors={['transparent', 'rgba(0,0,0,0.7)']}
-                      style={styles.galleryGradient}
+            <View style={styles.carousel3DContainer}>
+              <Animated.ScrollView 
+                ref={carousel3DRef}
+                horizontal 
+                showsHorizontalScrollIndicator={false} 
+                contentContainerStyle={styles.carousel3DContent}
+                pagingEnabled={false}
+                decelerationRate="normal"
+                onScroll={Animated.event(
+                  [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+                  { useNativeDriver: false }
+                )}
+                scrollEventThrottle={16}
+              >
+                {[
+                  require('../../assets/images/gallery/1.jpg'),
+                  require('../../assets/images/gallery/2.jpg'),
+                  require('../../assets/images/gallery/3.jpg'),
+                  require('../../assets/images/gallery/4.jpg'),
+                  require('../../assets/images/gallery/1.jpg'),
+                  require('../../assets/images/gallery/2.jpg'),
+                  require('../../assets/images/gallery/3.jpg'),
+                  require('../../assets/images/gallery/4.jpg'),
+                ].map((imageSource, index) => (
+                  <Animated.View 
+                    key={index} 
+                    style={[
+                      styles.carousel3DCard,
+                      getCardTransform(index, scrollX),
+                    ]}
+                  >
+                    <Image
+                      source={imageSource}
+                      style={styles.carousel3DImage}
+                      resizeMode="cover"
                     />
-                  </View>
-                </View>
-              ))}
-            </ScrollView>
+                    <View style={styles.carousel3DOverlay}>
+                      <LinearGradient
+                        colors={['transparent', 'rgba(0,0,0,0.8)']}
+                        style={styles.carousel3DGradient}
+                      />
+                    </View>
+                  </Animated.View>
+                ))}
+              </Animated.ScrollView>
+            </View>
           </Animated.View>
 
           {/* About Us Section */}
@@ -380,7 +442,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
       <SideMenu 
         visible={sideMenuVisible}
         onClose={() => setSideMenuVisible(false)}
-        onNavigate={onNavigate}
+        onNavigate={(screen) => {
+          console.log('HomeScreen onNavigate called with:', screen);
+          onNavigate(screen);
+        }}
+        onNotificationPress={() => setNotificationPanelVisible(true)}
+      />
+      
+      <NotificationPanel 
+        visible={notificationPanelVisible}
+        onClose={() => setNotificationPanelVisible(false)}
       />
     </SafeAreaView>
   );
@@ -604,6 +675,44 @@ const styles = StyleSheet.create({
   galleryCarouselContent: {
     paddingHorizontal: 4,
   },
+  carousel3DContainer: {
+    height: 240,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  carousel3DContent: {
+    paddingHorizontal: 15,
+  },
+  carousel3DCard: {
+    width: 140,
+    height: 200,
+    borderRadius: 18,
+    marginRight: 4,
+    backgroundColor: '#eee',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 15 },
+    shadowOpacity: 0.4,
+    shadowRadius: 18,
+    elevation: 15,
+  },
+  carousel3DImage: {
+    width: '100%',
+    height: '100%',
+  },
+  carousel3DOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 80,
+  },
+  carousel3DGradient: {
+    flex: 1,
+    borderBottomLeftRadius: 18,
+    borderBottomRightRadius: 18,
+  },
+  // Legacy styles (can be removed if not used elsewhere)
   galleryCard: {
     width: 180,
     height: 240,
@@ -656,7 +765,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 16,
     alignItems: 'center',
-    padding: 18,
+    padding: 24,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
@@ -665,20 +774,20 @@ const styles = StyleSheet.create({
   },
   aboutImageWide: {
     width: '100%',
-    height: 150,
+    height: 200,
     borderRadius: 12,
-    marginBottom: 12,
+    marginBottom: 20,
   },
   aboutContent: {
     flex: 1,
     alignItems: 'center',
   },
   aboutText: {
-    fontSize: 15,
+    fontSize: 17,
     color: '#555',
-    marginBottom: 16,
+    marginBottom: 20,
     textAlign: 'center',
-    lineHeight: 22,
+    lineHeight: 26,
   },
   wazeButton: {
     backgroundColor: '#50C878',

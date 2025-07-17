@@ -1,30 +1,32 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  SafeAreaView,
-  ScrollView,
-  TouchableOpacity,
-  Image,
-  Dimensions,
-  Modal,
-  Alert
+    Alert,
+    Dimensions,
+    Image,
+    Modal,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
 } from 'react-native';
-import { getBarbers, Barber } from '../../services/firebase';
+import { Barber, getBarbers } from '../../services/firebase';
 import TopNav from '../components/TopNav';
 
 const { width, height } = Dimensions.get('window');
 
 interface TeamScreenProps {
   onNavigate: (screen: string, params?: any) => void;
+  onBack?: () => void;
 }
 
-const TeamScreen: React.FC<TeamScreenProps> = ({ onNavigate }) => {
+const TeamScreen: React.FC<TeamScreenProps> = ({ onNavigate, onBack }) => {
   const [barbers, setBarbers] = useState<Barber[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedBarber, setSelectedBarber] = useState<Barber | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
+  const [detailsBarber, setDetailsBarber] = useState<Barber | null>(null);
 
   useEffect(() => {
     loadBarbers();
@@ -69,7 +71,13 @@ const TeamScreen: React.FC<TeamScreenProps> = ({ onNavigate }) => {
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
-        <TopNav title="הצוות שלנו" onBellPress={() => {}} onMenuPress={() => {}} />
+        <TopNav 
+          title="הצוות שלנו" 
+          onBellPress={() => {}} 
+          onMenuPress={() => {}}
+          showBackButton={true}
+          onBackPress={onBack || (() => onNavigate('home'))}
+        />
         <View style={styles.loadingContainer}>
           <Text style={styles.loadingText}>טוען...</Text>
         </View>
@@ -79,7 +87,13 @@ const TeamScreen: React.FC<TeamScreenProps> = ({ onNavigate }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <TopNav title="הצוות שלנו" onBellPress={() => {}} onMenuPress={() => {}} />
+      <TopNav 
+        title="הצוות שלנו" 
+        onBellPress={() => {}} 
+        onMenuPress={() => {}}
+        showBackButton={true}
+        onBackPress={onBack || (() => onNavigate('home'))}
+      />
       
       {/* Hero Section */}
       <View style={styles.heroSection}>
@@ -113,7 +127,15 @@ const TeamScreen: React.FC<TeamScreenProps> = ({ onNavigate }) => {
                 >
                   <View style={styles.barberImageContainer}>
                     <View style={styles.barberImage}>
-                      <Text style={styles.barberPlaceholder}>✂️</Text>
+                      {barber.image ? (
+                        <Image
+                          source={{ uri: barber.image }}
+                          style={styles.barberPhoto}
+                          resizeMode="cover"
+                        />
+                      ) : (
+                        <Text style={styles.barberPlaceholder}>✂️</Text>
+                      )}
                     </View>
                     {!barber.available && (
                       <View style={styles.unavailableBadge}>
@@ -134,12 +156,15 @@ const TeamScreen: React.FC<TeamScreenProps> = ({ onNavigate }) => {
                     </View>
                     
                     <View style={styles.specialtiesContainer}>
-                      {barber.specialties.slice(0, 2).map((specialty, index) => (
+                      {barber.specialties && barber.specialties.slice(0, 2).map((specialty, index) => (
                         <View key={index} style={styles.specialtyTag}>
                           <Text style={styles.specialtyText}>{specialty}</Text>
                         </View>
                       ))}
                     </View>
+                    <TouchableOpacity style={styles.detailsButton} onPress={() => setDetailsBarber(barber)}>
+                      <Text style={styles.detailsButtonText}>לפרטים</Text>
+                    </TouchableOpacity>
                   </View>
                 </TouchableOpacity>
               ))}
@@ -168,7 +193,15 @@ const TeamScreen: React.FC<TeamScreenProps> = ({ onNavigate }) => {
                 
                 <View style={styles.modalHeader}>
                   <View style={styles.modalBarberImage}>
-                    <Text style={styles.modalBarberPlaceholder}>✂️</Text>
+                    {selectedBarber.image ? (
+                      <Image
+                        source={{ uri: selectedBarber.image }}
+                        style={styles.barberPhoto}
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <Text style={styles.modalBarberPlaceholder}>✂️</Text>
+                    )}
                   </View>
                   <Text style={styles.modalBarberName}>{selectedBarber.name}</Text>
                   <Text style={styles.modalBarberExperience}>{selectedBarber.experience}</Text>
@@ -208,6 +241,36 @@ const TeamScreen: React.FC<TeamScreenProps> = ({ onNavigate }) => {
                 </View>
               </>
             )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Details Barber Modal */}
+      <Modal
+        visible={!!detailsBarber}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setDetailsBarber(null)}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center' }}>
+          <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 24, width: 320, alignItems: 'center' }}>
+            {detailsBarber?.image && (
+              <Image source={{ uri: detailsBarber.image }} style={{ width: 100, height: 100, borderRadius: 50, marginBottom: 12 }} />
+            )}
+            <Text style={{ fontSize: 22, fontWeight: 'bold', marginBottom: 6 }}>{detailsBarber?.name}</Text>
+            <Text style={{ fontSize: 16, color: '#666', marginBottom: 8 }}>{detailsBarber?.experience}</Text>
+            {detailsBarber?.phone && (
+              <Text style={{ fontSize: 16, color: '#3b82f6', marginBottom: 8 }}>טלפון: {detailsBarber.phone}</Text>
+            )}
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
+              {/* אייקון וואטסאפ */}
+              <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#25D366', alignItems: 'center', justifyContent: 'center', marginRight: 8 }}>
+                <Text style={{ color: '#fff', fontSize: 20 }}>🟢</Text>
+              </View>
+            </View>
+            <TouchableOpacity onPress={() => setDetailsBarber(null)} style={{ marginTop: 18 }}>
+              <Text style={{ color: '#3b82f6', fontWeight: 'bold' }}>סגור</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -314,6 +377,14 @@ const styles = StyleSheet.create({
   barberPlaceholder: {
     fontSize: 40,
     color: '#666',
+  },
+  barberPhoto: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 2,
+    borderColor: '#fff',
+    marginBottom: 6,
   },
   unavailableBadge: {
     position: 'absolute',
@@ -498,6 +569,18 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  detailsButton: {
+    backgroundColor: '#3b82f6',
+    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+    marginTop: 8,
+  },
+  detailsButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
   },
 });
 

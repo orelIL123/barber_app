@@ -1,37 +1,41 @@
-import React, { useState, useEffect } from 'react';
+import { LinearGradient } from 'expo-linear-gradient';
+import React, { useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  SafeAreaView,
-  TouchableOpacity,
-  Image,
-  ScrollView,
-  Alert,
-  TextInput,
-  Dimensions
+    Alert,
+    Dimensions,
+    Image,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
-import { 
-  getCurrentUser, 
-  getUserProfile, 
-  updateUserProfile, 
-  loginUser, 
-  registerUser, 
-  logoutUser, 
-  onAuthStateChange,
-  UserProfile,
-  getUserAppointments,
-  Appointment
+import {
+    Appointment,
+    getUserAppointments,
+    getUserProfile,
+    loginUser,
+    logoutUser,
+    makeUserAdmin,
+    onAuthStateChange,
+    registerUser,
+    updateUserProfile,
+    UserProfile,
+    createUserProfileFromAuth
 } from '../../services/firebase';
+import { NeonButton } from '../components/NeonButton';
 import TopNav from '../components/TopNav';
 
 const { width, height } = Dimensions.get('window');
 
 interface ProfileScreenProps {
   onNavigate: (screen: string) => void;
+  onBack?: () => void;
 }
 
-const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate }) => {
+const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate, onBack }) => {
   const [user, setUser] = useState<any>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -39,6 +43,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate }) => {
   const [showLoginForm, setShowLoginForm] = useState(false);
   const [showRegisterForm, setShowRegisterForm] = useState(false);
   const [editMode, setEditMode] = useState(false);
+  const [tab, setTab] = useState<'login' | 'register'>('login');
   
   // Form states
   const [email, setEmail] = useState('');
@@ -50,7 +55,12 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate }) => {
     const unsubscribe = onAuthStateChange(async (currentUser) => {
       setUser(currentUser);
       if (currentUser) {
-        const profile = await getUserProfile(currentUser.uid);
+        // Try to get profile, if it doesn't exist, create it
+        let profile = await getUserProfile(currentUser.uid);
+        if (!profile && currentUser.email) {
+          await createUserProfileFromAuth(currentUser.email);
+          profile = await getUserProfile(currentUser.uid);
+        }
         setUserProfile(profile);
         const userAppointments = await getUserAppointments(currentUser.uid);
         setAppointments(userAppointments);
@@ -67,17 +77,55 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate }) => {
   }, []);
 
   const handleLogin = async () => {
+    if (!email.trim()) {
+      Alert.alert('שגיאה', 'נא להזין כתובת מייל');
+      return;
+    }
+    if (!password.trim()) {
+      Alert.alert('שגיאה', 'נא להזין סיסמה');
+      return;
+    }
+    
+    setLoading(true);
     try {
       await loginUser(email, password);
       setShowLoginForm(false);
       setEmail('');
       setPassword('');
     } catch (error: any) {
-      Alert.alert('שגיאה', 'פרטי הכניסה שגויים');
+      let errorMessage = 'פרטי הכניסה שגויים';
+      if (error.code === 'auth/user-not-found') {
+        errorMessage = 'המשתמש לא נמצא במערכת';
+      } else if (error.code === 'auth/wrong-password') {
+        errorMessage = 'סיסמה שגויה';
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = 'כתובת המייל לא תקינה';
+      }
+      Alert.alert('שגיאה', errorMessage);
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleRegister = async () => {
+    if (!displayName.trim()) {
+      Alert.alert('שגיאה', 'נא להזין שם מלא');
+      return;
+    }
+    if (!email.trim()) {
+      Alert.alert('שגיאה', 'נא להזין כתובת מייל');
+      return;
+    }
+    if (!password.trim()) {
+      Alert.alert('שגיאה', 'נא להזין סיסמה');
+      return;
+    }
+    if (password.length < 6) {
+      Alert.alert('שגיאה', 'הסיסמה חייבת להיות באורך של לפחות 6 תווים');
+      return;
+    }
+    
+    setLoading(true);
     try {
       await registerUser(email, password, displayName, phone);
       setShowRegisterForm(false);
@@ -85,8 +133,19 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate }) => {
       setPassword('');
       setDisplayName('');
       setPhone('');
+      Alert.alert('הצלחה', 'המשתמש נרשם בהצלחה!');
     } catch (error: any) {
-      Alert.alert('שגיאה', 'לא ניתן ליצור חשבון');
+      let errorMessage = 'לא ניתן ליצור חשבון';
+      if (error.code === 'auth/email-already-in-use') {
+        errorMessage = 'כתובת המייל כבר רשומה במערכת';
+      } else if (error.code === 'auth/weak-password') {
+        errorMessage = 'הסיסמה חלשה מדי';
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = 'כתובת המייל לא תקינה';
+      }
+      Alert.alert('שגיאה', errorMessage);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -160,130 +219,138 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate }) => {
   if (!user) {
     return (
       <SafeAreaView style={styles.container}>
-        <TopNav title="פרופיל" onBellPress={() => {}} onMenuPress={() => {}} />
-        
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          <View style={styles.authContainer}>
-            <Text style={styles.welcomeText}>ברוכים הבאים ל-TURGI</Text>
-            <Text style={styles.subtitleText}>התחברו כדי לנהל את התורים שלכם</Text>
-            
-            <TouchableOpacity
-              style={styles.authButton}
-              onPress={() => setShowLoginForm(true)}
-            >
-              <Text style={styles.authButtonText}>התחברות</Text>
+        <TopNav 
+          title="התחברות" 
+          onBellPress={() => {}} 
+          onMenuPress={() => {}}
+          showBackButton={true}
+          onBackPress={onBack || (() => onNavigate('home'))}
+        />
+        <View style={styles.flexGrow}>
+          {/* Top Tabs */}
+          <View style={styles.tabBar}>
+            <TouchableOpacity onPress={() => setTab('login')} style={[styles.tab, tab === 'login' && styles.activeTab]}>
+              {tab === 'login' && (
+                <LinearGradient
+                  colors={['#333333', '#1a1a1a', '#000000']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.tabGradient}
+                />
+              )}
+              <Text style={[styles.tabText, tab === 'login' && styles.activeTabText]}>התחברות</Text>
             </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={[styles.authButton, styles.registerButton]}
-              onPress={() => setShowRegisterForm(true)}
-            >
-              <Text style={[styles.authButtonText, styles.registerButtonText]}>הרשמה</Text>
+            <TouchableOpacity onPress={() => setTab('register')} style={[styles.tab, tab === 'register' && styles.activeTab]}>
+              {tab === 'register' && (
+                <LinearGradient
+                  colors={['#333333', '#1a1a1a', '#000000']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.tabGradient}
+                />
+              )}
+              <Text style={[styles.tabText, tab === 'register' && styles.activeTabText]}>הרשמה</Text>
             </TouchableOpacity>
           </View>
-        </ScrollView>
-
-        {/* Login Modal */}
-        {showLoginForm && (
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>התחברות</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="אימייל"
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                textAlign="right"
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="סיסמה"
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-                textAlign="right"
-              />
-              <View style={styles.modalButtons}>
-                <TouchableOpacity style={styles.modalButton} onPress={handleLogin}>
-                  <Text style={styles.modalButtonText}>התחבר</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.modalButton, styles.cancelButton]}
-                  onPress={() => setShowLoginForm(false)}
-                >
-                  <Text style={styles.cancelButtonText}>ביטול</Text>
-                </TouchableOpacity>
+          {/* White half-sheet for form */}
+          <View style={styles.sheet}>
+            {tab === 'login' ? (
+              <View style={styles.form}>
+                <View style={styles.inputContainer}>
+                  <Text style={styles.inputLabel}>כתובת אימייל</Text>
+                  <TextInput style={styles.input} placeholder="example@email.com" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" />
+                </View>
+                <Text style={styles.orText}>או</Text>
+                <View style={styles.inputContainer}>
+                  <Text style={styles.inputLabel}>מספר טלפון</Text>
+                  <TextInput style={styles.input} placeholder="+972-50-123-4567" value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
+                </View>
+                <View style={styles.inputContainer}>
+                  <Text style={styles.inputLabel}>סיסמה</Text>
+                  <TextInput style={styles.input} placeholder="הזן סיסמה" value={password} onChangeText={setPassword} secureTextEntry />
+                </View>
+                <NeonButton title="התחברות" onPress={handleLogin} disabled={loading} />
+                {/* {step === 'input' && phone ? (
+                  <NeonButton title="Send OTP" onPress={handleSendOtp} loading={loading} />
+                ) : null} */}
+                {/* {step === 'otp' ? (
+                  <>
+                    <TextInput style={styles.input} placeholder="OTP" value={otp} onChangeText={setOtp} keyboardType="number-pad" />
+                    <NeonButton title="Verify OTP" onPress={handleVerifyOtp} loading={loading} />
+                  </>
+                ) : null} */}
+                {/* {error ? <Text style={styles.errorText}>{error}</Text> : null} */}
+                {/* {success ? <Text style={styles.successText}>{success}</Text> : null} */}
               </View>
-            </View>
-          </View>
-        )}
-
-        {/* Register Modal */}
-        {showRegisterForm && (
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>הרשמה</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="שם מלא"
-                value={displayName}
-                onChangeText={setDisplayName}
-                textAlign="right"
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="אימייל"
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                textAlign="right"
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="טלפון"
-                value={phone}
-                onChangeText={setPhone}
-                keyboardType="phone-pad"
-                textAlign="right"
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="סיסמה"
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-                textAlign="right"
-              />
-              <View style={styles.modalButtons}>
-                <TouchableOpacity style={styles.modalButton} onPress={handleRegister}>
-                  <Text style={styles.modalButtonText}>הירשם</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.modalButton, styles.cancelButton]}
-                  onPress={() => setShowRegisterForm(false)}
-                >
-                  <Text style={styles.cancelButtonText}>ביטול</Text>
-                </TouchableOpacity>
+            ) : (
+              <View style={styles.form}>
+                <View style={styles.inputContainer}>
+                  <Text style={styles.inputLabel}>שם מלא</Text>
+                  <TextInput style={styles.input} placeholder="הזן שם מלא" value={displayName} onChangeText={setDisplayName} />
+                </View>
+                <View style={styles.inputContainer}>
+                  <Text style={styles.inputLabel}>כתובת אימייל</Text>
+                  <TextInput style={styles.input} placeholder="example@email.com" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" />
+                </View>
+                <Text style={styles.orText}>או</Text>
+                <View style={styles.inputContainer}>
+                  <Text style={styles.inputLabel}>מספר טלפון</Text>
+                  <TextInput style={styles.input} placeholder="+972-50-123-4567" value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
+                </View>
+                <View style={styles.inputContainer}>
+                  <Text style={styles.inputLabel}>סיסמה</Text>
+                  <TextInput style={styles.input} placeholder="הזן סיסמה (לפחות 6 תווים)" value={password} onChangeText={setPassword} secureTextEntry />
+                </View>
+                <NeonButton title="הרשמה" onPress={handleRegister} disabled={loading} />
+                {/* {step === 'input' && phone ? (
+                  <NeonButton title="Send OTP" onPress={handleSendOtp} loading={loading} />
+                ) : null} */}
+                {/* {step === 'otp' ? (
+                  <>
+                    <TextInput style={styles.input} placeholder="OTP" value={otp} onChangeText={setOtp} keyboardType="number-pad" />
+                    <NeonButton title="Verify OTP" onPress={handleVerifyOtp} loading={loading} />
+                  </>
+                ) : null} */}
+                {/* {error ? <Text style={styles.errorText}>{error}</Text> : null} */}
+                {/* {success ? <Text style={styles.successText}>{success}</Text> : null} */}
               </View>
-            </View>
+            )}
           </View>
-        )}
+        </View>
       </SafeAreaView>
     );
   }
 
   return (
     <SafeAreaView style={styles.container}>
-      <TopNav title="פרופיל" onBellPress={() => {}} onMenuPress={() => {}} />
+      <TopNav 
+        title="פרופיל" 
+        onBellPress={() => {}} 
+        onMenuPress={() => {}}
+        showBackButton={true}
+        onBackPress={onBack || (() => onNavigate('home'))}
+      />
       
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Profile Header */}
         <View style={styles.profileHeader}>
           <View style={styles.avatarContainer}>
             <View style={styles.avatar}>
-              <Text style={styles.avatarText}>👤</Text>
+              {userProfile?.profileImage ? (
+                <Image 
+                  source={{ uri: userProfile.profileImage }} 
+                  style={styles.avatarImage}
+                />
+              ) : (
+                <Text style={styles.avatarText}>👤</Text>
+              )}
             </View>
+            <TouchableOpacity 
+              style={styles.editAvatarButton}
+              onPress={() => Alert.alert('העלאת תמונה', 'בקרוב יתאפשר להעלות תמונת פרופיל')}
+            >
+              <Text style={styles.editAvatarIcon}>✏️</Text>
+            </TouchableOpacity>
           </View>
           <View style={styles.profileInfo}>
             <Text style={styles.profileName}>
@@ -349,9 +416,36 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate }) => {
           )}
         </View>
 
-        {/* Appointments */}
+        {/* Appointments Quick View */}
         <View style={styles.appointmentsSection}>
-          <Text style={styles.sectionTitle}>התורים שלי</Text>
+          <View style={styles.sectionTitleRow}>
+            <Text style={styles.sectionTitle}>התורים שלי</Text>
+            <TouchableOpacity
+              style={styles.viewAllButton}
+              onPress={() => {
+                if (appointments.length > 0) {
+                  const upcomingAppointments = appointments
+                    .filter(apt => apt.status === 'confirmed' || apt.status === 'pending')
+                    .slice(0, 3);
+                  
+                  const appointmentList = upcomingAppointments.map(apt => 
+                    `• ${formatDate(apt.date)} - ${getStatusText(apt.status)}`
+                  ).join('\n');
+                  
+                  Alert.alert(
+                    'התורים הקרובים שלי',
+                    appointmentList || 'אין תורים קרובים',
+                    [{ text: 'סגור', style: 'default' }]
+                  );
+                } else {
+                  Alert.alert('התורים שלי', 'אין לך תורים קיימים');
+                }
+              }}
+            >
+              <Text style={styles.viewAllText}>הצג הכל</Text>
+            </TouchableOpacity>
+          </View>
+          
           {appointments.length === 0 ? (
             <View style={styles.emptyState}>
               <Text style={styles.emptyStateText}>אין לך תורים קיימים</Text>
@@ -363,31 +457,28 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate }) => {
               </TouchableOpacity>
             </View>
           ) : (
-            appointments.map((appointment) => (
-              <View key={appointment.id} style={styles.appointmentCard}>
-                <View style={styles.appointmentHeader}>
-                  <Text style={styles.appointmentDate}>
-                    {formatDate(appointment.date)}
-                  </Text>
-                  <View style={[
-                    styles.statusBadge,
-                    { backgroundColor: getStatusColor(appointment.status) }
-                  ]}>
-                    <Text style={styles.statusText}>
-                      {getStatusText(appointment.status)}
-                    </Text>
-                  </View>
-                </View>
-                <Text style={styles.appointmentBarber}>
-                  ספר: {appointment.barberId}
-                </Text>
-                <Text style={styles.appointmentTreatment}>
-                  טיפול: {appointment.treatmentId}
-                </Text>
-              </View>
-            ))
+            <View style={styles.appointmentSummary}>
+              <Text style={styles.appointmentSummaryText}>
+                יש לך {appointments.length} תורים במערכת
+              </Text>
+              <TouchableOpacity
+                style={styles.bookButton}
+                onPress={() => onNavigate('booking')}
+              >
+                <Text style={styles.bookButtonText}>הזמן תור חדש</Text>
+              </TouchableOpacity>
+            </View>
           )}
         </View>
+
+
+        {/* Settings Button */}
+        <TouchableOpacity 
+          style={styles.settingsButton} 
+          onPress={() => onNavigate('settings')}
+        >
+          <Text style={styles.settingsButtonText}>הגדרות</Text>
+        </TouchableOpacity>
 
         {/* Logout Button */}
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
@@ -399,10 +490,28 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate }) => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8f9fa',
+  container: { flex: 1, backgroundColor: '#181828' },
+  flexGrow: { flex: 1 },
+  tabBar: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', backgroundColor: 'transparent', marginTop: 24, marginBottom: 0, zIndex: 2 },
+  tab: { flex: 1, alignItems: 'center', paddingVertical: 16, position: 'relative' },
+  activeTab: { },
+  tabGradient: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, borderRadius: 16, zIndex: -1 },
+  tabText: { fontSize: 18, color: '#888', fontWeight: '600', zIndex: 1 },
+  activeTabText: { color: '#fff', fontWeight: 'bold' },
+  sheet: { flex: 1, backgroundColor: '#fff', borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 24, marginTop: 0, shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 8 },
+  form: { marginTop: 16 },
+  inputContainer: { marginBottom: 16 },
+  inputLabel: { 
+    fontSize: 16, 
+    fontWeight: 'bold', 
+    color: '#333', 
+    marginBottom: 8, 
+    textAlign: 'right' 
   },
+  input: { backgroundColor: '#f3f3f3', borderRadius: 12, padding: 16, fontSize: 16, borderWidth: 1, borderColor: '#eee' },
+  orText: { textAlign: 'center', color: '#aaa', marginBottom: 8, marginTop: 8 },
+  errorText: { color: '#f00', textAlign: 'center', marginTop: 8 },
+  successText: { color: '#0a0', textAlign: 'center', marginTop: 8 },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -471,6 +580,7 @@ const styles = StyleSheet.create({
   },
   avatarContainer: {
     marginRight: 16,
+    position: 'relative',
   },
   avatar: {
     width: 60,
@@ -479,10 +589,36 @@ const styles = StyleSheet.create({
     backgroundColor: '#f0f0f0',
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 30,
   },
   avatarText: {
     fontSize: 24,
     color: '#666',
+  },
+  editAvatarButton: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#007bff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  editAvatarIcon: {
+    fontSize: 12,
+    color: '#fff',
   },
   profileInfo: {
     flex: 1,
@@ -539,13 +675,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
     flex: 1,
-    textAlign: 'right',
+    textAlign: 'left',
   },
   detailValue: {
     fontSize: 16,
     color: '#222',
     flex: 2,
-    textAlign: 'right',
+    textAlign: 'left',
   },
   detailInput: {
     fontSize: 16,
@@ -555,7 +691,7 @@ const styles = StyleSheet.create({
     borderColor: '#ddd',
     borderRadius: 8,
     padding: 8,
-    textAlign: 'right',
+    textAlign: 'left',
   },
   saveButton: {
     backgroundColor: '#4CAF50',
@@ -580,6 +716,33 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 5,
+  },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  viewAllButton: {
+    backgroundColor: '#007bff',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  viewAllText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  appointmentSummary: {
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
+  appointmentSummaryText: {
+    fontSize: 16,
+    color: '#333',
+    marginBottom: 16,
+    textAlign: 'center',
   },
   emptyState: {
     alignItems: 'center',
@@ -639,6 +802,32 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'right',
   },
+  adminButton: {
+    backgroundColor: '#28a745',
+    paddingVertical: 16,
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderRadius: 12,
+  },
+  adminButtonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  settingsButton: {
+    backgroundColor: '#007bff',
+    paddingVertical: 16,
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderRadius: 12,
+  },
+  settingsButtonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
   logoutButton: {
     backgroundColor: '#F44336',
     paddingVertical: 16,
@@ -676,7 +865,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     textAlign: 'center',
   },
-  input: {
+  modalInput: {
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 8,

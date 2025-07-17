@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -17,15 +17,33 @@ interface SideMenuProps {
   visible: boolean;
   onClose: () => void;
   onNavigate: (screen: string) => void;
+  onNotificationPress?: () => void;
 }
 
-const SideMenu: React.FC<SideMenuProps> = ({ visible, onClose, onNavigate }) => {
+const SideMenu: React.FC<SideMenuProps> = ({ visible, onClose, onNavigate, onNotificationPress }) => {
+  const handleMenuPress = (screen: string) => {
+    console.log('Menu item pressed, navigating to:', screen);
+    onClose();
+    setTimeout(() => {
+      onNavigate(screen);
+    }, 100);
+  };
+
+  const handleNotificationPress = () => {
+    console.log('Notification pressed');
+    onClose();
+    setTimeout(() => {
+      onNotificationPress && onNotificationPress();
+    }, 100);
+  };
+
   const menuItems = [
-    { id: 'language', title: 'שפה', icon: 'language', action: () => {} },
-    { id: 'notifications', title: 'התראות', icon: 'notifications', action: () => {} },
-    { id: 'appointments', title: 'התורים שלך', icon: 'calendar-today', action: () => onNavigate('profile') },
-    { id: 'settings', title: 'הגדרות', icon: 'settings', action: () => {} },
-    { id: 'about', title: 'אודות', icon: 'info', action: () => {} },
+    { id: 'language', title: 'שפה', icon: 'language', screen: 'settings' },
+    { id: 'notifications', title: 'התראות', icon: 'notifications', screen: null },
+    { id: 'appointments', title: 'התורים שלך', icon: 'calendar-today', screen: 'profile' },
+    { id: 'settings', title: 'הגדרות', icon: 'settings', screen: 'settings' },
+    { id: 'admin', title: 'פאנל מנהל', icon: 'admin-panel-settings', screen: 'admin-home' },
+    { id: 'about', title: 'אודות', icon: 'info', screen: null },
   ];
 
   return (
@@ -51,8 +69,14 @@ const SideMenu: React.FC<SideMenuProps> = ({ visible, onClose, onNavigate }) => 
                 key={item.id}
                 style={styles.menuItem}
                 onPress={() => {
-                  item.action();
-                  onClose();
+                  console.log('Menu item pressed:', item.title);
+                  if (item.id === 'notifications') {
+                    handleNotificationPress();
+                  } else if (item.screen) {
+                    handleMenuPress(item.screen);
+                  } else {
+                    console.log('No action for', item.title);
+                  }
                 }}
               >
                 <MaterialIcons name={item.icon as any} size={24} color="#fff" />

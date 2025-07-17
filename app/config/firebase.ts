@@ -1,4 +1,4 @@
-import { initializeApp, getApps, getApp } from 'firebase/app';
+import { getApp, getApps, initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
@@ -57,7 +57,7 @@ export interface Appointment {
 export interface Barber {
   barberId: string;
   name: string;
-  photo: string;
+  photo?: string;
   availableSlots: string[];
   availabilityWindow: {
     start: string;

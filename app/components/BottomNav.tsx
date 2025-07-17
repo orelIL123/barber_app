@@ -39,19 +39,19 @@ export default function BottomNav({ onOrderPress, onTabPress, activeTab }: {
         zIndex: 101,
         borderTopLeftRadius: 0,
         borderTopRightRadius: 0,
-        backgroundColor: 'transparent',
+        backgroundColor: 'rgba(0,0,0,0.91)',
       }} pointerEvents="none">
         <View style={{
           flex: 1,
-          backgroundColor: 'transparent',
+          backgroundColor: 'rgba(0,0,0,0.91)',
           borderTopLeftRadius: 0,
           borderTopRightRadius: 0,
           overflow: 'hidden',
         }}>
           <View style={{
             flex: 1,
-            backgroundColor: 'rgba(255,255,255,0.18)',
-            opacity: 0.7,
+            backgroundColor: 'rgba(0,0,0,0.91)',
+            opacity: 1,
             borderTopLeftRadius: 0,
             borderTopRightRadius: 0,
           }} />
