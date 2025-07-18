@@ -15,6 +15,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import SideMenu from '../components/SideMenu';
 import TopNav from '../components/TopNav';
 import NotificationPanel from '../components/NotificationPanel';
@@ -52,6 +53,7 @@ const NeonButton: React.FC<{
 };
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
@@ -187,19 +189,19 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
 
   const handlePhoneCall = () => {
     Linking.openURL('tel:+972501234567').catch(() => {
-      Alert.alert('שגיאה', 'לא ניתן לפתוח את אפליקציית הטלפון');
+      Alert.alert(t('common.error'), t('errors.phone_error'));
     });
   };
 
   const handleWhatsApp = () => {
     Linking.openURL('https://wa.me/972501234567').catch(() => {
-      Alert.alert('שגיאה', 'לא ניתן לפתוח את WhatsApp');
+      Alert.alert(t('common.error'), t('errors.whatsapp_error'));
     });
   };
 
   const handleWaze = () => {
     Linking.openURL('https://waze.com/ul?ll=32.0853,34.7818&navigate=yes').catch(() => {
-      Alert.alert('שגיאה', 'לא ניתן לפתוח את Waze');
+      Alert.alert(t('common.error'), t('errors.waze_error'));
     });
   };
 
@@ -217,7 +219,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
     }
     
     Linking.openURL(url).catch(() => {
-      Alert.alert('שגיאה', 'לא ניתן לפתוח את הקישור');
+      Alert.alert(t('common.error'), t('errors.link_error'));
     });
   };
 
@@ -225,7 +227,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>טוען...</Text>
+          <Text style={styles.loadingText}>{t('common.loading')}</Text>
         </View>
       </SafeAreaView>
     );
@@ -234,7 +236,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
   return (
     <SafeAreaView style={styles.container}>
       <TopNav 
-        title="TURGI" 
+        title={t('home.title')} 
         onBellPress={() => setNotificationPanelVisible(true)} 
         onMenuPress={() => setSideMenuVisible(true)} 
       />
@@ -279,28 +281,28 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
               style={styles.cardGradient}
             />
             <NeonButton
-              title="הזמן תור"
+              title={t('home.book_appointment')}
               onPress={() => onNavigate('booking')}
               variant="primary"
               style={styles.ctaButton}
             />
             <View style={styles.greetingContainer}>
-              <Text style={styles.greeting}>שלום, ברוכים הבאים</Text>
-              <Text style={styles.subtitle}>ל-TURGI ברברשופ</Text>
+              <Text style={styles.greeting}>{t('home.welcome')}</Text>
+              <Text style={styles.subtitle}>{t('home.subtitle')}</Text>
             </View>
           </Animated.View>
 
           {/* Quick Actions */}
           <Animated.View style={[styles.quickActionsSection, { opacity: ctaFade }]}>
-            <Text style={styles.sectionTitle}>פעולות מהירות</Text>
+            <Text style={styles.sectionTitle}>{t('home.quick_actions')}</Text>
             <View style={styles.quickActionsGrid}>
               <TouchableOpacity 
                 style={styles.quickActionCard}
                 onPress={() => onNavigate('booking')}
               >
                 <Ionicons name="calendar" size={32} color="#007bff" />
-                <Text style={styles.quickActionTitle}>הזמנת תור</Text>
-                <Text style={styles.quickActionSubtitle}>קבע תור חדש</Text>
+                <Text style={styles.quickActionTitle}>{t('home.book_new')}</Text>
+                <Text style={styles.quickActionSubtitle}>{t('home.book_subtitle')}</Text>
               </TouchableOpacity>
               
               <TouchableOpacity 
@@ -308,8 +310,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
                 onPress={() => onNavigate('profile')}
               >
                 <Ionicons name="list" size={32} color="#007bff" />
-                <Text style={styles.quickActionTitle}>התורים שלי</Text>
-                <Text style={styles.quickActionSubtitle}>צפה בתורים</Text>
+                <Text style={styles.quickActionTitle}>{t('home.my_appointments')}</Text>
+                <Text style={styles.quickActionSubtitle}>{t('home.appointments_subtitle')}</Text>
               </TouchableOpacity>
               
               <TouchableOpacity 
@@ -317,15 +319,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
                 onPress={() => onNavigate('team')}
               >
                 <Ionicons name="people" size={32} color="#007bff" />
-                <Text style={styles.quickActionTitle}>הספרים שלנו</Text>
-                <Text style={styles.quickActionSubtitle}>הכר את הצוות</Text>
+                <Text style={styles.quickActionTitle}>{t('home.our_team')}</Text>
+                <Text style={styles.quickActionSubtitle}>{t('home.team_subtitle')}</Text>
               </TouchableOpacity>
             </View>
           </Animated.View>
 
           {/* 3D Gallery Carousel Section */}
           <Animated.View style={[styles.gallerySection, { opacity: cardsFade }]}>
-            <Text style={styles.sectionTitle}>הגלריה שלנו</Text>
+            <Text style={styles.sectionTitle}>{t('home.gallery')}</Text>
             <View style={styles.carousel3DContainer}>
               <Animated.ScrollView 
                 ref={carousel3DRef}
@@ -376,7 +378,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
 
           {/* About Us Section */}
           <Animated.View style={[styles.aboutSection, { opacity: cardsFade }]}>
-            <Text style={styles.sectionTitle}>קצת עלינו</Text>
+            <Text style={styles.sectionTitle}>{t('home.about')}</Text>
             <View style={styles.aboutCard}>
               <Image
                 source={require('../../assets/images/ABOUT US/aboutus.png')}
@@ -385,14 +387,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
               />
               <View style={styles.aboutContent}>
                 <Text style={styles.aboutText}>
-                  ברוכים הבאים ל-TURGI ברברשופ! אנחנו צוות מקצועי עם תשוקה לאסתטיקה, שירות וחוויה. 
-                  בואו להתרענן, להרגיש בבית ולצאת עם חיוך.
+                  {t('home.about_text')}
                 </Text>
                 <TouchableOpacity 
                   style={styles.wazeButton} 
                   onPress={handleWaze}
                 >
-                  <Text style={styles.wazeButtonText}>נווט עם Waze</Text>
+                  <Text style={styles.wazeButtonText}>{t('home.navigate_waze')}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -400,18 +401,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
 
           {/* Contact Section */}
           <Animated.View style={[styles.contactSection, { opacity: cardsFade }]}>
-            <Text style={styles.sectionTitle}>צרו קשר</Text>
+            <Text style={styles.sectionTitle}>{t('home.contact')}</Text>
             <View style={styles.contactGrid}>
               <TouchableOpacity style={styles.contactCard} onPress={handlePhoneCall}>
                 <Ionicons name="call" size={32} color="#007bff" />
-                <Text style={styles.contactTitle}>התקשרו</Text>
-                <Text style={styles.contactSubtitle}>050-123-4567</Text>
+                <Text style={styles.contactTitle}>{t('home.call_us')}</Text>
+                <Text style={styles.contactSubtitle}>{t('home.phone')}</Text>
               </TouchableOpacity>
               
               <TouchableOpacity style={styles.contactCard} onPress={handleWhatsApp}>
                 <Ionicons name="logo-whatsapp" size={32} color="#25d366" />
-                <Text style={styles.contactTitle}>WhatsApp</Text>
-                <Text style={styles.contactSubtitle}>שלחו הודעה</Text>
+                <Text style={styles.contactTitle}>{t('home.whatsapp')}</Text>
+                <Text style={styles.contactSubtitle}>{t('home.send_message')}</Text>
               </TouchableOpacity>
             </View>
             
@@ -427,13 +428,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
 
           {/* Footer */}
           <View style={styles.footerCard}>
-            <Text style={styles.footerText}>רח׳ הדוגמא 1, תל אביב</Text>
+            <Text style={styles.footerText}>{t('home.address')}</Text>
             <TouchableOpacity onPress={handleWaze}>
-              <Text style={styles.footerWaze}>נווט עם Waze</Text>
+              <Text style={styles.footerWaze}>{t('home.navigate_waze')}</Text>
             </TouchableOpacity>
-            <Text style={styles.footerCredit}>Powered by Orel Aharon</Text>
-            <TouchableOpacity onPress={() => Alert.alert('תנאי שימוש', 'תנאי השימוש יוצגו כאן')}>
-              <Text style={styles.footerTerms}>תנאי שימוש</Text>
+            <Text style={styles.footerCredit}>{t('home.powered_by')}</Text>
+            <TouchableOpacity onPress={() => Alert.alert(t('home.terms'), t('settings.terms_text'))}>
+              <Text style={styles.footerTerms}>{t('home.terms')}</Text>
             </TouchableOpacity>
           </View>
         </View>

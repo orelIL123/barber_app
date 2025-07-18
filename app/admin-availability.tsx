@@ -1,6 +1,7 @@
 import React from 'react';
 import { useRouter } from 'expo-router';
-import AdminAvailabilityScreen from './screens/AdminAvailabilityScreen';
+import { View, Text, SafeAreaView, StyleSheet, TouchableOpacity } from 'react-native';
+import TopNav from './components/TopNav';
 
 export default function AdminAvailabilityPage() {
   const router = useRouter();
@@ -30,16 +31,61 @@ export default function AdminAvailabilityPage() {
     router.replace('/admin-home');
   };
 
-  try {
-    return (
-      <AdminAvailabilityScreen 
-        onNavigate={handleNavigate}
-        onBack={handleBack}
+  return (
+    <SafeAreaView style={styles.container}>
+      <TopNav 
+        title="ניהול זמינות"
+        onBellPress={() => {}}
+        onMenuPress={() => {}}
+        showBackButton={true}
+        onBackPress={handleBack}
       />
-    );
-  } catch (error) {
-    console.error('Error loading AdminAvailabilityScreen:', error);
-    router.replace('/admin-home');
-    return null;
-  }
+      
+      <View style={styles.content}>
+        <Text style={styles.title}>ניהול זמינות ספרים</Text>
+        <Text style={styles.subtitle}>בקרוב - אפשרות לקבוע שעות עבודה לכל ספר</Text>
+        
+        <TouchableOpacity style={styles.backButton} onPress={handleBack}>
+          <Text style={styles.backButtonText}>חזור למסך ניהול</Text>
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
+  );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f8f9fa',
+  },
+  content: {
+    flex: 1,
+    padding: 20,
+    paddingTop: 100,
+    alignItems: 'center',
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#222',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 40,
+    textAlign: 'center',
+  },
+  backButton: {
+    backgroundColor: '#007bff',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  backButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+});

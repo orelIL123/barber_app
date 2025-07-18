@@ -5,6 +5,8 @@ import { StatusBar } from 'expo-status-bar';
 import 'nativewind';
 import 'react-native-reanimated';
 import '../app/globals.css';
+import { I18nextProvider } from 'react-i18next';
+import i18n from './i18n';
 
 import { useColorScheme } from '../hooks/useColorScheme';
 
@@ -20,13 +22,15 @@ export default function RootLayout() {
   }
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="splash" options={{ headerShown: false }} />
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="+not-found" />
-      </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+    <I18nextProvider i18n={i18n}>
+      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+        <Stack>
+          <Stack.Screen name="splash" options={{ headerShown: false }} />
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="+not-found" />
+        </Stack>
+        <StatusBar style="auto" />
+      </ThemeProvider>
+    </I18nextProvider>
   );
 }

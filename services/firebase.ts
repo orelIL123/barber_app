@@ -778,3 +778,81 @@ export const addBarber = async ({ name, image, availableSlots, availabilityWindo
     throw error;
   }
 };
+
+// Initialize default availability for a barber if none exists
+export const initializeBarberAvailability = async (barberId: string): Promise<void> => {
+  try {
+    const existing = await getBarberAvailability(barberId);
+    if (existing.length > 0) {
+      return; // Already has availability
+    }
+    
+    // Create default availability (Monday-Thursday 9:00-18:00)
+    const defaultSchedule = [
+      { dayOfWeek: 0, startTime: '09:00', endTime: '18:00', isAvailable: false }, // Sunday
+      { dayOfWeek: 1, startTime: '09:00', endTime: '18:00', isAvailable: true },  // Monday
+      { dayOfWeek: 2, startTime: '09:00', endTime: '18:00', isAvailable: true },  // Tuesday
+      { dayOfWeek: 3, startTime: '09:00', endTime: '18:00', isAvailable: true },  // Wednesday
+      { dayOfWeek: 4, startTime: '09:00', endTime: '18:00', isAvailable: true },  // Thursday
+      { dayOfWeek: 5, startTime: '09:00', endTime: '18:00', isAvailable: false }, // Friday
+      { dayOfWeek: 6, startTime: '09:00', endTime: '18:00', isAvailable: false }, // Saturday
+    ];
+    
+    await updateBarberWeeklyAvailability(barberId, defaultSchedule);
+    console.log(`Initialized default availability for barber ${barberId}`);
+  } catch (error) {
+    console.error('Error initializing barber availability:', error);
+  }
+};
+
+// Get barber appointments for a specific day - helper function for BookingScreen
+export const getBarberAppointmentsForDay = async (barberId: string, date: Date): Promise<any[]> => {
+  try {
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+    
+    console.log('Querying appointments for barber:', barberId);
+    console.log('Date range:', startOfDay.toISOString(), 'to', endOfDay.toISOString());
+    
+    // Simplified query to avoid Firebase index issues
+    const q = query(
+      collection(db, 'appointments'),
+      where('barberId', '==', barberId)
+    );
+    
+    const snapshot = await getDocs(q);
+    const allAppointments = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+    
+    // Filter in JavaScript instead of Firestore
+    const filteredAppointments = allAppointments.filter((appointment: any) => {
+      // Only consider confirmed/pending appointments
+      if (!['confirmed', 'pending'].includes(appointment.status)) {
+        return false;
+      }
+      
+      // Check if appointment is on the selected date
+      let appointmentDate;
+      if (appointment.date && typeof appointment.date.toDate === 'function') {
+        appointmentDate = appointment.date.toDate();
+      } else if (appointment.date) {
+        appointmentDate = new Date(appointment.date);
+      } else {
+        return false;
+      }
+      
+      return appointmentDate >= startOfDay && appointmentDate <= endOfDay;
+    });
+    
+    console.log('Found appointments:', filteredAppointments.length);
+    console.log('Appointment details:', filteredAppointments);
+    return filteredAppointments;
+  } catch (error) {
+    console.error('Error getting barber appointments for day:', error);
+    return [];
+  }
+};

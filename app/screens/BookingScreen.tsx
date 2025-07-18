@@ -13,13 +13,17 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import {
     Barber,
     createAppointment,
     getBarbers,
+    getBarberAppointmentsForDay,
+    getBarberAvailability,
     getCurrentUser,
     getTreatments,
-    Treatment
+    Treatment,
+    initializeBarberAvailability
 } from '../../services/firebase';
 import TopNav from '../components/TopNav';
 
@@ -37,6 +41,7 @@ interface BookingScreenProps {
 }
 
 const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClose, route }) => {
+  const { t } = useTranslation();
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedBarber, setSelectedBarber] = useState<Barber | null>(null);
   const [selectedTreatment, setSelectedTreatment] = useState<Treatment | null>(null);
@@ -77,21 +82,191 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
       }
     } catch (error) {
       console.error('Error loading data:', error);
-      Alert.alert('שגיאה', 'לא ניתן לטעון את הנתונים');
+      Alert.alert(t('common.error'), t('errors.load_data_error'));
     } finally {
       setLoading(false);
     }
   };
 
-  const generateAvailableTimes = () => {
-    const times = [];
-    for (let hour = 9; hour <= 20; hour++) {
-      times.push(`${hour.toString().padStart(2, '0')}:00`);
-      if (hour < 20) {
-        times.push(`${hour.toString().padStart(2, '0')}:30`);
+  // Check if a slot is available (no overlap with existing appointments)
+  function isSlotAvailable(slotStart: Date, slotDuration: number, appointments: any[]) {
+    const slotEnd = new Date(slotStart.getTime() + slotDuration * 60000);
+    
+    console.log('Checking slot availability:', {
+      slotStart: `${slotStart.getHours()}:${slotStart.getMinutes().toString().padStart(2, '0')}`,
+      slotDuration,
+      totalAppointments: appointments.length
+    });
+    
+    for (const appt of appointments) {
+      try {
+        // Handle Firestore Timestamp objects
+        let apptStart: Date;
+        if (appt.date && typeof appt.date.toDate === 'function') {
+          // Firestore Timestamp
+          apptStart = appt.date.toDate();
+        } else if (appt.date) {
+          // Regular date string or number
+          apptStart = new Date(appt.date);
+        } else if (appt.time) {
+          // Fallback to time field
+          apptStart = new Date(appt.time);
+        } else {
+          console.warn('Appointment missing date/time:', appt);
+          continue;
+        }
+        
+        const apptDuration = appt.duration || 30; // Default 30min
+        const apptEnd = new Date(apptStart.getTime() + apptDuration * 60000);
+        
+        // Check for overlap - if any part of the slot overlaps with appointment
+        const hasOverlap = slotStart < apptEnd && slotEnd > apptStart;
+        
+        if (hasOverlap) {
+          console.log('❌ Slot blocked by appointment:', {
+            slotTime: `${slotStart.getHours()}:${slotStart.getMinutes().toString().padStart(2, '0')}`,
+            apptTime: `${apptStart.getHours()}:${apptStart.getMinutes().toString().padStart(2, '0')}`,
+            apptDuration,
+            apptStatus: appt.status,
+            apptId: appt.id
+          });
+          return false;
+        }
+      } catch (error) {
+        console.error('Error processing appointment:', appt, error);
+        continue;
       }
     }
-    setAvailableTimes(times);
+    
+    console.log('✅ Slot is available');
+    return true;
+  }
+
+  // Generate available slots for the selected barber, date, and treatment duration
+  async function generateAvailableSlots(barberId: string, date: Date, treatmentDuration: number) {
+    try {
+      console.log('=== GENERATING TIME SLOTS ===');
+      console.log('Barber ID:', barberId);
+      console.log('Date:', date.toDateString());
+      console.log('Treatment Duration:', treatmentDuration, 'minutes');
+      
+      // Get barber's availability for the selected day
+      const dayOfWeek = date.getDay();
+      
+      // Initialize availability if it doesn't exist
+      await initializeBarberAvailability(barberId);
+      
+      const barberAvailability = await getBarberAvailability(barberId);
+      const dayAvailability = barberAvailability.find(a => a.dayOfWeek === dayOfWeek);
+      
+      if (!dayAvailability || !dayAvailability.isAvailable) {
+        console.log('❌ Barber not available on this day, using default hours');
+        // Use default working hours if no availability is set
+        const defaultStartHour = 9;
+        const defaultEndHour = 18;
+        
+        // Skip if it's Friday (5) or Saturday (6)
+        if (dayOfWeek === 5 || dayOfWeek === 6) {
+          console.log('❌ Weekend day, no default hours');
+          return [];
+        }
+        
+        // Use default hours for weekdays
+        const appointments = await getBarberAppointmentsForDay(barberId, date);
+        console.log('Found', appointments.length, 'appointments for this day');
+        
+        const slots = [];
+        
+        // Generate time slots with default hours
+        const startTime = new Date(date);
+        startTime.setHours(defaultStartHour, 0, 0, 0);
+        
+        const endTime = new Date(date);
+        endTime.setHours(defaultEndHour, 0, 0, 0);
+        
+        const currentSlot = new Date(startTime);
+        
+        while (currentSlot < endTime) {
+          const slotEnd = new Date(currentSlot.getTime() + treatmentDuration * 60000);
+          if (slotEnd > endTime) {
+            break;
+          }
+          
+          // Skip past times if it's today
+          const now = new Date();
+          if (date.toDateString() === now.toDateString() && currentSlot <= now) {
+            currentSlot.setMinutes(currentSlot.getMinutes() + treatmentDuration);
+            continue;
+          }
+          
+          if (isSlotAvailable(currentSlot, treatmentDuration, appointments)) {
+            slots.push(new Date(currentSlot));
+          }
+          
+          currentSlot.setMinutes(currentSlot.getMinutes() + treatmentDuration);
+        }
+        
+        console.log('Generated default slots:', slots.length);
+        return slots;
+      }
+      
+      console.log('📅 Barber availability:', dayAvailability.startTime, 'to', dayAvailability.endTime);
+      
+      const appointments = await getBarberAppointmentsForDay(barberId, date);
+      console.log('Found', appointments.length, 'appointments for this day');
+      
+      const slots = [];
+      
+      // Parse barber's working hours
+      const [startHour, startMin] = dayAvailability.startTime.split(':').map(Number);
+      const [endHour, endMin] = dayAvailability.endTime.split(':').map(Number);
+      
+      // Generate time slots every [treatmentDuration] minutes within working hours
+      const startTime = new Date(date);
+      startTime.setHours(startHour, startMin, 0, 0);
+      
+      const endTime = new Date(date);
+      endTime.setHours(endHour, endMin, 0, 0);
+      
+      const currentSlot = new Date(startTime);
+      
+      while (currentSlot < endTime) {
+        // Check if slot + treatment duration fits within working hours
+        const slotEnd = new Date(currentSlot.getTime() + treatmentDuration * 60000);
+        if (slotEnd > endTime) {
+          break;
+        }
+        
+        // Skip past times if it's today
+        const now = new Date();
+        if (date.toDateString() === now.toDateString() && currentSlot <= now) {
+          currentSlot.setMinutes(currentSlot.getMinutes() + treatmentDuration);
+          continue;
+        }
+        
+        if (isSlotAvailable(currentSlot, treatmentDuration, appointments)) {
+          slots.push(new Date(currentSlot));
+        }
+        
+        currentSlot.setMinutes(currentSlot.getMinutes() + treatmentDuration);
+      }
+      
+      console.log('Generated', slots.length, 'available time slots');
+      console.log('Available times:', slots.map(s => `${s.getHours()}:${s.getMinutes().toString().padStart(2, '0')}`));
+      
+      return slots;
+    } catch (error) {
+      console.error('Error generating available slots:', error);
+      return [];
+    }
+  }
+
+  const generateAvailableTimes = async () => {
+    if (!selectedBarber || !selectedDate || !selectedTreatment) return;
+    
+    const slots = await generateAvailableSlots(selectedBarber.id, selectedDate, selectedTreatment.duration);
+    const timeStrings = slots.map(slot => slot.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+    setAvailableTimes(timeStrings);
   };
 
   const generateAvailableDates = () => {
@@ -119,12 +294,96 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
   const handleTreatmentSelect = (treatment: Treatment) => {
     setSelectedTreatment(treatment);
     setCurrentStep(3);
-    generateAvailableTimes();
+    // If we already have a selected date, generate times now
+    if (selectedDate && selectedBarber) {
+      generateAvailableSlots(selectedBarber.id, selectedDate, treatment.duration).then(slots => {
+        const timeStrings = slots.map(slot => slot.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+        setAvailableTimes(timeStrings);
+      });
+    }
   };
 
-  const handleDateSelect = (date: Date) => {
+  const handleDateSelect = async (date: Date) => {
     setSelectedDate(date);
     setCurrentStep(4);
+    if (selectedBarber && selectedTreatment) {
+      try {
+        const slots = await generateAvailableSlots(selectedBarber.id, date, selectedTreatment.duration);
+        const timeStrings = slots.map(slot => slot.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+        
+        // If no slots available, show basic times as fallback but filter out taken ones
+        if (timeStrings.length === 0) {
+          console.log('No slots available, using fallback times');
+          const fallbackTimes = [];
+          
+          // Get existing appointments for filtering
+          const existingAppointments = await getBarberAppointmentsForDay(selectedBarber.id, date);
+          
+          for (let hour = 9; hour <= 18; hour++) {
+            const timeSlots = [
+              `${hour.toString().padStart(2, '0')}:00`,
+              hour < 18 ? `${hour.toString().padStart(2, '0')}:30` : null
+            ].filter(Boolean);
+            
+            for (const timeSlot of timeSlots) {
+              // Check if this time slot is available
+              const slotDateTime = new Date(date);
+              const [slotHour, slotMin] = timeSlot.split(':').map(Number);
+              slotDateTime.setHours(slotHour, slotMin, 0, 0);
+              
+              if (isSlotAvailable(slotDateTime, selectedTreatment.duration, existingAppointments)) {
+                fallbackTimes.push(timeSlot);
+              }
+            }
+          }
+          
+          console.log('Filtered fallback times:', fallbackTimes);
+          setAvailableTimes(fallbackTimes);
+        } else {
+          setAvailableTimes(timeStrings);
+        }
+      } catch (error) {
+        console.error('Error generating slots, using fallback:', error);
+        // Fallback to basic times but filter out taken ones
+        const fallbackTimes = [];
+        
+        try {
+          // Get existing appointments for filtering
+          const existingAppointments = await getBarberAppointmentsForDay(selectedBarber.id, date);
+          
+          for (let hour = 9; hour <= 18; hour++) {
+            const timeSlots = [
+              `${hour.toString().padStart(2, '0')}:00`,
+              hour < 18 ? `${hour.toString().padStart(2, '0')}:30` : null
+            ].filter(Boolean);
+            
+            for (const timeSlot of timeSlots) {
+              // Check if this time slot is available
+              const slotDateTime = new Date(date);
+              const [slotHour, slotMin] = timeSlot.split(':').map(Number);
+              slotDateTime.setHours(slotHour, slotMin, 0, 0);
+              
+              if (isSlotAvailable(slotDateTime, selectedTreatment.duration, existingAppointments)) {
+                fallbackTimes.push(timeSlot);
+              }
+            }
+          }
+          
+          console.log('Error fallback - filtered times:', fallbackTimes);
+        } catch (innerError) {
+          console.error('Error in fallback filtering:', innerError);
+          // Last resort - show basic times
+          for (let hour = 9; hour <= 18; hour++) {
+            fallbackTimes.push(`${hour.toString().padStart(2, '0')}:00`);
+            if (hour < 18) {
+              fallbackTimes.push(`${hour.toString().padStart(2, '0')}:30`);
+            }
+          }
+        }
+        
+        setAvailableTimes(fallbackTimes);
+      }
+    }
   };
 
   const handleTimeSelect = (time: string) => {
@@ -135,13 +394,13 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
   const handleConfirmBooking = async () => {
     const user = getCurrentUser();
     if (!user) {
-      Alert.alert('שגיאה', 'יש להתחבר כדי לקבוע תור');
+      Alert.alert(t('common.error'), t('booking.login_required'));
       onNavigate('profile');
       return;
     }
 
     if (!selectedBarber || !selectedTreatment || !selectedDate || !selectedTime) {
-      Alert.alert('שגיאה', 'יש לבחור את כל הפרטים');
+      Alert.alert(t('common.error'), t('booking.select_all_details'));
       return;
     }
 
@@ -151,21 +410,53 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
       const [hours, minutes] = selectedTime.split(':').map(Number);
       appointmentDateTime.setHours(hours, minutes, 0, 0);
 
+      console.log('Creating appointment:', {
+        barberId: selectedBarber.id,
+        date: appointmentDateTime.toISOString(),
+        duration: selectedTreatment.duration
+      });
+
+      // Double-check availability before creating appointment
+      const existingAppointments = await getBarberAppointmentsForDay(selectedBarber.id, selectedDate);
+      const isStillAvailable = isSlotAvailable(appointmentDateTime, selectedTreatment.duration, existingAppointments);
+      
+      if (!isStillAvailable) {
+        Alert.alert(
+          t('booking.slot_taken'),
+          t('booking.slot_taken_message'),
+          [{ text: t('common.confirm'), style: 'default' }]
+        );
+        setBooking(false);
+        setShowConfirmModal(false);
+        // Refresh available times
+        if (selectedBarber && selectedTreatment) {
+          const slots = await generateAvailableSlots(selectedBarber.id, selectedDate, selectedTreatment.duration);
+          const timeStrings = slots.map(slot => slot.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+          setAvailableTimes(timeStrings);
+        }
+        return;
+      }
+
       await createAppointment({
         userId: user.uid,
         barberId: selectedBarber.id,
         treatmentId: selectedTreatment.id,
         date: Timestamp.fromDate(appointmentDateTime),
+        duration: selectedTreatment.duration, // Save duration!
         status: 'confirmed' // Changed from 'pending' to 'confirmed' - auto-approve appointments
       });
 
+      console.log('Appointment created successfully');
       setShowConfirmModal(false);
       Alert.alert(
-        'התור נקבע בהצלחה!',
-        `התור שלך נקבע ל-${selectedDate.toLocaleDateString('he-IL')} בשעה ${selectedTime}`,
+        t('booking.appointment_booked'),
+        t('booking.appointment_details', { 
+          date: selectedDate.toLocaleDateString('he-IL'), 
+          time: selectedTime 
+        }),
         [
           {
-            text: 'אישור',
+            text: t('common.confirm'),
             onPress: () => {
               resetBooking();
               onNavigate('profile');
@@ -175,7 +466,7 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
       );
     } catch (error) {
       console.error('Error creating appointment:', error);
-      Alert.alert('שגיאה', 'לא ניתן לקבוע את התור');
+      Alert.alert(t('common.error'), t('booking.booking_error'));
     } finally {
       setBooking(false);
     }
@@ -235,7 +526,7 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
     return (
       <SafeAreaView style={styles.container}>
         <TopNav 
-          title="הזמנת תור" 
+          title={t('booking.title')} 
           onBellPress={() => {}} 
           onMenuPress={() => {}} 
           showBackButton={true}
@@ -244,7 +535,7 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
           onClosePress={onClose}
         />
         <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>טוען...</Text>
+          <Text style={styles.loadingText}>{t('common.loading')}</Text>
         </View>
       </SafeAreaView>
     );
@@ -253,7 +544,7 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
   return (
     <SafeAreaView style={styles.container}>
       <TopNav 
-        title="הזמנת תור" 
+        title={t('booking.title')} 
         onBellPress={() => {}} 
         onMenuPress={() => {}} 
         showBackButton={true}
@@ -267,7 +558,7 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
         <View style={styles.progressBar}>
           <View style={[styles.progressFill, { width: `${(currentStep / 4) * 100}%` }]} />
         </View>
-        <Text style={styles.progressText}>שלב {currentStep} מתוך 4</Text>
+        <Text style={styles.progressText}>{t('booking.step_of', { current: currentStep, total: 4 })}</Text>
       </View>
 
       {/* Step Header */}
@@ -275,7 +566,7 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
         <Text style={styles.stepTitle}>{getStepTitle()}</Text>
         {currentStep > 1 && (
           <TouchableOpacity style={styles.backButton} onPress={goBack}>
-            <Text style={styles.backButtonText}>חזור</Text>
+            <Text style={styles.backButtonText}>{t('common.back')}</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -315,11 +606,11 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
                     <Text style={styles.barberName}>{barber.name}</Text>
                     <Text style={styles.barberExperience}>{barber.experience}</Text>
                     <TouchableOpacity style={styles.detailsButton} onPress={() => setDetailsBarber(barber)}>
-                      <Text style={styles.detailsButtonText}>לפרטים</Text>
+                      <Text style={styles.detailsButtonText}>{t('booking.details')}</Text>
                     </TouchableOpacity>
                     {!barber.available && (
                       <View style={styles.unavailableBadge}>
-                        <Text style={styles.unavailableText}>לא זמין</Text>
+                        <Text style={styles.unavailableText}>{t('booking.unavailable')}</Text>
                       </View>
                     )}
                   </LinearGradient>
@@ -355,8 +646,8 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
                       <Text style={styles.treatmentName}>{treatment.name}</Text>
                       <Text style={styles.treatmentDescription}>{treatment.description}</Text>
                       <View style={styles.treatmentDetails}>
-                        <Text style={styles.treatmentPrice}>₪{treatment.price}</Text>
-                        <Text style={styles.treatmentDuration}>{treatment.duration} דקות</Text>
+                        <Text style={styles.treatmentPrice}>{t('booking.price', { price: treatment.price })}</Text>
+                        <Text style={styles.treatmentDuration}>{t('booking.duration', { duration: treatment.duration })}</Text>
                       </View>
                     </View>
                   </LinearGradient>
@@ -430,32 +721,32 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
             >
-              <Text style={styles.summaryTitle}>סיכום הזמנה</Text>
+              <Text style={styles.summaryTitle}>{t('booking.booking_summary')}</Text>
               
               {selectedBarber && (
                 <View style={styles.summaryItem}>
-                  <Text style={styles.summaryLabel}>ספר:</Text>
+                  <Text style={styles.summaryLabel}>{t('booking.barber')}</Text>
                   <Text style={styles.summaryValue}>{selectedBarber.name}</Text>
                 </View>
               )}
               
               {selectedTreatment && (
                 <View style={styles.summaryItem}>
-                  <Text style={styles.summaryLabel}>טיפול:</Text>
+                  <Text style={styles.summaryLabel}>{t('booking.treatment')}</Text>
                   <Text style={styles.summaryValue}>{selectedTreatment.name}</Text>
                 </View>
               )}
               
               {selectedDate && (
                 <View style={styles.summaryItem}>
-                  <Text style={styles.summaryLabel}>תאריך:</Text>
+                  <Text style={styles.summaryLabel}>{t('booking.date')}</Text>
                   <Text style={styles.summaryValue}>{formatDate(selectedDate)}</Text>
                 </View>
               )}
               
               {selectedTime && (
                 <View style={styles.summaryItem}>
-                  <Text style={styles.summaryLabel}>שעה:</Text>
+                  <Text style={styles.summaryLabel}>{t('booking.time')}</Text>
                   <Text style={styles.summaryValue}>{selectedTime}</Text>
                 </View>
               )}
@@ -473,23 +764,23 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>אישור הזמנה</Text>
+            <Text style={styles.modalTitle}>{t('booking.confirm_booking')}</Text>
             
             <View style={styles.confirmationDetails}>
               <Text style={styles.confirmationText}>
-                ספר: {selectedBarber?.name}
+                {t('booking.barber')} {selectedBarber?.name}
               </Text>
               <Text style={styles.confirmationText}>
-                טיפול: {selectedTreatment?.name}
+                {t('booking.treatment')} {selectedTreatment?.name}
               </Text>
               <Text style={styles.confirmationText}>
-                תאריך: {selectedDate && formatDate(selectedDate)}
+                {t('booking.date')} {selectedDate && formatDate(selectedDate)}
               </Text>
               <Text style={styles.confirmationText}>
-                שעה: {selectedTime}
+                {t('booking.time')} {selectedTime}
               </Text>
               <Text style={styles.confirmationPrice}>
-                מחיר: ₪{selectedTreatment?.price}
+                {t('booking.price', { price: selectedTreatment?.price })}
               </Text>
             </View>
 
@@ -500,7 +791,7 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
                 disabled={booking}
               >
                 <Text style={styles.confirmButtonText}>
-                  {booking ? 'מבצע הזמנה...' : 'אישור הזמנה'}
+                  {booking ? t('common.loading') : t('booking.confirm_booking')}
                 </Text>
               </TouchableOpacity>
               
@@ -509,7 +800,7 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
                 onPress={() => setShowConfirmModal(false)}
                 disabled={booking}
               >
-                <Text style={styles.cancelButtonText}>ביטול</Text>
+                <Text style={styles.cancelButtonText}>{t('common.cancel')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -531,7 +822,7 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
             <Text style={{ fontSize: 22, fontWeight: 'bold', marginBottom: 6 }}>{detailsBarber?.name}</Text>
             <Text style={{ fontSize: 16, color: '#666', marginBottom: 8 }}>{detailsBarber?.experience}</Text>
             {detailsBarber?.phone && (
-              <Text style={{ fontSize: 16, color: '#3b82f6', marginBottom: 8 }}>טלפון: {detailsBarber.phone}</Text>
+              <Text style={{ fontSize: 16, color: '#3b82f6', marginBottom: 8 }}>{t('profile.phone')} {detailsBarber.phone}</Text>
             )}
             <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
               {/* אייקון וואטסאפ */}
@@ -540,7 +831,7 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
               </View>
             </View>
             <TouchableOpacity onPress={() => setDetailsBarber(null)} style={{ marginTop: 18 }}>
-              <Text style={{ color: '#3b82f6', fontWeight: 'bold' }}>סגור</Text>
+              <Text style={{ color: '#3b82f6', fontWeight: 'bold' }}>{t('common.close')}</Text>
             </TouchableOpacity>
           </View>
         </View>
