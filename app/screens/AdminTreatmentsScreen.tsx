@@ -340,59 +340,92 @@ const AdminTreatmentsScreen: React.FC<AdminTreatmentsScreenProps> = ({ onNavigat
               </TouchableOpacity>
             </View>
 
-            <View style={styles.modalBody}>
-              <Text style={styles.inputLabel}>שם הטיפול</Text>
-              <TextInput
-                style={styles.textInput}
-                value={formData.name}
-                onChangeText={(text) => {
-                  console.log('📝 Updating name:', text);
-                  setFormData({ ...formData, name: text });
-                }}
-                placeholder="לדוגמה: תספורת קלאסית"
-                textAlign="right"
-              />
+            <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+              {/* פרטי הטיפול */}
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>פרטי הטיפול</Text>
+                
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>שם הטיפול *</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    value={formData.name}
+                    onChangeText={(text) => {
+                      console.log('📝 Updating name:', text);
+                      setFormData({ ...formData, name: text });
+                    }}
+                    placeholder="לדוגמה: תספורת קלאסית"
+                    textAlign="right"
+                    placeholderTextColor="#999"
+                  />
+                </View>
 
-              <Text style={styles.inputLabel}>זמן הטיפול (דקות)</Text>
-              <TextInput
-                style={styles.textInput}
-                value={formData.duration}
-                onChangeText={(text) => setFormData({ ...formData, duration: text })}
-                placeholder="30"
-                keyboardType="numeric"
-                textAlign="right"
-              />
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>תיאור הטיפול *</Text>
+                  <TextInput
+                    style={[styles.textInput, styles.textArea]}
+                    value={formData.description}
+                    onChangeText={(text) => setFormData({ ...formData, description: text })}
+                    placeholder="תיאור מפורט של הטיפול"
+                    multiline
+                    numberOfLines={4}
+                    textAlign="right"
+                    placeholderTextColor="#999"
+                  />
+                </View>
+              </View>
 
-              <Text style={styles.inputLabel}>מחיר (₪)</Text>
-              <TextInput
-                style={styles.textInput}
-                value={formData.price}
-                onChangeText={(text) => setFormData({ ...formData, price: text })}
-                placeholder="80"
-                keyboardType="numeric"
-                textAlign="right"
-              />
+              {/* מחיר וזמן */}
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>מחיר וזמן</Text>
+                
+                <View style={styles.row}>
+                  <View style={[styles.inputGroup, styles.halfWidth]}>
+                    <Text style={styles.inputLabel}>זמן הטיפול (דקות) *</Text>
+                    <TextInput
+                      style={styles.textInput}
+                      value={formData.duration}
+                      onChangeText={(text) => setFormData({ ...formData, duration: text })}
+                      placeholder="30"
+                      keyboardType="numeric"
+                      textAlign="right"
+                      placeholderTextColor="#999"
+                    />
+                  </View>
 
-              <Text style={styles.inputLabel}>תיאור הטיפול</Text>
-              <TextInput
-                style={[styles.textInput, styles.textArea]}
-                value={formData.description}
-                onChangeText={(text) => setFormData({ ...formData, description: text })}
-                placeholder="תיאור מפורט של הטיפול"
-                multiline
-                numberOfLines={4}
-                textAlign="right"
-              />
+                  <View style={[styles.inputGroup, styles.halfWidth]}>
+                    <Text style={styles.inputLabel}>מחיר (₪) *</Text>
+                    <TextInput
+                      style={styles.textInput}
+                      value={formData.price}
+                      onChangeText={(text) => setFormData({ ...formData, price: text })}
+                      placeholder="80"
+                      keyboardType="numeric"
+                      textAlign="right"
+                      placeholderTextColor="#999"
+                    />
+                  </View>
+                </View>
+              </View>
 
-              <Text style={styles.inputLabel}>קישור לתמונה (אופציונלי)</Text>
-              <TextInput
-                style={styles.textInput}
-                value={formData.image}
-                onChangeText={(text) => setFormData({ ...formData, image: text })}
-                placeholder="https://example.com/image.jpg"
-                textAlign="right"
-              />
-            </View>
+              {/* תמונה */}
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>תמונה (אופציונלי)</Text>
+                
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>קישור לתמונה</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    value={formData.image}
+                    onChangeText={(text) => setFormData({ ...formData, image: text })}
+                    placeholder="https://example.com/image.jpg"
+                    textAlign="right"
+                    placeholderTextColor="#999"
+                  />
+                  <Text style={styles.inputHint}>השאר ריק אם אין תמונה</Text>
+                </View>
+              </View>
+            </ScrollView>
 
             <View style={styles.modalActions}>
               <TouchableOpacity
@@ -406,7 +439,7 @@ const AdminTreatmentsScreen: React.FC<AdminTreatmentsScreenProps> = ({ onNavigat
                 style={[styles.actionButton, styles.saveButton]}
                 onPress={handleSave}
               >
-                <Text style={styles.saveButtonText}>שמור</Text>
+                <Text style={styles.saveButtonText}>שמור טיפול</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -571,18 +604,22 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 24,
     margin: 20,
-    width: '90%',
-    maxWidth: 400,
-    maxHeight: '90%',
+    width: '95%',
+    maxWidth: 450,
+    maxHeight: '95%',
+    minHeight: 500,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 20,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: 'bold',
     color: '#222',
   },
@@ -595,7 +632,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#333',
     marginBottom: 8,
-    marginTop: 16,
     textAlign: 'right',
   },
   textInput: {
@@ -606,20 +642,27 @@ const styles = StyleSheet.create({
     fontSize: 16,
     backgroundColor: '#fff',
     marginBottom: 8,
+    minHeight: 48,
   },
   textArea: {
     height: 100,
     textAlignVertical: 'top',
+    minHeight: 100,
   },
   modalActions: {
     flexDirection: 'row',
     gap: 12,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
   },
   actionButton: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: 16,
     borderRadius: 8,
     alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 50,
   },
   cancelButton: {
     backgroundColor: '#f8f9fa',
@@ -697,6 +740,27 @@ const styles = StyleSheet.create({
   debugText: {
     fontSize: 12,
     color: '#333',
+  },
+  section: {
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#222',
+    marginBottom: 12,
+    textAlign: 'right',
+  },
+  inputGroup: {
+    marginBottom: 12,
+  },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  halfWidth: {
+    flex: 1,
   },
 });
 
