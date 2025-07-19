@@ -26,6 +26,9 @@ export default function AdminHomeTab() {
       case 'admin-availability':
         router.replace('/admin-availability');
         break;
+      case 'admin-statistics':
+        router.replace('/admin-statistics');
+        break;
       case 'settings':
         router.replace('/settings');
         break;

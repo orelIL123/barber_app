@@ -2,16 +2,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useState } from 'react';
 import {
-  Alert,
-  Dimensions,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Dimensions,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
 } from 'react-native';
-import { checkIsAdmin, onAuthStateChange, initializeCollections, initializeGalleryImages, replaceGalleryPlaceholders, resetGalleryWithRealImages, listAllStorageImages, restoreGalleryFromStorage } from '../../services/firebase';
+import { checkIsAdmin, initializeCollections, initializeGalleryImages, listAllStorageImages, onAuthStateChange, replaceGalleryPlaceholders, resetGalleryWithRealImages, restoreGalleryFromStorage } from '../../services/firebase';
 import ToastMessage from '../components/ToastMessage';
 import TopNav from '../components/TopNav';
 
@@ -149,11 +148,18 @@ const AdminHomeScreen: React.FC<AdminHomeScreenProps> = ({ onNavigate, onBack })
       color: '#6f42c1'
     },
     {
+      title: 'סטטיסטיקות עסק',
+      subtitle: 'דשבורד הכנסות, לקוחות וטיפולים',
+      icon: 'analytics',
+      screen: 'admin-statistics',
+      color: '#17a2b8'
+    },
+    {
       title: 'צפה כלקוח',
       subtitle: 'צפה באפליקציה כמשתמש רגיל',
       icon: 'eye',
       screen: 'home',
-      color: '#17a2b8'
+      color: '#fd7e14'
     }
   ];
 
