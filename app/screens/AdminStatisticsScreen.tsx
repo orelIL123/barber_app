@@ -15,7 +15,8 @@ import {
     getAllAppointments,
     getBarbers,
     getTreatments,
-    onAuthStateChange
+    onAuthStateChange,
+    updateAppointment
 } from '../../services/firebase';
 import TopNav from '../components/TopNav';
 
@@ -73,8 +74,64 @@ const AdminStatisticsScreen: React.FC<AdminStatisticsScreenProps> = ({ onNavigat
   useEffect(() => {
     if (isAdmin) {
       loadStatistics();
+      
+      // Set up automatic appointment completion check
+      const interval = setInterval(() => {
+        checkAndCompleteAppointments();
+      }, 60000); // Check every minute
+      
+      return () => clearInterval(interval);
     }
   }, [isAdmin]);
+
+  const checkAndCompleteAppointments = async () => {
+    try {
+      const appointments = await getAllAppointments();
+      const now = new Date();
+      let completedCount = 0;
+      
+      for (const appointment of appointments) {
+        // Only process scheduled appointments
+        if ((appointment.status as any) !== 'scheduled') continue;
+        
+        let appointmentDate: Date;
+        try {
+          const dateValue = appointment.date as any;
+          if (dateValue && typeof dateValue.toDate === 'function') {
+            appointmentDate = dateValue.toDate();
+          } else if (dateValue) {
+            appointmentDate = new Date(dateValue);
+          } else {
+            continue;
+          }
+        } catch (error) {
+          console.warn('Error parsing appointment date for auto-completion:', error);
+          continue;
+        }
+        
+        // Check if appointment time has passed (add 30 minutes buffer for treatment duration)
+        const appointmentEndTime = new Date(appointmentDate.getTime() + 30 * 60000);
+        
+        if (now > appointmentEndTime) {
+          console.log(`🕐 Auto-completing appointment: ${appointment.id} at ${appointmentDate.toLocaleString()}`);
+          
+          // Update appointment status to completed
+          await updateAppointment(appointment.id, { status: 'completed' as any });
+          completedCount++;
+        }
+      }
+      
+      // If any appointments were completed, reload statistics
+      if (completedCount > 0) {
+        console.log(`✅ Auto-completed ${completedCount} appointments`);
+        setTimeout(() => {
+          loadStatistics();
+        }, 1000);
+      }
+    } catch (error) {
+      console.error('Error in automatic appointment completion:', error);
+    }
+  };
 
   const loadStatistics = async () => {
     try {
@@ -161,7 +218,7 @@ const AdminStatisticsScreen: React.FC<AdminStatisticsScreenProps> = ({ onNavigat
               barberCounts[barber.name].appointments++;
               barberCounts[barber.name].revenue += revenue;
             }
-          } else if (appointment.status === 'pending') {
+          } else if ((appointment.status as any) === 'scheduled' || (appointment.status as any) === 'confirmed') {
             pendingAppointments++;
           }
         }
@@ -343,6 +400,11 @@ const AdminStatisticsScreen: React.FC<AdminStatisticsScreenProps> = ({ onNavigat
             <TouchableOpacity style={styles.refreshButton} onPress={loadStatistics}>
               <Ionicons name="refresh" size={20} color="#fff" />
               <Text style={styles.refreshButtonText}>רענן נתונים</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity style={styles.checkButton} onPress={checkAndCompleteAppointments}>
+              <Ionicons name="checkmark-circle" size={20} color="#fff" />
+              <Text style={styles.checkButtonText}>בדוק השלמת תורים</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -568,6 +630,9 @@ const styles = StyleSheet.create({
   },
   refreshSection: {
     marginTop: 24,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   refreshButton: {
     backgroundColor: '#17a2b8',
@@ -576,8 +641,26 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 16,
     borderRadius: 8,
+    flex: 1,
+    marginRight: 8,
   },
   refreshButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 8,
+  },
+  checkButton: {
+    backgroundColor: '#dc3545',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    borderRadius: 8,
+    flex: 1,
+    marginLeft: 8,
+  },
+  checkButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
