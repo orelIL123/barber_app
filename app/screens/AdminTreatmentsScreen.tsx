@@ -128,15 +128,19 @@ const AdminTreatmentsScreen: React.FC<AdminTreatmentsScreenProps> = ({ onNavigat
   };
 
   const openAddModal = () => {
+    console.log('🔧 Opening add treatment modal...');
     setEditingTreatment(null);
-    setFormData({
+    const initialFormData = {
       name: '',
       duration: '',
       price: '',
       description: '',
       image: ''
-    });
+    };
+    console.log('📝 Initial form data:', initialFormData);
+    setFormData(initialFormData);
     setModalVisible(true);
+    console.log('✅ Modal should be visible now');
   };
 
   const openEditModal = (treatment: Treatment) => {
@@ -337,12 +341,21 @@ const AdminTreatmentsScreen: React.FC<AdminTreatmentsScreenProps> = ({ onNavigat
             </View>
 
             <ScrollView style={styles.modalBody}>
+              {/* Debug info */}
+              <View style={styles.debugInfo}>
+                <Text style={styles.debugText}>Modal is open: {modalVisible ? 'Yes' : 'No'}</Text>
+                <Text style={styles.debugText}>Form data: {JSON.stringify(formData)}</Text>
+              </View>
+
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>שם הטיפול</Text>
                 <TextInput
                   style={styles.textInput}
                   value={formData.name}
-                  onChangeText={(text) => setFormData({ ...formData, name: text })}
+                  onChangeText={(text) => {
+                    console.log('📝 Updating name:', text);
+                    setFormData({ ...formData, name: text });
+                  }}
                   placeholder="לדוגמה: תספורת קלאסית"
                   textAlign="right"
                 />
@@ -605,7 +618,8 @@ const styles = StyleSheet.create({
     margin: 20,
     width: '90%',
     maxWidth: 400,
-    maxHeight: '80%',
+    maxHeight: '90%',
+    minHeight: 400,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -719,6 +733,17 @@ const styles = StyleSheet.create({
     color: '#999',
     marginTop: 4,
     textAlign: 'right',
+  },
+  debugInfo: {
+    backgroundColor: '#f0f0f0',
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 16,
+    alignItems: 'center',
+  },
+  debugText: {
+    fontSize: 12,
+    color: '#333',
   },
 });
 
