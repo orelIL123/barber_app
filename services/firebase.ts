@@ -149,9 +149,26 @@ export const onAuthStateChange = (callback: (user: User | null) => void) => {
 };
 
 // Phone authentication functions
-export const sendSMSVerification = async (phoneNumber: string, recaptchaVerifier: RecaptchaVerifier) => {
+export const sendSMSVerification = async (phoneNumber: string, recaptchaVerifier?: RecaptchaVerifier | null) => {
   try {
-    const confirmationResult = await signInWithPhoneNumber(auth, phoneNumber, recaptchaVerifier);
+    // For React Native, we don't need reCAPTCHA
+    // The phone number should be in international format
+    let formattedPhone = phoneNumber;
+    
+    // Add +972 prefix if not present
+    if (!phoneNumber.startsWith('+')) {
+      if (phoneNumber.startsWith('0')) {
+        formattedPhone = '+972' + phoneNumber.substring(1);
+      } else {
+        formattedPhone = '+972' + phoneNumber;
+      }
+    }
+    
+    console.log('📱 Sending SMS to:', formattedPhone);
+    
+    // For React Native, we'll use a different approach
+    // You might need to implement this differently based on your Firebase setup
+    const confirmationResult = await signInWithPhoneNumber(auth, formattedPhone, recaptchaVerifier as any);
     return confirmationResult;
   } catch (error) {
     console.error('Error sending SMS:', error);
@@ -242,7 +259,7 @@ export const getAllUsers = async (): Promise<UserProfile[]> => {
     
     querySnapshot.forEach((doc) => {
       users.push({
-        id: doc.id,
+        uid: doc.id,
         ...doc.data()
       } as UserProfile);
     });
@@ -347,10 +364,9 @@ export const getUserAppointments = async (userId: string): Promise<Appointment[]
     // Sort by date in JavaScript instead of Firestore
     appointments.sort((a, b) => {
       if (a.date && b.date) {
-        // Handle both Timestamp objects and regular Date objects
-        const aTime = a.date.toMillis ? a.date.toMillis() : new Date(a.date).getTime();
-        const bTime = b.date.toMillis ? b.date.toMillis() : new Date(b.date).getTime();
-        return bTime - aTime;
+        const aTime = a.date.toMillis ? a.date.toMillis() : new Date(a.date as any).getTime();
+        const bTime = b.date.toMillis ? b.date.toMillis() : new Date(b.date as any).getTime();
+        return aTime - bTime;
       }
       return 0;
     });
@@ -471,8 +487,8 @@ export const getAllAppointments = async (): Promise<Appointment[]> => {
     appointments.sort((a, b) => {
       if (a.date && b.date) {
         // Handle both Timestamp objects and regular Date objects
-        const aTime = a.date.toMillis ? a.date.toMillis() : new Date(a.date).getTime();
-        const bTime = b.date.toMillis ? b.date.toMillis() : new Date(b.date).getTime();
+        const aTime = a.date.toMillis ? a.date.toMillis() : new Date(a.date as any).getTime();
+        const bTime = b.date.toMillis ? b.date.toMillis() : new Date(b.date as any).getTime();
         return bTime - aTime;
       }
       return 0;
