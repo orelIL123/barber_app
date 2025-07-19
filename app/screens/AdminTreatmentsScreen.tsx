@@ -340,104 +340,59 @@ const AdminTreatmentsScreen: React.FC<AdminTreatmentsScreenProps> = ({ onNavigat
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.modalBody}>
-              {/* Debug info */}
-              <View style={styles.debugInfo}>
-                <Text style={styles.debugText}>Modal is open: {modalVisible ? 'Yes' : 'No'}</Text>
-                <Text style={styles.debugText}>Form data: {JSON.stringify(formData)}</Text>
-              </View>
+            <View style={styles.modalBody}>
+              <Text style={styles.inputLabel}>שם הטיפול</Text>
+              <TextInput
+                style={styles.textInput}
+                value={formData.name}
+                onChangeText={(text) => {
+                  console.log('📝 Updating name:', text);
+                  setFormData({ ...formData, name: text });
+                }}
+                placeholder="לדוגמה: תספורת קלאסית"
+                textAlign="right"
+              />
 
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>שם הטיפול</Text>
-                <TextInput
-                  style={styles.textInput}
-                  value={formData.name}
-                  onChangeText={(text) => {
-                    console.log('📝 Updating name:', text);
-                    setFormData({ ...formData, name: text });
-                  }}
-                  placeholder="לדוגמה: תספורת קלאסית"
-                  textAlign="right"
-                />
-              </View>
+              <Text style={styles.inputLabel}>זמן הטיפול (דקות)</Text>
+              <TextInput
+                style={styles.textInput}
+                value={formData.duration}
+                onChangeText={(text) => setFormData({ ...formData, duration: text })}
+                placeholder="30"
+                keyboardType="numeric"
+                textAlign="right"
+              />
 
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>זמן הטיפול (דקות)</Text>
-                <TextInput
-                  style={styles.textInput}
-                  value={formData.duration}
-                  onChangeText={(text) => setFormData({ ...formData, duration: text })}
-                  placeholder="30"
-                  keyboardType="numeric"
-                  textAlign="right"
-                />
-              </View>
+              <Text style={styles.inputLabel}>מחיר (₪)</Text>
+              <TextInput
+                style={styles.textInput}
+                value={formData.price}
+                onChangeText={(text) => setFormData({ ...formData, price: text })}
+                placeholder="80"
+                keyboardType="numeric"
+                textAlign="right"
+              />
 
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>מחיר (₪)</Text>
-                <TextInput
-                  style={styles.textInput}
-                  value={formData.price}
-                  onChangeText={(text) => setFormData({ ...formData, price: text })}
-                  placeholder="80"
-                  keyboardType="numeric"
-                  textAlign="right"
-                />
-              </View>
+              <Text style={styles.inputLabel}>תיאור הטיפול</Text>
+              <TextInput
+                style={[styles.textInput, styles.textArea]}
+                value={formData.description}
+                onChangeText={(text) => setFormData({ ...formData, description: text })}
+                placeholder="תיאור מפורט של הטיפול"
+                multiline
+                numberOfLines={4}
+                textAlign="right"
+              />
 
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>תיאור הטיפול</Text>
-                <TextInput
-                  style={[styles.textInput, styles.textArea]}
-                  value={formData.description}
-                  onChangeText={(text) => setFormData({ ...formData, description: text })}
-                  placeholder="תיאור מפורט של הטיפול"
-                  multiline
-                  numberOfLines={4}
-                  textAlign="right"
-                />
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>תמונה לטיפול</Text>
-                {formData.image ? (
-                  <View style={styles.imagePreviewContainer}>
-                    <Image
-                      source={{ uri: formData.image }}
-                      style={styles.imagePreview}
-                      defaultSource={{ uri: 'https://via.placeholder.com/200x150' }}
-                    />
-                    <TouchableOpacity
-                      style={styles.changeImageButton}
-                      onPress={uploadTreatmentImage}
-                    >
-                      <Ionicons name="camera" size={20} color="#007bff" />
-                      <Text style={styles.changeImageText}>שנה תמונה</Text>
-                    </TouchableOpacity>
-                  </View>
-                ) : (
-                  <TouchableOpacity
-                    style={styles.uploadImageButton}
-                    onPress={uploadTreatmentImage}
-                  >
-                    <Ionicons name="camera" size={24} color="#007bff" />
-                    <Text style={styles.uploadImageText}>העלה תמונה מהטלפון</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>קישור לתמונה (אופציונלי)</Text>
-                <TextInput
-                  style={styles.textInput}
-                  value={formData.image}
-                  onChangeText={(text) => setFormData({ ...formData, image: text })}
-                  placeholder="https://example.com/image.jpg"
-                  textAlign="right"
-                />
-                <Text style={styles.inputHint}>או השתמש בקישור ישיר לתמונה</Text>
-              </View>
-            </ScrollView>
+              <Text style={styles.inputLabel}>קישור לתמונה (אופציונלי)</Text>
+              <TextInput
+                style={styles.textInput}
+                value={formData.image}
+                onChangeText={(text) => setFormData({ ...formData, image: text })}
+                placeholder="https://example.com/image.jpg"
+                textAlign="right"
+              />
+            </View>
 
             <View style={styles.modalActions}>
               <TouchableOpacity
@@ -619,7 +574,6 @@ const styles = StyleSheet.create({
     width: '90%',
     maxWidth: 400,
     maxHeight: '90%',
-    minHeight: 400,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -636,14 +590,12 @@ const styles = StyleSheet.create({
     flex: 1,
     marginBottom: 20,
   },
-  inputGroup: {
-    marginBottom: 16,
-  },
   inputLabel: {
     fontSize: 16,
     fontWeight: '600',
     color: '#333',
     marginBottom: 8,
+    marginTop: 16,
     textAlign: 'right',
   },
   textInput: {
@@ -653,6 +605,7 @@ const styles = StyleSheet.create({
     padding: 12,
     fontSize: 16,
     backgroundColor: '#fff',
+    marginBottom: 8,
   },
   textArea: {
     height: 100,
