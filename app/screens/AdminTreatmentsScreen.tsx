@@ -1,10 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
     Alert,
     Image,
+    KeyboardAvoidingView,
     Modal,
+    Platform,
     SafeAreaView,
     ScrollView,
     StyleSheet,
@@ -44,6 +46,14 @@ const AdminTreatmentsScreen: React.FC<AdminTreatmentsScreenProps> = ({ onNavigat
     description: '',
     image: ''
   });
+
+  // Refs for keyboard navigation
+  const nameInputRef = useRef<TextInput>(null);
+  const descriptionInputRef = useRef<TextInput>(null);
+  const durationInputRef = useRef<TextInput>(null);
+  const priceInputRef = useRef<TextInput>(null);
+  const imageInputRef = useRef<TextInput>(null);
+  const [currentField, setCurrentField] = useState<string>('name');
 
   useEffect(() => {
     loadTreatments();
@@ -124,6 +134,44 @@ const AdminTreatmentsScreen: React.FC<AdminTreatmentsScreenProps> = ({ onNavigat
     } catch (error) {
       console.error('❌ Error uploading treatment image:', error);
       showToast('שגיאה בהעלאת התמונה', 'error');
+    }
+  };
+
+  const focusNextField = () => {
+    switch (currentField) {
+      case 'name':
+        descriptionInputRef.current?.focus();
+        break;
+      case 'description':
+        durationInputRef.current?.focus();
+        break;
+      case 'duration':
+        priceInputRef.current?.focus();
+        break;
+      case 'price':
+        imageInputRef.current?.focus();
+        break;
+      case 'image':
+        // Last field, save the treatment
+        handleSave();
+        break;
+    }
+  };
+
+  const focusPreviousField = () => {
+    switch (currentField) {
+      case 'description':
+        nameInputRef.current?.focus();
+        break;
+      case 'duration':
+        descriptionInputRef.current?.focus();
+        break;
+      case 'price':
+        durationInputRef.current?.focus();
+        break;
+      case 'image':
+        priceInputRef.current?.focus();
+        break;
     }
   };
 
@@ -329,7 +377,10 @@ const AdminTreatmentsScreen: React.FC<AdminTreatmentsScreenProps> = ({ onNavigat
         visible={modalVisible}
         onRequestClose={() => setModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView 
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
@@ -357,6 +408,10 @@ const AdminTreatmentsScreen: React.FC<AdminTreatmentsScreenProps> = ({ onNavigat
                     placeholder="לדוגמה: תספורת קלאסית"
                     textAlign="right"
                     placeholderTextColor="#999"
+                    ref={nameInputRef}
+                    onFocus={() => setCurrentField('name')}
+                    returnKeyType="next"
+                    onSubmitEditing={focusNextField}
                   />
                 </View>
 
@@ -371,6 +426,10 @@ const AdminTreatmentsScreen: React.FC<AdminTreatmentsScreenProps> = ({ onNavigat
                     numberOfLines={4}
                     textAlign="right"
                     placeholderTextColor="#999"
+                    ref={descriptionInputRef}
+                    onFocus={() => setCurrentField('description')}
+                    returnKeyType="next"
+                    onSubmitEditing={focusNextField}
                   />
                 </View>
               </View>
@@ -390,6 +449,10 @@ const AdminTreatmentsScreen: React.FC<AdminTreatmentsScreenProps> = ({ onNavigat
                       keyboardType="numeric"
                       textAlign="right"
                       placeholderTextColor="#999"
+                      ref={durationInputRef}
+                      onFocus={() => setCurrentField('duration')}
+                      returnKeyType="next"
+                      onSubmitEditing={focusNextField}
                     />
                   </View>
 
@@ -403,6 +466,10 @@ const AdminTreatmentsScreen: React.FC<AdminTreatmentsScreenProps> = ({ onNavigat
                       keyboardType="numeric"
                       textAlign="right"
                       placeholderTextColor="#999"
+                      ref={priceInputRef}
+                      onFocus={() => setCurrentField('price')}
+                      returnKeyType="next"
+                      onSubmitEditing={focusNextField}
                     />
                   </View>
                 </View>
@@ -421,11 +488,35 @@ const AdminTreatmentsScreen: React.FC<AdminTreatmentsScreenProps> = ({ onNavigat
                     placeholder="https://example.com/image.jpg"
                     textAlign="right"
                     placeholderTextColor="#999"
+                    ref={imageInputRef}
+                    onFocus={() => setCurrentField('image')}
+                    returnKeyType="done"
+                    onSubmitEditing={handleSave}
                   />
                   <Text style={styles.inputHint}>השאר ריק אם אין תמונה</Text>
                 </View>
               </View>
             </ScrollView>
+
+            {/* Navigation Buttons - Always visible */}
+            <View style={styles.navigationButtons}>
+              <TouchableOpacity
+                style={styles.navButton}
+                onPress={focusPreviousField}
+                disabled={currentField === 'name'}
+              >
+                <Ionicons name="chevron-up" size={20} color={currentField === 'name' ? '#ccc' : '#007bff'} />
+                <Text style={[styles.navButtonText, { color: currentField === 'name' ? '#ccc' : '#007bff' }]}>קודם</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={styles.navButton}
+                onPress={focusNextField}
+              >
+                <Text style={styles.navButtonText}>הבא</Text>
+                <Ionicons name="chevron-down" size={20} color="#007bff" />
+              </TouchableOpacity>
+            </View>
 
             <View style={styles.modalActions}>
               <TouchableOpacity
@@ -443,7 +534,7 @@ const AdminTreatmentsScreen: React.FC<AdminTreatmentsScreenProps> = ({ onNavigat
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       <ToastMessage
@@ -761,6 +852,31 @@ const styles = StyleSheet.create({
   },
   halfWidth: {
     flex: 1,
+  },
+  navigationButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  navButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#007bff',
+  },
+  navButtonText: {
+    fontSize: 14,
+    color: '#007bff',
+    fontWeight: 'bold',
   },
 });
 
