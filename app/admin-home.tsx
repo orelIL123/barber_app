@@ -1,6 +1,6 @@
+import { useRouter } from 'expo-router';
 import React from 'react';
 import AdminHomeScreen from './screens/AdminHomeScreen';
-import { useRouter } from 'expo-router';
 
 export default function AdminHomeTab() {
   const router = useRouter();
@@ -23,16 +23,19 @@ export default function AdminHomeTab() {
       case 'admin-gallery':
         router.replace('/admin-gallery');
         break;
+      case 'admin-availability':
+        router.replace('/admin-availability');
+        break;
       case 'settings':
         router.replace('/settings');
         break;
       default:
-        router.replace('/');
+        router.replace('/(tabs)');
     }
   };
 
   const handleBack = () => {
-    router.replace('/');
+    router.replace('/(tabs)');
   };
 
   return (

@@ -1,5 +1,6 @@
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
     Dimensions,
     Modal,
@@ -10,9 +11,8 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { useTranslation } from 'react-i18next';
+import { checkIsAdmin, getCurrentUser } from '../../services/firebase';
 import { changeLanguage } from '../i18n';
-import { getCurrentUser, checkIsAdmin } from '../../services/firebase';
 
 const { width } = Dimensions.get('window');
 
@@ -27,6 +27,7 @@ const SideMenu: React.FC<SideMenuProps> = ({ visible, onClose, onNavigate, onNot
   const { t, i18n } = useTranslation();
   const [showLanguageOptions, setShowLanguageOptions] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [showAbout, setShowAbout] = useState(false);
   
   useEffect(() => {
     const checkAdminStatus = async () => {
@@ -78,6 +79,8 @@ const SideMenu: React.FC<SideMenuProps> = ({ visible, onClose, onNavigate, onNot
     { id: 'about', title: t('nav.about') || 'אודות', icon: 'info', screen: null },
   ];
 
+  const aboutText = `ברוכים הבאים למספרה של רון תורג׳מן! כאן תיהנו מחוויה אישית, מקצועית ומפנקת, עם יחס חם לכל לקוח. רון, בעל ניסיון של שנים בתחום, מזמין אתכם להתרווח, להתחדש ולהרגיש בבית.\n\n✂️ AI: "המספרה שלנו היא לא רק מקום להסתפר, אלא מקום להרגיש בו טוב, להירגע ולצאת עם חיוך. כל תספורת היא יצירת אמנות!"`;
+
   return (
     <Modal
       animationType="slide"
@@ -106,6 +109,8 @@ const SideMenu: React.FC<SideMenuProps> = ({ visible, onClose, onNavigate, onNot
                       setShowLanguageOptions(!showLanguageOptions);
                     } else if (item.id === 'notifications') {
                       handleNotificationPress();
+                    } else if (item.id === 'about') {
+                      setShowAbout(true);
                     } else if (item.screen) {
                       handleMenuPress(item.screen);
                     } else {
@@ -156,6 +161,24 @@ const SideMenu: React.FC<SideMenuProps> = ({ visible, onClose, onNavigate, onNot
           </View>
         </SafeAreaView>
       </View>
+
+      {/* About Modal */}
+      <Modal
+        visible={showAbout}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowAbout(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center' }}>
+          <View style={{ backgroundColor: '#111', borderRadius: 16, padding: 24, maxWidth: 340, alignItems: 'center' }}>
+            <Text style={{ color: '#fff', fontSize: 20, fontWeight: 'bold', marginBottom: 16 }}>אודות</Text>
+            <Text style={{ color: '#fff', fontSize: 16, textAlign: 'right', marginBottom: 24 }}>{aboutText}</Text>
+            <TouchableOpacity onPress={() => setShowAbout(false)} style={{ backgroundColor: '#007bff', borderRadius: 8, paddingHorizontal: 24, paddingVertical: 12 }}>
+              <Text style={{ color: '#fff', fontSize: 16, fontWeight: 'bold' }}>סגור</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </Modal>
   );
 };

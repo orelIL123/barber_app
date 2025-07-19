@@ -1,6 +1,6 @@
-import React from 'react';
 import { useRouter } from 'expo-router';
-import { View, Text, SafeAreaView, StyleSheet, TouchableOpacity } from 'react-native';
+import React from 'react';
+import { SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import TopNav from './components/TopNav';
 
 export default function AdminAvailabilityPage() {
@@ -18,7 +18,7 @@ export default function AdminAvailabilityPage() {
         router.replace('/admin-team');
         break;
       case 'home':
-        router.replace('/');
+        router.replace('/(tabs)');
         break;
       default:
         console.log('Unknown screen:', screen);

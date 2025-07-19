@@ -20,7 +20,7 @@ export default function TabLayout() {
 
   // ניווט בין טאבים
   const handleTabPress = (tab: string) => {
-    if (tab === 'home') router.replace('/');
+    if (tab === 'home') router.replace('/(tabs)');
     else if (tab === 'profile') router.replace('/profile');
     else if (tab === 'shop') router.replace('/explore');
     else if (tab === 'team') router.replace('/team');
