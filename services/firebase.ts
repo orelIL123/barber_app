@@ -4,7 +4,11 @@ import {
     signInWithEmailAndPassword,
     signOut,
     updateProfile,
-    User
+    User,
+    signInWithPhoneNumber,
+    PhoneAuthProvider,
+    signInWithCredential,
+    RecaptchaVerifier
 } from 'firebase/auth';
 import {
     addDoc,
@@ -19,12 +23,12 @@ import {
     updateDoc,
     where
 } from 'firebase/firestore';
-import { getDownloadURL, listAll, ref, uploadBytes } from 'firebase/storage';
+import { getDownloadURL, listAll, ref, uploadBytes, deleteObject } from 'firebase/storage';
 import { auth, db, storage } from '../config/firebase';
 
 export interface UserProfile {
   uid: string;
-  email: string;
+  email?: string; // Make email optional for phone auth
   displayName: string;
   phone: string;
   profileImage?: string;
@@ -142,6 +146,67 @@ export const getCurrentUser = (): User | null => {
 
 export const onAuthStateChange = (callback: (user: User | null) => void) => {
   return onAuthStateChanged(auth, callback);
+};
+
+// Phone authentication functions
+export const sendSMSVerification = async (phoneNumber: string, recaptchaVerifier: RecaptchaVerifier) => {
+  try {
+    const confirmationResult = await signInWithPhoneNumber(auth, phoneNumber, recaptchaVerifier);
+    return confirmationResult;
+  } catch (error) {
+    console.error('Error sending SMS:', error);
+    throw error;
+  }
+};
+
+export const verifySMSCode = async (confirmationResult: any, verificationCode: string) => {
+  try {
+    const result = await confirmationResult.confirm(verificationCode);
+    return result.user;
+  } catch (error) {
+    console.error('Error verifying SMS code:', error);
+    throw error;
+  }
+};
+
+export const registerUserWithPhone = async (phoneNumber: string, displayName: string, verificationId: string, verificationCode: string) => {
+  try {
+    const credential = PhoneAuthProvider.credential(verificationId, verificationCode);
+    const userCredential = await signInWithCredential(auth, credential);
+    const user = userCredential.user;
+    
+    await updateProfile(user, {
+      displayName: displayName
+    });
+    
+    // Check if this is the admin phone number (replace with your admin phone)
+    const isAdminPhone = phoneNumber === '+972523456789'; // Replace with actual admin phone
+    
+    const userProfile: UserProfile = {
+      uid: user.uid,
+      displayName: displayName,
+      phone: phoneNumber,
+      isAdmin: isAdminPhone,
+      createdAt: Timestamp.now()
+    };
+    
+    await setDoc(doc(db, 'users', user.uid), userProfile);
+    return user;
+  } catch (error) {
+    console.error('Error registering user with phone:', error);
+    throw error;
+  }
+};
+
+export const loginWithPhone = async (phoneNumber: string, verificationId: string, verificationCode: string) => {
+  try {
+    const credential = PhoneAuthProvider.credential(verificationId, verificationCode);
+    const userCredential = await signInWithCredential(auth, credential);
+    return userCredential.user;
+  } catch (error) {
+    console.error('Error logging in with phone:', error);
+    throw error;
+  }
 };
 
 // User profile functions
@@ -597,17 +662,287 @@ export const uploadImageToStorage = async (
   }
 };
 
+// Check what's in Firebase Storage
+export const listAllStorageImages = async () => {
+  try {
+    console.log('📂 Checking Firebase Storage contents...');
+    
+    const storageImages = await getAllStorageImages();
+    
+    console.log('🗂️ Firebase Storage contents:');
+    console.log('Gallery folder:', storageImages.gallery);
+    console.log('Backgrounds folder:', storageImages.backgrounds);
+    console.log('Splash folder:', storageImages.splash);
+    console.log('Workers folder:', storageImages.workers);
+    console.log('About us folder:', storageImages.aboutus);
+    
+    return storageImages;
+  } catch (error) {
+    console.error('❌ Error listing storage images:', error);
+    throw error;
+  }
+};
+
+// Restore gallery from Firebase Storage images
+export const restoreGalleryFromStorage = async () => {
+  try {
+    console.log('🔄 Restoring gallery from Firebase Storage...');
+    
+    // Get images from Firebase Storage
+    const storageImages = await getAllStorageImages();
+    
+    // Clear existing gallery
+    const existingImages = await getGalleryImages();
+    for (const image of existingImages) {
+      console.log('🗑️ Deleting existing image:', image.id);
+      await deleteGalleryImage(image.id);
+    }
+    
+    // Add images from storage to gallery collection
+    let addedCount = 0;
+    
+    // Add gallery images
+    for (let i = 0; i < storageImages.gallery.length; i++) {
+      const imageUrl = storageImages.gallery[i];
+      await addGalleryImage({
+        imageUrl,
+        type: 'gallery',
+        order: i,
+        isActive: true
+      });
+      console.log('➕ Added gallery image:', imageUrl);
+      addedCount++;
+    }
+    
+    // Add background images
+    for (let i = 0; i < storageImages.backgrounds.length; i++) {
+      const imageUrl = storageImages.backgrounds[i];
+      await addGalleryImage({
+        imageUrl,
+        type: 'background',
+        order: i,
+        isActive: true
+      });
+      console.log('➕ Added background image:', imageUrl);
+      addedCount++;
+    }
+    
+    // Add about us images
+    for (let i = 0; i < storageImages.aboutus.length; i++) {
+      const imageUrl = storageImages.aboutus[i];
+      await addGalleryImage({
+        imageUrl,
+        type: 'gallery',
+        order: storageImages.gallery.length + storageImages.backgrounds.length + i,
+        isActive: true
+      });
+      console.log('➕ Added about us image:', imageUrl);
+      addedCount++;
+    }
+    
+    console.log('✅ Gallery restored with', addedCount, 'images from Firebase Storage');
+    return addedCount;
+  } catch (error) {
+    console.error('❌ Error restoring gallery from storage:', error);
+    throw error;
+  }
+};
+
+// Clear all gallery images and add fresh ones
+export const resetGalleryWithRealImages = async () => {
+  try {
+    console.log('🧹 Clearing all gallery images and adding fresh ones...');
+    
+    // Get all existing gallery images
+    const existingImages = await getGalleryImages();
+    console.log('Found', existingImages.length, 'existing images to delete');
+    
+    // Delete ALL existing gallery images
+    for (const image of existingImages) {
+      console.log('🗑️ Deleting image:', image.id);
+      await deleteGalleryImage(image.id);
+    }
+    
+    // Add fresh real images
+    const realGalleryImages = [
+      {
+        imageUrl: 'https://images.unsplash.com/photo-1585747860715-2ba37e788b70?w=400&h=300&fit=crop&auto=format',
+        type: 'gallery' as const,
+        order: 0,
+        isActive: true
+      },
+      {
+        imageUrl: 'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?w=400&h=300&fit=crop&auto=format',
+        type: 'gallery' as const,
+        order: 1,
+        isActive: true
+      },
+      {
+        imageUrl: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=400&h=300&fit=crop&auto=format',
+        type: 'gallery' as const,
+        order: 2,
+        isActive: true
+      },
+      {
+        imageUrl: 'https://images.unsplash.com/photo-1559599101-f09722fb4948?w=400&h=300&fit=crop&auto=format',
+        type: 'gallery' as const,
+        order: 3,
+        isActive: true
+      }
+    ];
+
+    for (const imageData of realGalleryImages) {
+      console.log('➕ Adding fresh image:', imageData.imageUrl);
+      await addGalleryImage(imageData);
+    }
+    
+    console.log('✅ Gallery reset with', realGalleryImages.length, 'fresh real images');
+    return realGalleryImages.length;
+  } catch (error) {
+    console.error('❌ Error resetting gallery:', error);
+    throw error;
+  }
+};
+
+// Replace existing placeholder images with real images
+export const replaceGalleryPlaceholders = async () => {
+  try {
+    console.log('🔄 Replacing placeholder images with real images...');
+    
+    // Get all existing gallery images
+    const existingImages = await getGalleryImages();
+    console.log('Found', existingImages.length, 'existing images');
+    
+    // Debug: show what we have
+    existingImages.forEach((img, index) => {
+      console.log(`Image ${index}:`, {
+        id: img.id,
+        imageUrl: img.imageUrl || 'MISSING URL',
+        type: img.type,
+        isActive: img.isActive
+      });
+    });
+    
+    // Delete old placeholder images
+    for (const image of existingImages) {
+      if (image.imageUrl && (image.imageUrl.includes('placeholder') || image.imageUrl.includes('via.placeholder'))) {
+        console.log('🗑️ Deleting placeholder image:', image.id);
+        await deleteGalleryImage(image.id);
+      } else if (!image.imageUrl) {
+        console.log('🗑️ Deleting image with missing URL:', image.id);
+        await deleteGalleryImage(image.id);
+      }
+    }
+    
+    // Add new real images
+    const realGalleryImages = [
+      {
+        imageUrl: 'https://images.unsplash.com/photo-1585747860715-2ba37e788b70?w=400&h=300&fit=crop&auto=format',
+        type: 'gallery' as const,
+        order: 0,
+        isActive: true
+      },
+      {
+        imageUrl: 'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?w=400&h=300&fit=crop&auto=format',
+        type: 'gallery' as const,
+        order: 1,
+        isActive: true
+      },
+      {
+        imageUrl: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=400&h=300&fit=crop&auto=format',
+        type: 'gallery' as const,
+        order: 2,
+        isActive: true
+      },
+      {
+        imageUrl: 'https://images.unsplash.com/photo-1559599101-f09722fb4948?w=400&h=300&fit=crop&auto=format',
+        type: 'gallery' as const,
+        order: 3,
+        isActive: true
+      }
+    ];
+
+    for (const imageData of realGalleryImages) {
+      console.log('➕ Adding real image:', imageData.imageUrl);
+      await addGalleryImage(imageData);
+    }
+    
+    console.log('✅ Gallery updated with', realGalleryImages.length, 'real images');
+    return realGalleryImages.length;
+  } catch (error) {
+    console.error('❌ Error replacing gallery placeholders:', error);
+    throw error;
+  }
+};
+
+// Initialize gallery with default images
+export const initializeGalleryImages = async () => {
+  try {
+    // Check if gallery already has images
+    const existingImages = await getGalleryImages();
+    
+    // If we have placeholder images, replace them
+    const hasPlaceholders = existingImages.some(img => 
+      img.imageUrl && (img.imageUrl.includes('placeholder') || img.imageUrl.includes('via.placeholder'))
+    );
+    
+    if (hasPlaceholders) {
+      console.log('🔄 Found placeholder images, replacing with real images...');
+      await replaceGalleryPlaceholders();
+      return;
+    }
+    
+    if (existingImages.length > 0) {
+      console.log('Gallery already has real images, skipping initialization');
+      return;
+    }
+
+    console.log('Initializing gallery with default images...');
+    
+    // Add some real gallery images
+    const defaultGalleryImages = [
+      {
+        imageUrl: 'https://images.unsplash.com/photo-1585747860715-2ba37e788b70?w=400&h=300&fit=crop&auto=format',
+        type: 'gallery' as const,
+        order: 0,
+        isActive: true
+      },
+      {
+        imageUrl: 'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?w=400&h=300&fit=crop&auto=format',
+        type: 'gallery' as const,
+        order: 1,
+        isActive: true
+      },
+      {
+        imageUrl: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=400&h=300&fit=crop&auto=format',
+        type: 'gallery' as const,
+        order: 2,
+        isActive: true
+      },
+      {
+        imageUrl: 'https://images.unsplash.com/photo-1559599101-f09722fb4948?w=400&h=300&fit=crop&auto=format',
+        type: 'gallery' as const,
+        order: 3,
+        isActive: true
+      }
+    ];
+
+    for (const imageData of defaultGalleryImages) {
+      await addGalleryImage(imageData);
+    }
+    
+    console.log('Gallery initialized with', defaultGalleryImages.length, 'images');
+  } catch (error) {
+    console.error('Error initializing gallery images:', error);
+    throw error;
+  }
+};
+
 // Initialize empty collections (run once)
 export const initializeCollections = async () => {
   try {
-    // Create gallery collection with sample data
-    await addDoc(collection(db, 'gallery'), {
-      imageUrl: 'https://via.placeholder.com/300x200',
-      type: 'gallery',
-      order: 0,
-      isActive: true,
-      createdAt: Timestamp.now()
-    });
+    // Initialize gallery images
+    await initializeGalleryImages();
     
     // Create availability collection sample
     await addDoc(collection(db, 'availability'), {
@@ -854,5 +1189,234 @@ export const getBarberAppointmentsForDay = async (barberId: string, date: Date):
   } catch (error) {
     console.error('Error getting barber appointments for day:', error);
     return [];
+  }
+};
+
+// Image Management Functions for Admin Panel
+
+export interface AppImages {
+  atmosphereImage?: string;
+  aboutUsImage?: string;
+  galleryImages?: string[];
+}
+
+// Get current app images from Firestore
+export const getAppImages = async (): Promise<AppImages> => {
+  try {
+    const docRef = doc(db, 'settings', 'images');
+    const docSnap = await getDoc(docRef);
+    
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      return {
+        atmosphereImage: data.atmosphereImage || '',
+        aboutUsImage: data.aboutUsImage || '',
+        galleryImages: Array.isArray(data.galleryImages) ? data.galleryImages : []
+      };
+    }
+    
+    return {
+      atmosphereImage: '',
+      aboutUsImage: '',
+      galleryImages: []
+    };
+  } catch (error) {
+    console.error('Error getting app images:', error);
+    throw error;
+  }
+};
+
+// Upload image to Firebase Storage for app images
+export const uploadAppImageToStorage = async (
+  imageUri: string, 
+  imagePath: string, 
+  fileName: string
+): Promise<string> => {
+  try {
+    // Convert image URI to blob
+    const response = await fetch(imageUri);
+    const blob = await response.blob();
+    
+    // Create storage reference
+    const imageRef = ref(storage, `${imagePath}/${fileName}`);
+    
+    // Upload image
+    await uploadBytes(imageRef, blob);
+    
+    // Get download URL
+    const downloadURL = await getDownloadURL(imageRef);
+    
+    console.log('Image uploaded successfully:', downloadURL);
+    return downloadURL;
+  } catch (error) {
+    console.error('Error uploading image:', error);
+    throw error;
+  }
+};
+
+// Delete image from Firebase Storage (used when replacing)
+export const deleteImageFromStorage = async (imageUrl: string): Promise<void> => {
+  try {
+    if (!imageUrl || !imageUrl.includes('firebasestorage.googleapis.com')) {
+      return; // Skip if not a Firebase Storage URL
+    }
+    
+    // Extract storage path from URL
+    const pathStart = imageUrl.indexOf('/o/') + 3;
+    const pathEnd = imageUrl.indexOf('?');
+    const path = decodeURIComponent(imageUrl.slice(pathStart, pathEnd));
+    
+    const imageRef = ref(storage, path);
+    await deleteObject(imageRef);
+    
+    console.log('Image deleted successfully:', path);
+  } catch (error) {
+    console.error('Error deleting image:', error);
+    // Don't throw error - deletion failure shouldn't prevent upload
+  }
+};
+
+// Update atmosphere/background image
+export const updateAtmosphereImage = async (imageUri: string): Promise<string> => {
+  try {
+    const fileName = `atmosphere_${Date.now()}.jpg`;
+    
+    // Get current image URL to delete old one
+    const currentImages = await getAppImages();
+    
+    // Upload new image
+    const newImageUrl = await uploadAppImageToStorage(imageUri, 'app-images', fileName);
+    
+    // Update Firestore
+    const docRef = doc(db, 'settings', 'images');
+    await setDoc(docRef, {
+      ...currentImages,
+      atmosphereImage: newImageUrl
+    }, { merge: true });
+    
+    // Delete old image after successful update
+    if (currentImages.atmosphereImage) {
+      await deleteImageFromStorage(currentImages.atmosphereImage);
+    }
+    
+    console.log('Atmosphere image updated successfully');
+    return newImageUrl;
+  } catch (error) {
+    console.error('Error updating atmosphere image:', error);
+    throw error;
+  }
+};
+
+// Update about us image
+export const updateAboutUsImage = async (imageUri: string): Promise<string> => {
+  try {
+    const fileName = `about_us_${Date.now()}.jpg`;
+    
+    // Get current image URL to delete old one
+    const currentImages = await getAppImages();
+    
+    // Upload new image
+    const newImageUrl = await uploadAppImageToStorage(imageUri, 'app-images', fileName);
+    
+    // Update Firestore
+    const docRef = doc(db, 'settings', 'images');
+    await setDoc(docRef, {
+      ...currentImages,
+      aboutUsImage: newImageUrl
+    }, { merge: true });
+    
+    // Delete old image after successful update
+    if (currentImages.aboutUsImage) {
+      await deleteImageFromStorage(currentImages.aboutUsImage);
+    }
+    
+    console.log('About us image updated successfully');
+    return newImageUrl;
+  } catch (error) {
+    console.error('Error updating about us image:', error);
+    throw error;
+  }
+};
+
+// Add image to app gallery (different from gallery collection)
+export const addAppGalleryImage = async (imageUri: string): Promise<string> => {
+  try {
+    const fileName = `gallery_${Date.now()}.jpg`;
+    
+    // Upload new image
+    const newImageUrl = await uploadAppImageToStorage(imageUri, 'app-images/gallery', fileName);
+    
+    // Get current images
+    const currentImages = await getAppImages();
+    const updatedGallery = [...(currentImages.galleryImages || []), newImageUrl];
+    
+    // Update Firestore
+    const docRef = doc(db, 'settings', 'images');
+    await setDoc(docRef, {
+      ...currentImages,
+      galleryImages: updatedGallery
+    }, { merge: true });
+    
+    console.log('App gallery image added successfully');
+    return newImageUrl;
+  } catch (error) {
+    console.error('Error adding app gallery image:', error);
+    throw error;
+  }
+};
+
+// Remove image from app gallery
+export const removeAppGalleryImage = async (imageUrl: string): Promise<void> => {
+  try {
+    // Get current images
+    const currentImages = await getAppImages();
+    const updatedGallery = (currentImages.galleryImages || []).filter(url => url !== imageUrl);
+    
+    // Update Firestore
+    const docRef = doc(db, 'settings', 'images');
+    await setDoc(docRef, {
+      ...currentImages,
+      galleryImages: updatedGallery
+    }, { merge: true });
+    
+    // Delete from storage
+    await deleteImageFromStorage(imageUrl);
+    
+    console.log('App gallery image removed successfully');
+  } catch (error) {
+    console.error('Error removing app gallery image:', error);
+    throw error;
+  }
+};
+
+// Replace app gallery image (remove old, add new)
+export const replaceAppGalleryImage = async (oldImageUrl: string, newImageUri: string): Promise<string> => {
+  try {
+    const fileName = `gallery_${Date.now()}.jpg`;
+    
+    // Upload new image
+    const newImageUrl = await uploadAppImageToStorage(newImageUri, 'app-images/gallery', fileName);
+    
+    // Get current images
+    const currentImages = await getAppImages();
+    const updatedGallery = (currentImages.galleryImages || []).map(url => 
+      url === oldImageUrl ? newImageUrl : url
+    );
+    
+    // Update Firestore
+    const docRef = doc(db, 'settings', 'images');
+    await setDoc(docRef, {
+      ...currentImages,
+      galleryImages: updatedGallery
+    }, { merge: true });
+    
+    // Delete old image
+    await deleteImageFromStorage(oldImageUrl);
+    
+    console.log('App gallery image replaced successfully');
+    return newImageUrl;
+  } catch (error) {
+    console.error('Error replacing app gallery image:', error);
+    throw error;
   }
 };

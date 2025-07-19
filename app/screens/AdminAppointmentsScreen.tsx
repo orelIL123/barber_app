@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import {
   Alert,
   Dimensions,
+  Linking,
   Modal,
   SafeAreaView,
   ScrollView,
@@ -135,6 +136,29 @@ const AdminAppointmentsScreen: React.FC<AdminAppointmentsScreenProps> = ({ onNav
     }
     const user = users.find(u => u.uid === appointment.userId);
     return user ? user.displayName : 'לא נמצא';
+  };
+
+  const getUserPhone = (appointment: any) => {
+    // Check if this is a manual client
+    if (appointment.isManualClient && appointment.clientPhone) {
+      return appointment.clientPhone;
+    }
+    const user = users.find(u => u.uid === appointment.userId);
+    return user ? user.phone : null;
+  };
+
+  const handlePhoneCall = (phoneNumber: string) => {
+    if (!phoneNumber) {
+      Alert.alert('שגיאה', 'מספר טלפון לא זמין');
+      return;
+    }
+    
+    // Clean phone number (remove spaces, dashes, etc.)
+    const cleanedNumber = phoneNumber.replace(/[^\d+]/g, '');
+    
+    Linking.openURL(`tel:${cleanedNumber}`).catch(() => {
+      Alert.alert('שגיאה', 'לא ניתן לפתוח את אפליקציית הטלפון');
+    });
   };
 
   const getTreatmentName = (treatmentId: string) => {
@@ -412,9 +436,24 @@ const AdminAppointmentsScreen: React.FC<AdminAppointmentsScreenProps> = ({ onNav
                     
                     <View style={styles.appointmentRow}>
                       <Text style={styles.appointmentLabel}>לקוח:</Text>
-                      <Text style={styles.appointmentValue}>
-                        {getUserName(appointment)}
-                      </Text>
+                      <View style={styles.clientInfoContainer}>
+                        <Text style={styles.appointmentValue}>
+                          {getUserName(appointment)}
+                        </Text>
+                        {getUserPhone(appointment) && (
+                          <View style={styles.phoneContainer}>
+                            <Text style={styles.phoneNumber}>
+                              {getUserPhone(appointment)}
+                            </Text>
+                            <TouchableOpacity
+                              style={styles.callButton}
+                              onPress={() => handlePhoneCall(getUserPhone(appointment)!)}
+                            >
+                              <Ionicons name="call" size={16} color="#fff" />
+                            </TouchableOpacity>
+                          </View>
+                        )}
+                      </View>
                     </View>
                   </View>
                 </TouchableOpacity>
@@ -467,6 +506,23 @@ const AdminAppointmentsScreen: React.FC<AdminAppointmentsScreenProps> = ({ onNav
                     <Text style={styles.modalLabel}>לקוח: </Text>
                     {getUserName(selectedAppointment)}
                   </Text>
+                  {getUserPhone(selectedAppointment) && (
+                    <View style={styles.modalPhoneRow}>
+                      <Text style={styles.modalLabel}>טלפון: </Text>
+                      <View style={styles.modalPhoneContainer}>
+                        <Text style={styles.modalPhoneNumber}>
+                          {getUserPhone(selectedAppointment)}
+                        </Text>
+                        <TouchableOpacity
+                          style={styles.modalCallButton}
+                          onPress={() => handlePhoneCall(getUserPhone(selectedAppointment)!)}
+                        >
+                          <Ionicons name="call" size={18} color="#fff" />
+                          <Text style={styles.modalCallButtonText}>התקשר</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  )}
                   <Text style={styles.modalDetail}>
                     <Text style={styles.modalLabel}>סטטוס: </Text>
                     {getStatusText(selectedAppointment.status)}
@@ -1136,6 +1192,58 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginLeft: 8,
     textAlign: 'center',
+  },
+  // Phone call styles
+  clientInfoContainer: {
+    flex: 1,
+    alignItems: 'flex-start',
+  },
+  phoneContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+    gap: 8,
+  },
+  phoneNumber: {
+    fontSize: 13,
+    color: '#007bff',
+    fontWeight: '500',
+  },
+  callButton: {
+    backgroundColor: '#28a745',
+    borderRadius: 12,
+    padding: 4,
+    paddingHorizontal: 8,
+  },
+  modalPhoneRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  modalPhoneContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'space-between',
+  },
+  modalPhoneNumber: {
+    fontSize: 16,
+    color: '#007bff',
+    fontWeight: '500',
+  },
+  modalCallButton: {
+    backgroundColor: '#28a745',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    gap: 4,
+  },
+  modalCallButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
   },
 });
 

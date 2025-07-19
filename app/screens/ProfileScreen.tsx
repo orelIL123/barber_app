@@ -23,8 +23,13 @@ import {
     registerUser,
     updateUserProfile,
     UserProfile,
-    createUserProfileFromAuth
+    createUserProfileFromAuth,
+    sendSMSVerification,
+    verifySMSCode,
+    registerUserWithPhone,
+    loginWithPhone
 } from '../../services/firebase';
+import { RecaptchaVerifier } from 'firebase/auth';
 import { NeonButton } from '../components/NeonButton';
 import TopNav from '../components/TopNav';
 
@@ -44,6 +49,12 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate, onBack }) => 
   const [showRegisterForm, setShowRegisterForm] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [tab, setTab] = useState<'login' | 'register'>('login');
+  const [authMethod, setAuthMethod] = useState<'email' | 'phone'>('phone'); // Default to phone
+  const [step, setStep] = useState<'input' | 'otp'>('input');
+  const [verificationId, setVerificationId] = useState('');
+  const [verificationCode, setVerificationCode] = useState('');
+  const [confirmationResult, setConfirmationResult] = useState<any>(null);
+  const [recaptchaVerifier, setRecaptchaVerifier] = useState<RecaptchaVerifier | null>(null);
   
   // Form states
   const [email, setEmail] = useState('');
@@ -76,7 +87,63 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate, onBack }) => 
     return unsubscribe;
   }, []);
 
+  const handleSendSMSVerification = async () => {
+    if (!phone.trim()) {
+      Alert.alert('שגיאה', 'נא להזין מספר טלפון');
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      // For React Native, we need to handle reCAPTCHA differently
+      const confirmationResult = await sendSMSVerification(phone, null as any);
+      setConfirmationResult(confirmationResult);
+      setStep('otp');
+      Alert.alert('הצלחה', 'קוד אימות נשלח לטלפון שלך');
+    } catch (error: any) {
+      console.error('Error sending SMS:', error);
+      Alert.alert('שגיאה', 'לא ניתן לשלוח קוד אימות. נסה שוב.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyCode = async () => {
+    if (!verificationCode.trim()) {
+      Alert.alert('שגיאה', 'נא להזין קוד אימות');
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      if (tab === 'login') {
+        await verifySMSCode(confirmationResult, verificationCode);
+        setStep('input');
+        setVerificationCode('');
+        setPhone('');
+      } else {
+        // Register new user
+        await registerUserWithPhone(phone, displayName, verificationId, verificationCode);
+        setStep('input');
+        setVerificationCode('');
+        setPhone('');
+        setDisplayName('');
+        Alert.alert('הצלחה', 'המשתמש נרשם בהצלחה!');
+      }
+    } catch (error: any) {
+      console.error('Error verifying code:', error);
+      Alert.alert('שגיאה', 'קוד האימות שגוי או פג תוקף');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleLogin = async () => {
+    if (authMethod === 'phone') {
+      handleSendSMSVerification();
+      return;
+    }
+    
     if (!email.trim()) {
       Alert.alert('שגיאה', 'נא להזין כתובת מייל');
       return;
@@ -112,6 +179,16 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate, onBack }) => 
       Alert.alert('שגיאה', 'נא להזין שם מלא');
       return;
     }
+    
+    if (authMethod === 'phone') {
+      if (!phone.trim()) {
+        Alert.alert('שגיאה', 'נא להזין מספר טלפון');
+        return;
+      }
+      handleSendSMSVerification();
+      return;
+    }
+    
     if (!email.trim()) {
       Alert.alert('שגיאה', 'נא להזין כתובת מייל');
       return;
@@ -256,63 +333,221 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate, onBack }) => 
           <View style={styles.sheet}>
             {tab === 'login' ? (
               <View style={styles.form}>
-                <View style={styles.inputContainer}>
-                  <Text style={styles.inputLabel}>כתובת אימייל</Text>
-                  <TextInput style={styles.input} placeholder="example@email.com" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" />
+                {/* Auth Method Selection */}
+                <View style={styles.authMethodContainer}>
+                  <TouchableOpacity
+                    style={[styles.authMethodButton, authMethod === 'phone' && styles.activeAuthMethod]}
+                    onPress={() => {
+                      setAuthMethod('phone');
+                      setStep('input');
+                    }}
+                  >
+                    <Text style={[styles.authMethodText, authMethod === 'phone' && styles.activeAuthMethodText]}>
+                      📱 טלפון
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.authMethodButton, authMethod === 'email' && styles.activeAuthMethod]}
+                    onPress={() => {
+                      setAuthMethod('email');
+                      setStep('input');
+                    }}
+                  >
+                    <Text style={[styles.authMethodText, authMethod === 'email' && styles.activeAuthMethodText]}>
+                      ✉️ אימייל
+                    </Text>
+                  </TouchableOpacity>
                 </View>
-                <Text style={styles.orText}>או</Text>
-                <View style={styles.inputContainer}>
-                  <Text style={styles.inputLabel}>מספר טלפון</Text>
-                  <TextInput style={styles.input} placeholder="+972-50-123-4567" value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
-                </View>
-                <View style={styles.inputContainer}>
-                  <Text style={styles.inputLabel}>סיסמה</Text>
-                  <TextInput style={styles.input} placeholder="הזן סיסמה" value={password} onChangeText={setPassword} secureTextEntry />
-                </View>
-                <NeonButton title="התחברות" onPress={handleLogin} disabled={loading} />
-                {/* {step === 'input' && phone ? (
-                  <NeonButton title="Send OTP" onPress={handleSendOtp} loading={loading} />
-                ) : null} */}
-                {/* {step === 'otp' ? (
+                
+                {step === 'input' ? (
                   <>
-                    <TextInput style={styles.input} placeholder="OTP" value={otp} onChangeText={setOtp} keyboardType="number-pad" />
-                    <NeonButton title="Verify OTP" onPress={handleVerifyOtp} loading={loading} />
+                    {authMethod === 'phone' ? (
+                      <View style={styles.inputContainer}>
+                        <Text style={styles.inputLabel}>מספר טלפון</Text>
+                        <TextInput 
+                          style={styles.input} 
+                          placeholder="+972-50-123-4567" 
+                          value={phone} 
+                          onChangeText={setPhone} 
+                          keyboardType="phone-pad" 
+                        />
+                      </View>
+                    ) : (
+                      <>
+                        <View style={styles.inputContainer}>
+                          <Text style={styles.inputLabel}>כתובת אימייל</Text>
+                          <TextInput 
+                            style={styles.input} 
+                            placeholder="example@email.com" 
+                            value={email} 
+                            onChangeText={setEmail} 
+                            autoCapitalize="none" 
+                            keyboardType="email-address" 
+                          />
+                        </View>
+                        <View style={styles.inputContainer}>
+                          <Text style={styles.inputLabel}>סיסמה</Text>
+                          <TextInput 
+                            style={styles.input} 
+                            placeholder="הזן סיסמה" 
+                            value={password} 
+                            onChangeText={setPassword} 
+                            secureTextEntry 
+                          />
+                        </View>
+                      </>
+                    )}
+                    <NeonButton 
+                      title={authMethod === 'phone' ? 'שלח קוד אימות' : 'התחברות'} 
+                      onPress={handleLogin} 
+                      disabled={loading} 
+                    />
                   </>
-                ) : null} */}
-                {/* {error ? <Text style={styles.errorText}>{error}</Text> : null} */}
-                {/* {success ? <Text style={styles.successText}>{success}</Text> : null} */}
+                ) : (
+                  <>
+                    <View style={styles.inputContainer}>
+                      <Text style={styles.inputLabel}>קוד אימות (נשלח לטלפון)</Text>
+                      <TextInput 
+                        style={styles.input} 
+                        placeholder="הזן קוד בן 6 ספרות" 
+                        value={verificationCode} 
+                        onChangeText={setVerificationCode} 
+                        keyboardType="number-pad" 
+                        maxLength={6}
+                      />
+                    </View>
+                    <NeonButton 
+                      title="אמת קוד" 
+                      onPress={handleVerifyCode} 
+                      disabled={loading} 
+                    />
+                    <TouchableOpacity 
+                      style={styles.backButton} 
+                      onPress={() => setStep('input')}
+                    >
+                      <Text style={styles.backButtonText}>חזור</Text>
+                    </TouchableOpacity>
+                  </>
+                )}
               </View>
             ) : (
               <View style={styles.form}>
-                <View style={styles.inputContainer}>
-                  <Text style={styles.inputLabel}>שם מלא</Text>
-                  <TextInput style={styles.input} placeholder="הזן שם מלא" value={displayName} onChangeText={setDisplayName} />
+                {/* Auth Method Selection */}
+                <View style={styles.authMethodContainer}>
+                  <TouchableOpacity
+                    style={[styles.authMethodButton, authMethod === 'phone' && styles.activeAuthMethod]}
+                    onPress={() => {
+                      setAuthMethod('phone');
+                      setStep('input');
+                    }}
+                  >
+                    <Text style={[styles.authMethodText, authMethod === 'phone' && styles.activeAuthMethodText]}>
+                      📱 טלפון
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.authMethodButton, authMethod === 'email' && styles.activeAuthMethod]}
+                    onPress={() => {
+                      setAuthMethod('email');
+                      setStep('input');
+                    }}
+                  >
+                    <Text style={[styles.authMethodText, authMethod === 'email' && styles.activeAuthMethodText]}>
+                      ✉️ אימייל
+                    </Text>
+                  </TouchableOpacity>
                 </View>
-                <View style={styles.inputContainer}>
-                  <Text style={styles.inputLabel}>כתובת אימייל</Text>
-                  <TextInput style={styles.input} placeholder="example@email.com" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" />
-                </View>
-                <Text style={styles.orText}>או</Text>
-                <View style={styles.inputContainer}>
-                  <Text style={styles.inputLabel}>מספר טלפון</Text>
-                  <TextInput style={styles.input} placeholder="+972-50-123-4567" value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
-                </View>
-                <View style={styles.inputContainer}>
-                  <Text style={styles.inputLabel}>סיסמה</Text>
-                  <TextInput style={styles.input} placeholder="הזן סיסמה (לפחות 6 תווים)" value={password} onChangeText={setPassword} secureTextEntry />
-                </View>
-                <NeonButton title="הרשמה" onPress={handleRegister} disabled={loading} />
-                {/* {step === 'input' && phone ? (
-                  <NeonButton title="Send OTP" onPress={handleSendOtp} loading={loading} />
-                ) : null} */}
-                {/* {step === 'otp' ? (
+                
+                {step === 'input' ? (
                   <>
-                    <TextInput style={styles.input} placeholder="OTP" value={otp} onChangeText={setOtp} keyboardType="number-pad" />
-                    <NeonButton title="Verify OTP" onPress={handleVerifyOtp} loading={loading} />
+                    <View style={styles.inputContainer}>
+                      <Text style={styles.inputLabel}>שם מלא</Text>
+                      <TextInput 
+                        style={styles.input} 
+                        placeholder="הזן שם מלא" 
+                        value={displayName} 
+                        onChangeText={setDisplayName} 
+                      />
+                    </View>
+                    
+                    {authMethod === 'phone' ? (
+                      <View style={styles.inputContainer}>
+                        <Text style={styles.inputLabel}>מספר טלפון</Text>
+                        <TextInput 
+                          style={styles.input} 
+                          placeholder="+972-50-123-4567" 
+                          value={phone} 
+                          onChangeText={setPhone} 
+                          keyboardType="phone-pad" 
+                        />
+                      </View>
+                    ) : (
+                      <>
+                        <View style={styles.inputContainer}>
+                          <Text style={styles.inputLabel}>כתובת אימייל</Text>
+                          <TextInput 
+                            style={styles.input} 
+                            placeholder="example@email.com" 
+                            value={email} 
+                            onChangeText={setEmail} 
+                            autoCapitalize="none" 
+                            keyboardType="email-address" 
+                          />
+                        </View>
+                        <View style={styles.inputContainer}>
+                          <Text style={styles.inputLabel}>מספר טלפון (אופציונלי)</Text>
+                          <TextInput 
+                            style={styles.input} 
+                            placeholder="+972-50-123-4567" 
+                            value={phone} 
+                            onChangeText={setPhone} 
+                            keyboardType="phone-pad" 
+                          />
+                        </View>
+                        <View style={styles.inputContainer}>
+                          <Text style={styles.inputLabel}>סיסמה</Text>
+                          <TextInput 
+                            style={styles.input} 
+                            placeholder="הזן סיסמה (לפחות 6 תווים)" 
+                            value={password} 
+                            onChangeText={setPassword} 
+                            secureTextEntry 
+                          />
+                        </View>
+                      </>
+                    )}
+                    <NeonButton 
+                      title={authMethod === 'phone' ? 'שלח קוד אימות' : 'הרשמה'} 
+                      onPress={handleRegister} 
+                      disabled={loading} 
+                    />
                   </>
-                ) : null} */}
-                {/* {error ? <Text style={styles.errorText}>{error}</Text> : null} */}
-                {/* {success ? <Text style={styles.successText}>{success}</Text> : null} */}
+                ) : (
+                  <>
+                    <View style={styles.inputContainer}>
+                      <Text style={styles.inputLabel}>קוד אימות (נשלח לטלפון)</Text>
+                      <TextInput 
+                        style={styles.input} 
+                        placeholder="הזן קוד בן 6 ספרות" 
+                        value={verificationCode} 
+                        onChangeText={setVerificationCode} 
+                        keyboardType="number-pad" 
+                        maxLength={6}
+                      />
+                    </View>
+                    <NeonButton 
+                      title="אמת קוד והירשם" 
+                      onPress={handleVerifyCode} 
+                      disabled={loading} 
+                    />
+                    <TouchableOpacity 
+                      style={styles.backButton} 
+                      onPress={() => setStep('input')}
+                    >
+                      <Text style={styles.backButtonText}>חזור</Text>
+                    </TouchableOpacity>
+                  </>
+                )}
               </View>
             )}
           </View>
@@ -899,6 +1134,51 @@ const styles = StyleSheet.create({
   },
   cancelButtonText: {
     color: '#666',
+  },
+  authMethodContainer: {
+    flexDirection: 'row',
+    marginBottom: 20,
+    borderRadius: 12,
+    backgroundColor: '#f0f0f0',
+    padding: 4,
+  },
+  authMethodButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginHorizontal: 2,
+  },
+  activeAuthMethod: {
+    backgroundColor: '#007bff',
+    shadowColor: '#007bff',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  authMethodText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666',
+  },
+  activeAuthMethodText: {
+    color: '#fff',
+  },
+  backButton: {
+    backgroundColor: '#f8f9fa',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginTop: 12,
+    alignItems: 'center',
+  },
+  backButtonText: {
+    color: '#666',
+    fontSize: 16,
+    fontWeight: '500',
   },
 });
 

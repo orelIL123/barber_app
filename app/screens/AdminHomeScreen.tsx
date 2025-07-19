@@ -11,7 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { checkIsAdmin, onAuthStateChange, initializeCollections } from '../../services/firebase';
+import { checkIsAdmin, onAuthStateChange, initializeCollections, initializeGalleryImages, replaceGalleryPlaceholders, resetGalleryWithRealImages, listAllStorageImages, restoreGalleryFromStorage } from '../../services/firebase';
 import ToastMessage from '../components/ToastMessage';
 import TopNav from '../components/TopNav';
 
@@ -55,6 +55,61 @@ const AdminHomeScreen: React.FC<AdminHomeScreenProps> = ({ onNavigate, onBack })
 
   const hideToast = () => {
     setToast({ ...toast, visible: false });
+  };
+
+  const handleInitializeGallery = async () => {
+    try {
+      showToast('מאתחל גלריה...', 'success');
+      await initializeGalleryImages();
+      showToast('הגלריה אותחלה בהצלחה!', 'success');
+    } catch (error) {
+      console.error('Error initializing gallery:', error);
+      showToast('שגיאה באתחול הגלריה', 'error');
+    }
+  };
+
+  const handleReplaceGallery = async () => {
+    try {
+      showToast('מחליף תמונות...', 'success');
+      await replaceGalleryPlaceholders();
+      showToast('התמונות הוחלפו בהצלחה!', 'success');
+    } catch (error) {
+      console.error('Error replacing gallery:', error);
+      showToast('שגיאה בהחלפת התמונות', 'error');
+    }
+  };
+
+  const handleResetGallery = async () => {
+    try {
+      showToast('מאפס גלריה...', 'success');
+      await resetGalleryWithRealImages();
+      showToast('הגלריה אופסה והתמונות החדשות נוספו!', 'success');
+    } catch (error) {
+      console.error('Error resetting gallery:', error);
+      showToast('שגיאה באיפוס הגלריה', 'error');
+    }
+  };
+
+  const handleListStorage = async () => {
+    try {
+      showToast('בודק תמונות ב-Firebase Storage...', 'success');
+      await listAllStorageImages();
+      showToast('בדוק את הקונסול לראות את התמונות!', 'success');
+    } catch (error) {
+      console.error('Error listing storage:', error);
+      showToast('שגיאה בבדיקת Storage', 'error');
+    }
+  };
+
+  const handleRestoreFromStorage = async () => {
+    try {
+      showToast('משחזר תמונות מ-Firebase Storage...', 'success');
+      const count = await restoreGalleryFromStorage();
+      showToast(`שוחזרו ${count} תמונות מ-Storage!`, 'success');
+    } catch (error) {
+      console.error('Error restoring from storage:', error);
+      showToast('שגיאה בשחזור מ-Storage', 'error');
+    }
   };
 
   const adminMenuItems = [
@@ -147,6 +202,58 @@ const AdminHomeScreen: React.FC<AdminHomeScreenProps> = ({ onNavigate, onBack })
               <Text style={styles.welcomeTitle}>ברוך הבא למנהל המערכת</Text>
               <Text style={styles.welcomeSubtitle}>נהל את הברברשופ שלך בקלות</Text>
             </LinearGradient>
+          </View>
+
+          {/* System Status */}
+          <View style={styles.systemSection}>
+            <Text style={styles.systemTitle}>מצב המערכת</Text>
+            <View style={styles.systemItem}>
+              <View style={styles.systemInfo}>
+                <Text style={styles.systemLabel}>Firestore Database</Text>
+                <Text style={styles.systemStatus}>פעיל</Text>
+              </View>
+              <View style={[styles.statusIndicator, styles.statusActive]} />
+            </View>
+            
+            <TouchableOpacity 
+              style={styles.initButton}
+              onPress={handleInitializeGallery}
+            >
+              <Ionicons name="images" size={20} color="#fff" />
+              <Text style={styles.initButtonText}>אתחל גלריה עם תמונות דמה</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[styles.initButton, { backgroundColor: '#dc3545', marginTop: 12 }]}
+              onPress={handleReplaceGallery}
+            >
+              <Ionicons name="refresh" size={20} color="#fff" />
+              <Text style={styles.initButtonText}>החלף תמונות אפורות בתמונות אמיתיות</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[styles.initButton, { backgroundColor: '#28a745', marginTop: 12 }]}
+              onPress={handleResetGallery}
+            >
+              <Ionicons name="trash" size={20} color="#fff" />
+              <Text style={styles.initButtonText}>מחק הכל וצור גלריה חדשה</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[styles.initButton, { backgroundColor: '#6f42c1', marginTop: 12 }]}
+              onPress={handleListStorage}
+            >
+              <Ionicons name="folder" size={20} color="#fff" />
+              <Text style={styles.initButtonText}>בדוק מה יש ב-Firebase Storage</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[styles.initButton, { backgroundColor: '#fd7e14', marginTop: 12 }]}
+              onPress={handleRestoreFromStorage}
+            >
+              <Ionicons name="download" size={20} color="#fff" />
+              <Text style={styles.initButtonText}>שחזר התמונות שלי מ-Storage</Text>
+            </TouchableOpacity>
           </View>
 
           {/* Admin Menu Grid */}
@@ -373,9 +480,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   initButton: {
-    backgroundColor: '#28a745',
-    paddingHorizontal: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#007bff',
     paddingVertical: 12,
+    paddingHorizontal: 20,
     borderRadius: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -385,8 +495,60 @@ const styles = StyleSheet.create({
   },
   initButtonText: {
     color: '#fff',
-    fontSize: 14,
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  systemSection: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  systemTitle: {
+    fontSize: 18,
     fontWeight: 'bold',
+    color: '#222',
+    marginBottom: 16,
+    textAlign: 'right',
+  },
+  systemItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  systemInfo: {
+    flex: 1,
+  },
+  systemLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    textAlign: 'right',
+  },
+  systemStatus: {
+    fontSize: 14,
+    color: '#28a745',
+    textAlign: 'right',
+    marginTop: 2,
+  },
+  statusIndicator: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+  },
+  statusActive: {
+    backgroundColor: '#28a745',
   },
 });
 

@@ -11,7 +11,10 @@
     "save": "Save",
     "edit": "Edit",
     "delete": "Delete",
-    "add": "Add"
+    "add": "Add",
+    "or": "or",
+    "version": "Version",
+    "user": "User"
   },
   "nav": {
     "home": "Home",
@@ -19,7 +22,8 @@
     "booking": "Book Appointment",
     "team": "Team",
     "settings": "Settings",
-    "admin": "Admin"
+    "admin": "Admin",
+    "about": "About"
   },
   "home": {
     "title": "TURGI",
@@ -126,7 +130,14 @@
     "delete_account_message": "Are you sure you want to delete your account? This action cannot be undone.",
     "delete_account_confirm": "Delete Account",
     "account_will_be_deleted": "Account will be deleted soon...",
-    "understood": "Understood"
+    "understood": "Understood",
+    "language_changed": "Language Changed",
+    "language_changed_to": "Language changed to",
+    "language_change_error": "Error changing language",
+    "barber_messages": "Barber Messages",
+    "legal_support": "Legal & Support",
+    "support": "Support",
+    "danger_zone": "Danger Zone"
   },
   "team": {
     "title": "Our Team",
@@ -148,7 +159,21 @@
     "settings": "Advanced Settings",
     "back_to_admin": "Back to Admin Panel",
     "availability_management": "Barber Availability Management",
-    "availability_coming_soon": "Coming Soon - Ability to set working hours for each barber"
+    "availability_coming_soon": "Coming Soon - Ability to set working hours for each barber",
+    "image_management": "Image Management",
+    "atmosphere_image": "Atmosphere Image",
+    "about_us_image": "About Us Image",
+    "gallery_images": "Gallery Images",
+    "update_image": "Update Image",
+    "add_image": "Add Image",
+    "no_gallery_images": "No gallery images",
+    "uploading": "Uploading...",
+    "atmosphere_updated": "Atmosphere image updated successfully",
+    "about_us_updated": "About us image updated successfully",
+    "gallery_image_added": "Gallery image added successfully",
+    "gallery_image_removed": "Gallery image removed successfully",
+    "gallery_image_replaced": "Gallery image replaced successfully",
+    "confirm_remove_image": "Are you sure you want to remove this image?"
   },
   "appointment_status": {
     "confirmed": "Confirmed",

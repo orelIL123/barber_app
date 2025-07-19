@@ -11,7 +11,10 @@
     "save": "שמור",
     "edit": "עריכה",
     "delete": "מחק",
-    "add": "הוסף"
+    "add": "הוסף",
+    "or": "או",
+    "version": "גרסה",
+    "user": "משתמש"
   },
   "nav": {
     "home": "בית",
@@ -19,7 +22,8 @@
     "booking": "הזמנת תור",
     "team": "הצוות",
     "settings": "הגדרות",
-    "admin": "ניהול"
+    "admin": "ניהול",
+    "about": "אודות"
   },
   "home": {
     "title": "TURGI",
@@ -126,7 +130,14 @@
     "delete_account_message": "האם אתה בטוח שברצונך למחוק את החשבון? פעולה זו לא ניתנת לביטול.",
     "delete_account_confirm": "מחק חשבון",
     "account_will_be_deleted": "החשבון יימחק בקרוב...",
-    "understood": "הבנתי"
+    "understood": "הבנתי",
+    "language_changed": "שינוי שפה",
+    "language_changed_to": "השפה שונתה ל",
+    "language_change_error": "שגיאה בשינוי שפה",
+    "barber_messages": "הודעות מהספר",
+    "legal_support": "משפטי ותמיכה",
+    "support": "תמיכה",
+    "danger_zone": "אזור מסוכן"
   },
   "team": {
     "title": "הצוות שלנו",
@@ -148,7 +159,21 @@
     "settings": "הגדרות מתקדמות",
     "back_to_admin": "חזור למסך ניהול",
     "availability_management": "ניהול זמינות ספרים",
-    "availability_coming_soon": "בקרוב - אפשרות לקבוע שעות עבודה לכל ספר"
+    "availability_coming_soon": "בקרוב - אפשרות לקבוע שעות עבודה לכל ספר",
+    "image_management": "ניהול תמונות",
+    "atmosphere_image": "תמונת רקע",
+    "about_us_image": "תמונת אודות",
+    "gallery_images": "תמונות גלריה",
+    "update_image": "עדכן תמונה",
+    "add_image": "הוסף תמונה",
+    "no_gallery_images": "אין תמונות בגלריה",
+    "uploading": "מעלה...",
+    "atmosphere_updated": "תמונת הרקע עודכנה בהצלחה",
+    "about_us_updated": "תמונת האודות עודכנה בהצלחה",
+    "gallery_image_added": "תמונה נוספה לגלריה בהצלחה",
+    "gallery_image_removed": "תמונה הוסרה מהגלריה בהצלחה",
+    "gallery_image_replaced": "תמונה הוחלפה בהצלחה",
+    "confirm_remove_image": "האם אתה בטוח שברצונך להסיר תמונה זו?"
   },
   "appointment_status": {
     "confirmed": "מאושר",

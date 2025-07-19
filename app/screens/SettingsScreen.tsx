@@ -1,16 +1,19 @@
+import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import {
-  Alert,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-  Switch,
-  Linking
+    Alert,
+    Linking,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Switch,
+    Text,
+    TouchableOpacity,
+    View
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
+import { changeLanguage } from '../i18n';
+import TermsModal from '../components/TermsModal';
 import TopNav from '../components/TopNav';
 
 interface SettingsScreenProps {
@@ -19,25 +22,30 @@ interface SettingsScreenProps {
 }
 
 const SettingsScreen: React.FC<SettingsScreenProps> = ({ onNavigate, onBack }) => {
-  const [language, setLanguage] = useState('hebrew');
+  const { t, i18n } = useTranslation();
   const [notifications, setNotifications] = useState(true);
   const [appointmentReminders, setAppointmentReminders] = useState(true);
   const [generalNotifications, setGeneralNotifications] = useState(true);
+  const [showTerms, setShowTerms] = useState(false);
 
   const languages = [
-    { code: 'hebrew', name: 'עברית', flag: '🇮🇱' },
-    { code: 'english', name: 'English', flag: '🇺🇸' },
-    { code: 'russian', name: 'Русский', flag: '🇷🇺' }
+    { code: 'he', name: t('settings.hebrew'), flag: '🇮🇱' },
+    { code: 'en', name: t('settings.english'), flag: '🇺🇸' }
   ];
 
-  const handleLanguageChange = (langCode: string) => {
-    setLanguage(langCode);
-    const selectedLang = languages.find(l => l.code === langCode);
-    Alert.alert(
-      'שינוי שפה',
-      `השפה שונתה ל${selectedLang?.name} ${selectedLang?.flag}\n\nבמימוש מלא, האפליקציה תתחיל להציג את כל התוכן בשפה החדשה.`,
-      [{ text: 'אישור', style: 'default' }]
-    );
+  const handleLanguageChange = async (langCode: string) => {
+    try {
+      await changeLanguage(langCode);
+      const selectedLang = languages.find(l => l.code === langCode);
+      Alert.alert(
+        t('settings.language_changed') || 'שינוי שפה',
+        `${t('settings.language_changed_to') || 'השפה שונתה ל'} ${selectedLang?.name} ${selectedLang?.flag}`,
+        [{ text: t('common.confirm'), style: 'default' }]
+      );
+    } catch (error) {
+      console.error('Error changing language:', error);
+      Alert.alert(t('common.error'), t('settings.language_change_error') || 'שגיאה בשינוי שפה');
+    }
   };
 
   const handleDeleteAccount = () => {
@@ -82,11 +90,11 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onNavigate, onBack }) =
   return (
     <SafeAreaView style={styles.container}>
       <TopNav 
-        title="הגדרות" 
+        title={t('nav.settings')} 
         onBellPress={() => {}} 
         onMenuPress={() => {}}
         showBackButton={true}
-        onBackPress={onBack || (() => onNavigate('home'))}
+        onBackPress={() => onNavigate('home')}
       />
       
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
@@ -94,13 +102,13 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onNavigate, onBack }) =
           
           {/* Language Settings */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>שפה</Text>
+            <Text style={styles.sectionTitle}>{t('settings.language')}</Text>
             {languages.map((lang) => (
               <TouchableOpacity
                 key={lang.code}
                 style={[
                   styles.settingItem,
-                  language === lang.code && styles.selectedItem
+                  i18n.language === lang.code && styles.selectedItem
                 ]}
                 onPress={() => handleLanguageChange(lang.code)}
               >
@@ -108,7 +116,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onNavigate, onBack }) =
                   <Text style={styles.languageFlag}>{lang.flag}</Text>
                   <Text style={styles.settingText}>{lang.name}</Text>
                 </View>
-                {language === lang.code && (
+                {i18n.language === lang.code && (
                   <Ionicons name="checkmark" size={20} color="#007bff" />
                 )}
               </TouchableOpacity>
@@ -117,12 +125,12 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onNavigate, onBack }) =
 
           {/* Notification Settings */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>התראות</Text>
+            <Text style={styles.sectionTitle}>{t('settings.notifications')}</Text>
             
             <View style={styles.settingItem}>
               <View style={styles.settingLeft}>
                 <Ionicons name="notifications" size={20} color="#666" style={styles.settingIcon} />
-                <Text style={styles.settingText}>התראות כלליות</Text>
+                <Text style={styles.settingText}>{t('settings.general_notifications')}</Text>
               </View>
               <Switch
                 value={notifications}
@@ -135,7 +143,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onNavigate, onBack }) =
             <View style={styles.settingItem}>
               <View style={styles.settingLeft}>
                 <Ionicons name="time" size={20} color="#666" style={styles.settingIcon} />
-                <Text style={styles.settingText}>תזכורות לתורים</Text>
+                <Text style={styles.settingText}>{t('settings.appointment_reminders')}</Text>
               </View>
               <Switch
                 value={appointmentReminders}
@@ -148,7 +156,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onNavigate, onBack }) =
             <View style={styles.settingItem}>
               <View style={styles.settingLeft}>
                 <Ionicons name="megaphone" size={20} color="#666" style={styles.settingIcon} />
-                <Text style={styles.settingText}>הודעות מהספר</Text>
+                <Text style={styles.settingText}>{t('settings.barber_messages') || 'הודעות מהספר'}</Text>
               </View>
               <Switch
                 value={generalNotifications}
@@ -161,28 +169,31 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onNavigate, onBack }) =
 
           {/* Legal & Support */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>משפטי ותמיכה</Text>
+            <Text style={styles.sectionTitle}>{t('settings.legal_support') || 'משפטי ותמיכה'}</Text>
             
             <TouchableOpacity style={styles.settingItem} onPress={handlePrivacyPolicy}>
               <View style={styles.settingLeft}>
                 <Ionicons name="shield-checkmark" size={20} color="#666" style={styles.settingIcon} />
-                <Text style={styles.settingText}>מדיניות פרטיות</Text>
+                <Text style={styles.settingText}>{t('settings.privacy_policy')}</Text>
               </View>
               <Ionicons name="chevron-forward" size={20} color="#999" />
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.settingItem} onPress={handleTermsOfService}>
-              <View style={styles.settingLeft}>
-                <Ionicons name="document-text" size={20} color="#666" style={styles.settingIcon} />
-                <Text style={styles.settingText}>תנאי שימוש</Text>
+            <TouchableOpacity onPress={() => setShowTerms(true)}>
+              <View style={styles.settingItem}>
+                <View style={styles.settingLeft}>
+                  <Ionicons name="document-text" size={20} color="#666" style={styles.settingIcon} />
+                  <Text style={styles.settingText}>{t('settings.terms_of_service')}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color="#999" />
               </View>
-              <Ionicons name="chevron-forward" size={20} color="#999" />
             </TouchableOpacity>
+            <TermsModal visible={showTerms} onClose={() => setShowTerms(false)} />
 
             <TouchableOpacity style={styles.settingItem} onPress={handleSupport}>
               <View style={styles.settingLeft}>
                 <Ionicons name="help-circle" size={20} color="#666" style={styles.settingIcon} />
-                <Text style={styles.settingText}>תמיכה</Text>
+                <Text style={styles.settingText}>{t('settings.support') || 'תמיכה'}</Text>
               </View>
               <Ionicons name="chevron-forward" size={20} color="#999" />
             </TouchableOpacity>
@@ -190,12 +201,12 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onNavigate, onBack }) =
 
           {/* Danger Zone */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>אזור מסוכן</Text>
+            <Text style={styles.sectionTitle}>{t('settings.danger_zone') || 'אזור מסוכן'}</Text>
             
             <TouchableOpacity style={styles.dangerItem} onPress={handleDeleteAccount}>
               <View style={styles.settingLeft}>
                 <Ionicons name="trash" size={20} color="#F44336" style={styles.settingIcon} />
-                <Text style={styles.dangerText}>מחק חשבון</Text>
+                <Text style={styles.dangerText}>{t('settings.delete_account')}</Text>
               </View>
               <Ionicons name="chevron-forward" size={20} color="#F44336" />
             </TouchableOpacity>
@@ -204,8 +215,8 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onNavigate, onBack }) =
           {/* App Info */}
           <View style={styles.appInfo}>
             <Text style={styles.appInfoText}>TURGI Barber App</Text>
-            <Text style={styles.appVersionText}>גרסה 1.0.0</Text>
-            <Text style={styles.appCreditText}>Powered by Orel Aharon</Text>
+            <Text style={styles.appVersionText}>{t('common.version') || 'גרסה'} 1.0.0</Text>
+            <Text style={styles.appCreditText}>{t('home.powered_by')}</Text>
           </View>
         </View>
       </ScrollView>
@@ -305,6 +316,13 @@ const styles = StyleSheet.create({
   appCreditText: {
     fontSize: 12,
     color: '#999',
+  },
+  legalLink: {
+    color: '#fff',
+    fontSize: 16,
+    marginVertical: 8,
+    textAlign: 'right',
+    textDecorationLine: 'underline',
   },
 });
 

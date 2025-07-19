@@ -26,6 +26,7 @@ import {
     initializeBarberAvailability
 } from '../../services/firebase';
 import TopNav from '../components/TopNav';
+import ConfirmationModal from '../components/ConfirmationModal';
 
 const { width, height } = Dimensions.get('window');
 
@@ -55,6 +56,8 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
   const [booking, setBooking] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [detailsBarber, setDetailsBarber] = useState<Barber | null>(null);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
 
   const preSelectedBarberId = route?.params?.barberId;
 
@@ -448,22 +451,11 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
 
       console.log('Appointment created successfully');
       setShowConfirmModal(false);
-      Alert.alert(
-        t('booking.appointment_booked'),
-        t('booking.appointment_details', { 
-          date: selectedDate.toLocaleDateString('he-IL'), 
-          time: selectedTime 
-        }),
-        [
-          {
-            text: t('common.confirm'),
-            onPress: () => {
-              resetBooking();
-              onNavigate('profile');
-            }
-          }
-        ]
-      );
+      setSuccessMessage(t('booking.appointment_details', { 
+        date: selectedDate.toLocaleDateString('he-IL'), 
+        time: selectedTime 
+      }));
+      setShowSuccessModal(true);
     } catch (error) {
       console.error('Error creating appointment:', error);
       Alert.alert(t('common.error'), t('booking.booking_error'));
@@ -836,6 +828,26 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
           </View>
         </View>
       </Modal>
+
+      {/* Success Modal */}
+      <ConfirmationModal
+        visible={showSuccessModal}
+        onClose={() => {
+          setShowSuccessModal(false);
+          resetBooking();
+          onNavigate('profile');
+        }}
+        title={t('booking.appointment_booked')}
+        message={successMessage}
+        type="success"
+        icon="checkmark-circle"
+        confirmText={t('profile.view_all')}
+        onConfirm={() => {
+          setShowSuccessModal(false);
+          resetBooking();
+          onNavigate('profile');
+        }}
+      />
     </SafeAreaView>
   );
 };

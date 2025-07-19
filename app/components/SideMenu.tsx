@@ -1,15 +1,18 @@
-import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Modal,
-  Dimensions,
-  SafeAreaView,
-  ScrollView,
-} from 'react-native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import React, { useState, useEffect } from 'react';
+import {
+    Dimensions,
+    Modal,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from 'react-native';
+import { useTranslation } from 'react-i18next';
+import { changeLanguage } from '../i18n';
+import { getCurrentUser, checkIsAdmin } from '../../services/firebase';
 
 const { width } = Dimensions.get('window');
 
@@ -21,12 +24,41 @@ interface SideMenuProps {
 }
 
 const SideMenu: React.FC<SideMenuProps> = ({ visible, onClose, onNavigate, onNotificationPress }) => {
+  const { t, i18n } = useTranslation();
+  const [showLanguageOptions, setShowLanguageOptions] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      const user = getCurrentUser();
+      if (user) {
+        const adminStatus = await checkIsAdmin(user.uid);
+        setIsAdmin(adminStatus);
+      } else {
+        setIsAdmin(false);
+      }
+    };
+    
+    if (visible) {
+      checkAdminStatus();
+    }
+  }, [visible]);
+  
   const handleMenuPress = (screen: string) => {
     console.log('Menu item pressed, navigating to:', screen);
     onClose();
     setTimeout(() => {
       onNavigate(screen);
     }, 100);
+  };
+  
+  const handleLanguageChange = async (languageCode: string) => {
+    try {
+      await changeLanguage(languageCode);
+      setShowLanguageOptions(false);
+    } catch (error) {
+      console.error('Error changing language:', error);
+    }
   };
 
   const handleNotificationPress = () => {
@@ -38,12 +70,12 @@ const SideMenu: React.FC<SideMenuProps> = ({ visible, onClose, onNavigate, onNot
   };
 
   const menuItems = [
-    { id: 'language', title: 'שפה', icon: 'language', screen: 'settings' },
-    { id: 'notifications', title: 'התראות', icon: 'notifications', screen: null },
-    { id: 'appointments', title: 'התורים שלך', icon: 'calendar-today', screen: 'profile' },
-    { id: 'settings', title: 'הגדרות', icon: 'settings', screen: 'settings' },
-    { id: 'admin', title: 'פאנל מנהל', icon: 'admin-panel-settings', screen: 'admin-home' },
-    { id: 'about', title: 'אודות', icon: 'info', screen: null },
+    { id: 'language', title: t('settings.language'), icon: 'language', screen: null },
+    { id: 'notifications', title: t('settings.notifications'), icon: 'notifications', screen: null },
+    { id: 'appointments', title: t('profile.my_appointments'), icon: 'calendar-today', screen: 'profile' },
+    { id: 'settings', title: t('nav.settings'), icon: 'settings', screen: 'settings' },
+    ...(isAdmin ? [{ id: 'admin', title: t('nav.admin'), icon: 'admin-panel-settings', screen: 'admin-home' }] : []),
+    { id: 'about', title: t('nav.about') || 'אודות', icon: 'info', screen: null },
   ];
 
   return (
@@ -57,7 +89,7 @@ const SideMenu: React.FC<SideMenuProps> = ({ visible, onClose, onNavigate, onNot
         <TouchableOpacity style={styles.overlayTouch} onPress={onClose} />
         <SafeAreaView style={styles.menuContainer}>
           <View style={styles.header}>
-            <Text style={styles.headerTitle}>TURGI</Text>
+            <Text style={styles.headerTitle}>{t('home.title')}</Text>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
               <Ionicons name="close" size={24} color="#fff" />
             </TouchableOpacity>
@@ -65,30 +97,62 @@ const SideMenu: React.FC<SideMenuProps> = ({ visible, onClose, onNavigate, onNot
           
           <ScrollView style={styles.menuContent}>
             {menuItems.map((item) => (
-              <TouchableOpacity
-                key={item.id}
-                style={styles.menuItem}
-                onPress={() => {
-                  console.log('Menu item pressed:', item.title);
-                  if (item.id === 'notifications') {
-                    handleNotificationPress();
-                  } else if (item.screen) {
-                    handleMenuPress(item.screen);
-                  } else {
-                    console.log('No action for', item.title);
-                  }
-                }}
-              >
-                <MaterialIcons name={item.icon as any} size={24} color="#fff" />
-                <Text style={styles.menuItemText}>{item.title}</Text>
-                <Ionicons name="chevron-forward" size={20} color="#666" />
-              </TouchableOpacity>
+              <View key={item.id}>
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={() => {
+                    console.log('Menu item pressed:', item.title);
+                    if (item.id === 'language') {
+                      setShowLanguageOptions(!showLanguageOptions);
+                    } else if (item.id === 'notifications') {
+                      handleNotificationPress();
+                    } else if (item.screen) {
+                      handleMenuPress(item.screen);
+                    } else {
+                      console.log('No action for', item.title);
+                    }
+                  }}
+                >
+                  <MaterialIcons name={item.icon as any} size={24} color="#fff" />
+                  <Text style={styles.menuItemText}>{item.title}</Text>
+                  {item.id === 'language' ? (
+                    <Ionicons name={showLanguageOptions ? "chevron-down" : "chevron-forward"} size={20} color="#666" />
+                  ) : (
+                    <Ionicons name="chevron-forward" size={20} color="#666" />
+                  )}
+                </TouchableOpacity>
+                
+                {/* Language Options Submenu */}
+                {item.id === 'language' && showLanguageOptions && (
+                  <View style={styles.languageSubmenu}>
+                    <TouchableOpacity
+                      style={[styles.languageOption, i18n.language === 'he' && styles.activeLanguage]}
+                      onPress={() => handleLanguageChange('he')}
+                    >
+                      <Text style={[styles.languageText, i18n.language === 'he' && styles.activeLanguageText]}>
+                        {t('settings.hebrew')}
+                      </Text>
+                      {i18n.language === 'he' && <Ionicons name="checkmark" size={20} color="#4CAF50" />}
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity
+                      style={[styles.languageOption, i18n.language === 'en' && styles.activeLanguage]}
+                      onPress={() => handleLanguageChange('en')}
+                    >
+                      <Text style={[styles.languageText, i18n.language === 'en' && styles.activeLanguageText]}>
+                        {t('settings.english')}
+                      </Text>
+                      {i18n.language === 'en' && <Ionicons name="checkmark" size={20} color="#4CAF50" />}
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
             ))}
           </ScrollView>
           
           <View style={styles.footer}>
-            <Text style={styles.footerText}>גרסה 1.0.0</Text>
-            <Text style={styles.footerCredit}>Powered by Orel Aharon</Text>
+            <Text style={styles.footerText}>{t('common.version') || 'גרסה'} 1.0.0</Text>
+            <Text style={styles.footerCredit}>{t('home.powered_by')}</Text>
           </View>
         </SafeAreaView>
       </View>
@@ -164,6 +228,36 @@ const styles = StyleSheet.create({
   footerCredit: {
     fontSize: 12,
     color: '#888',
+  },
+  languageSubmenu: {
+    marginTop: 8,
+    marginLeft: 40,
+    paddingLeft: 16,
+    borderLeftWidth: 2,
+    borderLeftColor: '#333',
+  },
+  languageOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginBottom: 4,
+    backgroundColor: 'rgba(255,255,255,0.02)',
+    borderRadius: 8,
+  },
+  activeLanguage: {
+    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(76, 175, 80, 0.3)',
+  },
+  languageText: {
+    fontSize: 14,
+    color: '#ccc',
+  },
+  activeLanguageText: {
+    color: '#4CAF50',
+    fontWeight: '600',
   },
 });
 
