@@ -2,25 +2,25 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import React, { useEffect, useState } from 'react';
 import {
-  Alert,
-  Dimensions,
-  Image,
-  Modal,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    Alert,
+    Dimensions,
+    Image,
+    Modal,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
-import { 
-  GalleryImage, 
-  getGalleryImages, 
-  addGalleryImage, 
-  deleteGalleryImage,
-  getAllStorageImages,
-  uploadImageToStorage
+import {
+    addGalleryImage,
+    deleteGalleryImage,
+    GalleryImage,
+    getAllStorageImages,
+    getGalleryImages,
+    uploadImageToStorage
 } from '../../services/firebase';
 import ToastMessage from '../components/ToastMessage';
 import TopNav from '../components/TopNav';
@@ -452,6 +452,14 @@ const AdminGalleryScreen: React.FC<AdminGalleryScreenProps> = ({ onNavigate, onB
             <Ionicons name="add" size={24} color="#fff" />
             <Text style={styles.addButtonText}>הוסף תמונה ל{getTabTitle(selectedTab)}</Text>
           </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.uploadButton} 
+            onPress={uploadImageFromDevice}
+          >
+            <Ionicons name="phone-portrait" size={24} color="#fff" />
+            <Text style={styles.uploadButtonText}>העלה מהטלפון</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Images Grid */}
@@ -476,6 +484,22 @@ const AdminGalleryScreen: React.FC<AdminGalleryScreenProps> = ({ onNavigate, onB
                       <View style={styles.imageInfo}>
                         <Text style={styles.imageOrder}>Firebase Storage</Text>
                         <Text style={styles.imageStatus}>פעיל</Text>
+                      </View>
+                      <View style={styles.imageActions}>
+                        <TouchableOpacity 
+                          style={styles.actionButton}
+                          onPress={() => {
+                            setFormData({
+                              imageUrl: imageUrl,
+                              type: selectedTab,
+                              order: '0'
+                            });
+                            setModalVisible(true);
+                          }}
+                        >
+                          <Ionicons name="add-circle" size={20} color="#007bff" />
+                          <Text style={styles.actionButtonText}>הוסף לגלריה</Text>
+                        </TouchableOpacity>
                       </View>
                     </View>
                   ))}
@@ -527,9 +551,33 @@ const AdminGalleryScreen: React.FC<AdminGalleryScreenProps> = ({ onNavigate, onB
                       </View>
                       <View style={styles.imageInfo}>
                         <Text style={styles.imageOrder}>סדר: {image.order}</Text>
-                        <Text style={styles.imageStatus}>
-                          {image.isActive ? 'פעיל' : 'לא פעיל'}
-                        </Text>
+                        <Text style={styles.imageStatus}>{image.isActive ? 'פעיל' : 'לא פעיל'}</Text>
+                      </View>
+                      <View style={styles.imageActions}>
+                        <TouchableOpacity 
+                          style={[styles.reorderButton, styles.moveUpButton]}
+                          onPress={() => handleMoveUp(image)}
+                        >
+                          <Ionicons name="chevron-up" size={20} color="#007bff" />
+                        </TouchableOpacity>
+                        <TouchableOpacity 
+                          style={[styles.reorderButton, styles.moveDownButton]}
+                          onPress={() => handleMoveDown(image)}
+                        >
+                          <Ionicons name="chevron-down" size={20} color="#007bff" />
+                        </TouchableOpacity>
+                        <TouchableOpacity 
+                          style={styles.editButton}
+                          onPress={() => openEditModal(image)}
+                        >
+                          <Ionicons name="create" size={20} color="#28a745" />
+                        </TouchableOpacity>
+                        <TouchableOpacity 
+                          style={styles.deleteButton}
+                          onPress={() => handleDelete(image.id)}
+                        >
+                          <Ionicons name="trash" size={20} color="#dc3545" />
+                        </TouchableOpacity>
                       </View>
                     </View>
                   ))}
@@ -722,6 +770,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   addButton: {
     flexDirection: 'row',
@@ -733,6 +784,21 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   addButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 8,
+  },
+  uploadButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#007bff',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+  },
+  uploadButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
@@ -913,10 +979,21 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   actionButton: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f8f9fa',
+    borderWidth: 1,
+    borderColor: '#007bff',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 8,
+  },
+  actionButtonText: {
+    color: '#007bff',
+    fontSize: 16,
+    fontWeight: '500',
+    marginLeft: 8,
   },
   cancelButton: {
     backgroundColor: '#f8f9fa',
@@ -936,7 +1013,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
-  uploadButton: {
+  uploadFromDeviceButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -947,7 +1024,7 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 8,
   },
-  uploadButtonText: {
+  uploadFromDeviceButtonText: {
     color: '#007bff',
     fontSize: 16,
     fontWeight: '500',
@@ -996,6 +1073,36 @@ const styles = StyleSheet.create({
     color: '#1976d2',
     fontWeight: '600',
     textAlign: 'center',
+  },
+  imageActions: {
+    position: 'absolute',
+    bottom: 8,
+    left: 8,
+    flexDirection: 'row',
+    gap: 8,
+  },
+  reorderButton: {
+    backgroundColor: 'rgba(0, 123, 255, 0.1)',
+    borderRadius: 20,
+    padding: 8,
+  },
+  moveUpButton: {
+    top: 0,
+    left: 0,
+  },
+  moveDownButton: {
+    top: 0,
+    right: 0,
+  },
+  editButton: {
+    backgroundColor: 'rgba(40, 167, 69, 0.1)',
+    borderRadius: 20,
+    padding: 8,
+  },
+  deleteButton: {
+    backgroundColor: 'rgba(220, 53, 69, 0.1)',
+    borderRadius: 20,
+    padding: 8,
   },
 });
 

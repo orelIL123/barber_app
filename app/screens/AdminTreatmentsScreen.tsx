@@ -1,23 +1,25 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import React, { useEffect, useState } from 'react';
 import {
-  Alert,
-  Dimensions,
-  Modal,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    Alert,
+    Image,
+    Modal,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
-import { 
-  Treatment, 
-  getTreatments, 
-  addTreatment, 
-  updateTreatment, 
-  deleteTreatment 
+import {
+    Treatment,
+    addTreatment,
+    deleteTreatment,
+    getTreatments,
+    updateTreatment,
+    uploadImageToStorage
 } from '../../services/firebase';
 import ToastMessage from '../components/ToastMessage';
 import TopNav from '../components/TopNav';
@@ -66,6 +68,63 @@ const AdminTreatmentsScreen: React.FC<AdminTreatmentsScreenProps> = ({ onNavigat
 
   const hideToast = () => {
     setToast({ ...toast, visible: false });
+  };
+
+  const pickImageFromDevice = async () => {
+    try {
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      
+      if (permissionResult.granted === false) {
+        showToast('נדרשת הרשאה לגישה לגלריה', 'error');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        return result.assets[0].uri;
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      showToast('שגיאה בבחירת התמונה', 'error');
+    }
+    return null;
+  };
+
+  const uploadTreatmentImage = async () => {
+    try {
+      console.log('📱 Starting treatment image upload...');
+      const imageUri = await pickImageFromDevice();
+      if (!imageUri) {
+        console.log('❌ No image selected');
+        return;
+      }
+
+      console.log('📤 Uploading treatment image:', imageUri);
+      showToast('מעלה תמונה...', 'success');
+      
+      const fileName = `treatment_${Date.now()}_${Math.random().toString(36).substr(2, 9)}.jpg`;
+      const folderPath = 'treatments';
+      
+      console.log('📁 Upload path:', `${folderPath}/${fileName}`);
+      const downloadURL = await uploadImageToStorage(imageUri, folderPath, fileName);
+      console.log('✅ Upload successful. Download URL:', downloadURL);
+      
+      setFormData({
+        ...formData,
+        image: downloadURL
+      });
+      
+      showToast('התמונה הועלתה בהצלחה', 'success');
+    } catch (error) {
+      console.error('❌ Error uploading treatment image:', error);
+      showToast('שגיאה בהעלאת התמונה', 'error');
+    }
   };
 
   const openAddModal = () => {
@@ -224,6 +283,16 @@ const AdminTreatmentsScreen: React.FC<AdminTreatmentsScreenProps> = ({ onNavigat
                     </View>
                   </View>
                   
+                  {treatment.image && (
+                    <View style={styles.treatmentImageContainer}>
+                      <Image
+                        source={{ uri: treatment.image }}
+                        style={styles.treatmentImage}
+                        defaultSource={{ uri: 'https://via.placeholder.com/200x150' }}
+                      />
+                    </View>
+                  )}
+                  
                   <Text style={styles.treatmentDescription}>
                     {treatment.description}
                   </Text>
@@ -236,6 +305,10 @@ const AdminTreatmentsScreen: React.FC<AdminTreatmentsScreenProps> = ({ onNavigat
                     <View style={styles.detailItem}>
                       <Ionicons name="cash" size={16} color="#666" />
                       <Text style={styles.detailText}>₪{treatment.price}</Text>
+                    </View>
+                    <View style={styles.detailItem}>
+                      <Ionicons name="checkmark-circle" size={16} color="#28a745" />
+                      <Text style={styles.detailText}>זמין</Text>
                     </View>
                   </View>
                 </View>
@@ -313,6 +386,34 @@ const AdminTreatmentsScreen: React.FC<AdminTreatmentsScreenProps> = ({ onNavigat
               </View>
 
               <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>תמונה לטיפול</Text>
+                {formData.image ? (
+                  <View style={styles.imagePreviewContainer}>
+                    <Image
+                      source={{ uri: formData.image }}
+                      style={styles.imagePreview}
+                      defaultSource={{ uri: 'https://via.placeholder.com/200x150' }}
+                    />
+                    <TouchableOpacity
+                      style={styles.changeImageButton}
+                      onPress={uploadTreatmentImage}
+                    >
+                      <Ionicons name="camera" size={20} color="#007bff" />
+                      <Text style={styles.changeImageText}>שנה תמונה</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    style={styles.uploadImageButton}
+                    onPress={uploadTreatmentImage}
+                  >
+                    <Ionicons name="camera" size={24} color="#007bff" />
+                    <Text style={styles.uploadImageText}>העלה תמונה מהטלפון</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>קישור לתמונה (אופציונלי)</Text>
                 <TextInput
                   style={styles.textInput}
@@ -321,6 +422,7 @@ const AdminTreatmentsScreen: React.FC<AdminTreatmentsScreenProps> = ({ onNavigat
                   placeholder="https://example.com/image.jpg"
                   textAlign="right"
                 />
+                <Text style={styles.inputHint}>או השתמש בקישור ישיר לתמונה</Text>
               </View>
             </ScrollView>
 
@@ -457,6 +559,18 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: '#ffebee',
   },
+  treatmentImageContainer: {
+    width: '100%',
+    height: 150,
+    borderRadius: 8,
+    overflow: 'hidden',
+    marginBottom: 12,
+    backgroundColor: '#f0f0f0',
+  },
+  treatmentImage: {
+    width: '100%',
+    height: '100%',
+  },
   treatmentDescription: {
     fontSize: 14,
     color: '#666',
@@ -557,6 +671,54 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  imagePreviewContainer: {
+    width: '100%',
+    height: 150,
+    borderRadius: 8,
+    overflow: 'hidden',
+    marginBottom: 12,
+    backgroundColor: '#f0f0f0',
+    position: 'relative',
+  },
+  imagePreview: {
+    width: '100%',
+    height: '100%',
+  },
+  changeImageButton: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  changeImageText: {
+    fontSize: 12,
+    color: '#007bff',
+  },
+  uploadImageButton: {
+    width: '100%',
+    height: 150,
+    borderRadius: 8,
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  uploadImageText: {
+    fontSize: 14,
+    color: '#007bff',
+    textDecorationLine: 'underline',
+  },
+  inputHint: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 4,
+    textAlign: 'right',
   },
 });
 

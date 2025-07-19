@@ -1,14 +1,14 @@
 import {
     createUserWithEmailAndPassword,
     onAuthStateChanged,
+    PhoneAuthProvider,
+    RecaptchaVerifier,
+    signInWithCredential,
     signInWithEmailAndPassword,
+    signInWithPhoneNumber,
     signOut,
     updateProfile,
-    User,
-    signInWithPhoneNumber,
-    PhoneAuthProvider,
-    signInWithCredential,
-    RecaptchaVerifier
+    User
 } from 'firebase/auth';
 import {
     addDoc,
@@ -23,7 +23,7 @@ import {
     updateDoc,
     where
 } from 'firebase/firestore';
-import { getDownloadURL, listAll, ref, uploadBytes, deleteObject } from 'firebase/storage';
+import { deleteObject, getDownloadURL, listAll, ref, uploadBytes } from 'firebase/storage';
 import { auth, db, storage } from '../config/firebase';
 
 export interface UserProfile {
@@ -71,7 +71,7 @@ export interface Appointment {
 export interface GalleryImage {
   id: string;
   imageUrl: string;
-  type: 'gallery' | 'background' | 'splash';
+  type: 'gallery' | 'background' | 'splash' | 'aboutus';
   order: number;
   isActive: boolean;
   createdAt: Timestamp;
