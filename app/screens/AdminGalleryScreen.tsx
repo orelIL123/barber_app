@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import { addDoc, collection, deleteDoc, doc, getDocs, getFirestore, updateDoc } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
 import {
     Alert,
@@ -28,11 +29,12 @@ import TopNav from '../components/TopNav';
 const { width } = Dimensions.get('window');
 
 interface AdminGalleryScreenProps {
-  onNavigate: (screen: string) => void;
+  onNavigate?: (screen: string) => void;
   onBack?: () => void;
+  initialTab?: 'gallery' | 'background' | 'splash' | 'aboutus' | 'shop';
 }
 
-const AdminGalleryScreen: React.FC<AdminGalleryScreenProps> = ({ onNavigate, onBack }) => {
+const AdminGalleryScreen: React.FC<AdminGalleryScreenProps> = ({ onNavigate, onBack, initialTab }) => {
   const [images, setImages] = useState<GalleryImage[]>([]);
   const [storageImages, setStorageImages] = useState<{
     gallery: string[];
@@ -49,7 +51,7 @@ const AdminGalleryScreen: React.FC<AdminGalleryScreenProps> = ({ onNavigate, onB
   });
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
-  const [selectedTab, setSelectedTab] = useState<'gallery' | 'background' | 'splash' | 'aboutus'>('gallery');
+  const [selectedTab, setSelectedTab] = useState<'gallery' | 'background' | 'splash' | 'aboutus' | 'shop'>(initialTab || 'gallery');
   const [toast, setToast] = useState({ visible: false, message: '', type: 'success' as 'success' | 'error' });
   const [editingImage, setEditingImage] = useState<GalleryImage | null>(null);
 
@@ -60,9 +62,24 @@ const AdminGalleryScreen: React.FC<AdminGalleryScreenProps> = ({ onNavigate, onB
     order: '0'
   });
 
+  // הוסף state למוצרים
+  const [shopProducts, setShopProducts] = useState<any[]>([]);
+  const [shopLoading, setShopLoading] = useState(false);
+  const [shopForm, setShopForm] = useState({ name: '', price: '', imageUrl: '', editingId: null });
+
+  // הוסף state לתמונות shop מהסטורג'
+  const [shopStorageImages, setShopStorageImages] = useState<string[]>([]);
+
   useEffect(() => {
     loadImages();
   }, []);
+
+  useEffect(() => {
+    if (selectedTab === 'shop') {
+      fetchShopProducts();
+      fetchShopStorageImages();
+    }
+  }, [selectedTab]);
 
   const loadImages = async () => {
     try {
@@ -365,6 +382,7 @@ const AdminGalleryScreen: React.FC<AdminGalleryScreenProps> = ({ onNavigate, onB
       case 'background': return 'רקע';
       case 'splash': return 'מסך טעינה';
       case 'aboutus': return 'אודותינו';
+      case 'shop': return 'חנות';
       default: return tab;
     }
   };
@@ -375,6 +393,7 @@ const AdminGalleryScreen: React.FC<AdminGalleryScreenProps> = ({ onNavigate, onB
       case 'background': return 'image';
       case 'splash': return 'phone-portrait';
       case 'aboutus': return 'information-circle';
+      case 'shop': return 'cart';
       default: return 'image';
     }
   };
@@ -392,19 +411,126 @@ const AdminGalleryScreen: React.FC<AdminGalleryScreenProps> = ({ onNavigate, onB
         return storageImages.splash;
       case 'aboutus':
         return storageImages.aboutus;
+      // case 'shop':
+      //   return storageImages.workers; // REMOVE THIS LINE
       default:
         return [];
     }
   };
-  
-  const storageImagesForTab = getStorageImagesForTab();
+
+  // Only use getStorageImagesForTab for non-shop tabs
+  const storageImagesForTab = (selectedTab === 'shop') ? [] : getStorageImagesForTab();
 
   const tabs = [
     { key: 'gallery', label: 'גלריה', icon: 'images' },
     { key: 'background', label: 'רקע', icon: 'image' },
     { key: 'splash', label: 'מסך טעינה', icon: 'phone-portrait' },
     { key: 'aboutus', label: 'אודותינו', icon: 'information-circle' },
+    { key: 'shop', label: 'חנות', icon: 'cart' },
   ];
+
+  // טען מוצרים מה-shop
+  const fetchShopProducts = async () => {
+    setShopLoading(true);
+    try {
+      const db = getFirestore();
+      const snap = await getDocs(collection(db, 'shop'));
+      setShopProducts(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    } catch (e) {
+      showToast('שגיאה בטעינת מוצרים', 'error');
+    } finally {
+      setShopLoading(false);
+    }
+  };
+
+  // העלאת תמונה ל-shop
+  const uploadShopImageFromDevice = async () => {
+    try {
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permissionResult.granted) {
+        showToast('נדרשת הרשאה לגישה לגלריה', 'error');
+        return null;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+      if (!result.canceled && result.assets[0]) {
+        const imageUri = result.assets[0].uri;
+        const fileName = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}.jpg`;
+        const downloadURL = await uploadImageToStorage(imageUri, 'shop', fileName);
+        return downloadURL;
+      }
+    } catch (error) {
+      showToast('שגיאה בהעלאת התמונה', 'error');
+    }
+    return null;
+  };
+
+  // שמירת מוצר חדש/ערוך
+  const handleSaveShopProduct = async () => {
+    if (!shopForm.name.trim() || !shopForm.price.trim() || !shopForm.imageUrl) {
+      showToast('נא למלא שם, מחיר ותמונה', 'error');
+      return;
+    }
+    setShopLoading(true);
+    try {
+      const db = getFirestore();
+      if (shopForm.editingId) {
+        await updateDoc(doc(db, 'shop', shopForm.editingId), {
+          name: shopForm.name.trim(),
+          price: Number(shopForm.price),
+          imageUrl: shopForm.imageUrl
+        });
+        showToast('המוצר עודכן!');
+      } else {
+        await addDoc(collection(db, 'shop'), {
+          name: shopForm.name.trim(),
+          price: Number(shopForm.price),
+          imageUrl: shopForm.imageUrl,
+          createdAt: new Date()
+        });
+        showToast('המוצר נוסף!');
+      }
+      setShopForm({ name: '', price: '', imageUrl: '', editingId: null });
+      fetchShopProducts();
+    } catch (e) {
+      showToast('שגיאה בשמירת מוצר', 'error');
+    } finally {
+      setShopLoading(false);
+    }
+  };
+
+  // מחיקת מוצר
+  const handleDeleteShopProduct = async (id: string) => {
+    setShopLoading(true);
+    try {
+      const db = getFirestore();
+      await deleteDoc(doc(db, 'shop', id));
+      showToast('המוצר נמחק!');
+      fetchShopProducts();
+    } catch (e) {
+      showToast('שגיאה במחיקת מוצר', 'error');
+    } finally {
+      setShopLoading(false);
+    }
+  };
+
+  // טען תמונות shop מהסטורג'
+  const fetchShopStorageImages = async () => {
+    try {
+      const all = await getAllStorageImages() as Record<string, string[]>;
+      setShopStorageImages(all.shop || []);
+    } catch (e) {
+      showToast('שגיאה בטעינת תמונות מהסטורג׳', 'error');
+    }
+  };
+
+  // Fix openAddModal and getTabTitle calls to only use the original four tabs
+  const isImageTab = (tab: string): tab is 'gallery' | 'background' | 'splash' | 'aboutus' =>
+    tab === 'gallery' || tab === 'background' || tab === 'splash' || tab === 'aboutus';
 
   return (
     <SafeAreaView style={styles.container}>
@@ -447,10 +573,13 @@ const AdminGalleryScreen: React.FC<AdminGalleryScreenProps> = ({ onNavigate, onB
         <View style={styles.header}>
           <TouchableOpacity 
             style={styles.addButton} 
-            onPress={() => openAddModal(selectedTab)}
+            onPress={() => isImageTab(selectedTab) && openAddModal(selectedTab)}
+            disabled={!isImageTab(selectedTab)}
           >
             <Ionicons name="add" size={24} color="#fff" />
-            <Text style={styles.addButtonText}>הוסף תמונה ל{getTabTitle(selectedTab)}</Text>
+            <Text style={styles.addButtonText}>
+              {isImageTab(selectedTab) ? `הוסף תמונה ל${getTabTitle(selectedTab)}` : ''}
+            </Text>
           </TouchableOpacity>
           
           <TouchableOpacity 
@@ -715,6 +844,123 @@ const AdminGalleryScreen: React.FC<AdminGalleryScreenProps> = ({ onNavigate, onB
           </View>
         </View>
       </Modal>
+
+      {selectedTab === 'shop' && (
+        <Modal
+          animationType="slide"
+          transparent={true}
+          visible={modalVisible}
+          onRequestClose={() => setModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>
+                  {shopForm.editingId ? 'עריכת מוצר' : 'הוספת מוצר חדש'}
+                </Text>
+                <TouchableOpacity onPress={() => setModalVisible(false)}>
+                  <Ionicons name="close" size={24} color="#666" />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView style={styles.modalBody}>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>שם המוצר</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    value={shopForm.name}
+                    onChangeText={text => setShopForm(f => ({ ...f, name: text }))}
+                    placeholder="שם המוצר"
+                    placeholderTextColor="#aaa"
+                  />
+                </View>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>מחיר</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    value={shopForm.price}
+                    onChangeText={text => setShopForm(f => ({ ...f, price: text }))}
+                    keyboardType="numeric"
+                    placeholder="מחיר"
+                    placeholderTextColor="#aaa"
+                  />
+                </View>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>תמונה</Text>
+                  <TouchableOpacity
+                    style={styles.uploadButton}
+                    onPress={async()=>{
+                      const url = await uploadShopImageFromDevice();
+                      if(url) setShopForm(f=>({...f,imageUrl:url}));
+                    }}
+                  >
+                    <Ionicons name="cloud-upload" size={20} color="#007bff" />
+                    <Text style={styles.uploadButtonText}>
+                      {shopForm.imageUrl ? 'החלף תמונה' : 'העלה תמונה'}
+                    </Text>
+                  </TouchableOpacity>
+                  {shopForm.imageUrl ? (
+                    <Image source={{ uri: shopForm.imageUrl }} style={{width:100,height:100,borderRadius:8,alignSelf:'center',marginBottom:8}} />
+                  ) : null}
+                </View>
+              </ScrollView>
+
+              <View style={styles.modalActions}>
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.cancelButton]}
+                  onPress={() => setModalVisible(false)}
+                >
+                  <Text style={styles.cancelButtonText}>ביטול</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.saveButton]}
+                  onPress={handleSaveShopProduct}
+                  disabled={shopLoading}
+                >
+                  <Text style={styles.saveButtonText}>
+                    {shopForm.editingId ? 'עדכן מוצר' : 'הוסף מוצר'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              <ScrollView style={{marginTop:16,maxHeight:300}}>
+                {shopProducts.map(prod => (
+                  <View key={prod.id} style={{flexDirection:'row',alignItems:'center',backgroundColor:'#222',borderRadius:8,padding:8,marginBottom:8}}>
+                    <Image source={{ uri: prod.imageUrl }} style={{width:60,height:60,borderRadius:8,marginRight:8}} />
+                    <View style={{flex:1}}>
+                      <Text style={{color:'#fff',fontWeight:'bold'}}>{prod.name}</Text>
+                      <Text style={{color:'#fff'}}>{prod.price} ₪</Text>
+                    </View>
+                    <TouchableOpacity onPress={()=>setShopForm({ name: prod.name, price: String(prod.price), imageUrl: prod.imageUrl, editingId: prod.id })} style={{marginHorizontal:4}}>
+                      <Ionicons name="create-outline" size={24} color="#007bff" />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={()=>handleDeleteShopProduct(prod.id)} style={{marginHorizontal:4}}>
+                      <Ionicons name="trash-outline" size={24} color="#dc3545" />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </ScrollView>
+              {selectedTab === 'shop' && (
+                <View style={{margin:16}}>
+                  <Text style={{color:'#fff',fontWeight:'bold',fontSize:16,marginTop:24,marginBottom:8}}>תמונות בסטורג׳ shop שעדיין לא מוצר:</Text>
+                  {shopStorageImages.filter(url => !shopProducts.some(prod => prod.imageUrl === url)).length === 0 ? (
+                    <Text style={{color:'#aaa'}}>כל התמונות כבר משויכות למוצרים.</Text>
+                  ) : (
+                    shopStorageImages.filter(url => !shopProducts.some(prod => prod.imageUrl === url)).map((url, idx) => (
+                      <View key={url} style={{flexDirection:'row',alignItems:'center',backgroundColor:'#222',borderRadius:8,padding:8,marginBottom:8}}>
+                        <Image source={{ uri: url }} style={{width:60,height:60,borderRadius:8,marginRight:8}} />
+                        <TouchableOpacity onPress={()=>setShopForm({ name: '', price: '', imageUrl: url, editingId: null })} style={{marginHorizontal:4,backgroundColor:'#007bff',borderRadius:6,padding:8}}>
+                          <Text style={{color:'#fff'}}>הפוך למוצר</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ))
+                  )}
+                </View>
+              )}
+            </View>
+          </View>
+        </Modal>
+      )}
 
       <ToastMessage
         visible={toast.visible}

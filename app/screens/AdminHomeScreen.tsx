@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { doc, getDoc, getFirestore, setDoc } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
 import {
     Dimensions,
@@ -7,6 +8,7 @@ import {
     ScrollView,
     StyleSheet,
     Text,
+    TextInput,
     TouchableOpacity,
     View
 } from 'react-native';
@@ -25,6 +27,8 @@ const AdminHomeScreen: React.FC<AdminHomeScreenProps> = ({ onNavigate, onBack })
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState({ visible: false, message: '', type: 'success' as 'success' | 'error' });
+  const [aboutUsText, setAboutUsText] = useState('');
+  const [aboutUsLoading, setAboutUsLoading] = useState(true);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChange(async (user) => {
@@ -46,6 +50,25 @@ const AdminHomeScreen: React.FC<AdminHomeScreenProps> = ({ onNavigate, onBack })
     });
 
     return unsubscribe;
+  }, []);
+
+  // טען טקסט אודות מה-DB
+  useEffect(() => {
+    const fetchAboutUs = async () => {
+      try {
+        const db = getFirestore();
+        const docRef = doc(db, 'settings', 'aboutus');
+        const snap = await getDoc(docRef);
+        if (snap.exists()) {
+          setAboutUsText(snap.data().text || '');
+        }
+      } catch (e) {
+        showToast('שגיאה בטעינת אודות', 'error');
+      } finally {
+        setAboutUsLoading(false);
+      }
+    };
+    fetchAboutUs();
   }, []);
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
@@ -108,6 +131,19 @@ const AdminHomeScreen: React.FC<AdminHomeScreenProps> = ({ onNavigate, onBack })
     } catch (error) {
       console.error('Error restoring from storage:', error);
       showToast('שגיאה בשחזור מ-Storage', 'error');
+    }
+  };
+
+  const handleSaveAboutUs = async () => {
+    setAboutUsLoading(true);
+    try {
+      const db = getFirestore();
+      await setDoc(doc(db, 'settings', 'aboutus'), { text: aboutUsText });
+      showToast('הטקסט נשמר בהצלחה!');
+    } catch (e) {
+      showToast('שגיאה בשמירת הטקסט', 'error');
+    } finally {
+      setAboutUsLoading(false);
     }
   };
 
@@ -266,6 +302,22 @@ const AdminHomeScreen: React.FC<AdminHomeScreenProps> = ({ onNavigate, onBack })
             >
               <Ionicons name="download" size={20} color="#fff" />
               <Text style={styles.initButtonText}>שחזר התמונות שלי מ-Storage</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* עריכת טקסט הכירו אותנו */}
+          <View style={{margin: 16, backgroundColor: '#222', borderRadius: 12, padding: 16}}>
+            <Text style={{color: '#fff', fontWeight: 'bold', fontSize: 18, marginBottom: 8}}>ערוך טקסט הכירו אותנו</Text>
+            <TextInput
+              value={aboutUsText}
+              onChangeText={setAboutUsText}
+              placeholder="הכנס טקסט הכירו אותנו..."
+              style={{backgroundColor: '#333', color: '#fff', borderRadius: 8, padding: 8, minHeight: 80, marginBottom: 8}}
+              placeholderTextColor="#aaa"
+              multiline
+            />
+            <TouchableOpacity style={{backgroundColor: '#007bff', borderRadius: 8, padding: 12, marginTop: 8}} onPress={handleSaveAboutUs} disabled={aboutUsLoading}>
+              <Text style={{color: 'white', fontWeight: 'bold', textAlign: 'center'}}>{aboutUsLoading ? 'שומר...' : 'שמור טקסט'}</Text>
             </TouchableOpacity>
           </View>
 

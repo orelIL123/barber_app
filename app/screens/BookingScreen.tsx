@@ -621,7 +621,7 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
                     selectedBarber?.id === barber.id && styles.selectedCard
                   ]}
                   onPress={() => handleBarberSelect(barber)}
-                  disabled={!barber.available}
+                  disabled={false}
                 >
                   <LinearGradient
                     colors={['#1a1a1a', '#000000', '#1a1a1a']}
@@ -645,11 +645,6 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
                     <TouchableOpacity style={styles.detailsButton} onPress={() => setDetailsBarber(barber)}>
                       <Text style={styles.detailsButtonText}>{t('booking.details')}</Text>
                     </TouchableOpacity>
-                    {!barber.available && (
-                      <View style={styles.unavailableBadge}>
-                        <Text style={styles.unavailableText}>{t('booking.unavailable')}</Text>
-                      </View>
-                    )}
                   </LinearGradient>
                 </TouchableOpacity>
               ))}

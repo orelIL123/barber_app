@@ -1,3 +1,4 @@
+import { PlayfairDisplay_700Bold, useFonts } from '@expo-google-fonts/playfair-display';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
@@ -23,6 +24,10 @@ const TopNav: React.FC<TopNavProps> = ({
   showCloseButton = false, 
   onClosePress 
 }) => {
+  const [fontsLoaded] = useFonts({
+    PlayfairDisplay_700Bold,
+  });
+  if (!fontsLoaded) return null;
   return (
     <View style={styles.container}>
       {/* Diagonal blue gradient accent */}
@@ -51,7 +56,7 @@ const TopNav: React.FC<TopNavProps> = ({
         )}
       </TouchableOpacity>
       
-      <Text style={styles.title}>{title}</Text>
+      <Text style={[styles.title, { fontFamily: 'PlayfairDisplay_700Bold', textTransform: 'uppercase' }]}>{title}</Text>
       
       {/* Right icon - shows close button, notification, or empty space */}
       <TouchableOpacity style={styles.iconRight} onPress={showCloseButton ? onClosePress : onBellPress}>

@@ -18,6 +18,7 @@ import {
     doc,
     getDoc,
     getDocs,
+    orderBy,
     query,
     setDoc,
     Timestamp,
@@ -26,6 +27,8 @@ import {
 } from 'firebase/firestore';
 import { deleteObject, getDownloadURL, listAll, ref, uploadBytes } from 'firebase/storage';
 import { auth, db, storage } from '../config/firebase';
+import { CacheUtils } from './cache';
+import { ImageOptimizer } from './imageOptimization';
 
 
 export interface UserProfile {
@@ -293,8 +296,17 @@ export const getAllUsers = async (): Promise<UserProfile[]> => {
 };
 
 // Barbers functions
-export const getBarbers = async (): Promise<Barber[]> => {
+export const getBarbers = async (useCache: boolean = true): Promise<Barber[]> => {
   try {
+    // Try cache first if enabled
+    if (useCache) {
+      const cached = await CacheUtils.getBarbers();
+      if (cached) {
+        console.log('📦 Barbers loaded from cache');
+        return cached;
+      }
+    }
+
     const querySnapshot = await getDocs(collection(db, 'barbers'));
     const barbers: Barber[] = [];
     
@@ -304,6 +316,12 @@ export const getBarbers = async (): Promise<Barber[]> => {
         ...doc.data()
       } as Barber);
     });
+    
+    // Cache the results for 60 minutes
+    if (useCache) {
+      await CacheUtils.setBarbers(barbers, 60);
+      console.log('💾 Barbers cached for 60 minutes');
+    }
     
     return barbers;
   } catch (error) {
@@ -331,8 +349,17 @@ export const getBarber = async (barberId: string): Promise<Barber | null> => {
 };
 
 // Treatments functions
-export const getTreatments = async (): Promise<Treatment[]> => {
+export const getTreatments = async (useCache: boolean = true): Promise<Treatment[]> => {
   try {
+    // Try cache first if enabled
+    if (useCache) {
+      const cached = await CacheUtils.getTreatments();
+      if (cached) {
+        console.log('📦 Treatments loaded from cache');
+        return cached;
+      }
+    }
+
     const querySnapshot = await getDocs(collection(db, 'treatments'));
     const treatments: Treatment[] = [];
     
@@ -342,6 +369,12 @@ export const getTreatments = async (): Promise<Treatment[]> => {
         ...doc.data()
       } as Treatment);
     });
+    
+    // Cache the results for 60 minutes
+    if (useCache) {
+      await CacheUtils.setTreatments(treatments, 60);
+      console.log('💾 Treatments cached for 60 minutes');
+    }
     
     return treatments;
   } catch (error) {
@@ -625,6 +658,54 @@ export const getAllAppointments = async (): Promise<Appointment[]> => {
   }
 };
 
+// Optimized appointment queries
+export const getAppointmentsByDateRange = async (startDate: Date, endDate: Date): Promise<Appointment[]> => {
+  try {
+    const q = query(
+      collection(db, 'appointments'),
+      where('date', '>=', Timestamp.fromDate(startDate)),
+      where('date', '<=', Timestamp.fromDate(endDate)),
+      orderBy('date', 'desc')
+    );
+    const querySnapshot = await getDocs(q);
+    const appointments: Appointment[] = [];
+    
+    querySnapshot.forEach((doc) => {
+      appointments.push({
+        id: doc.id,
+        ...doc.data()
+      } as Appointment);
+    });
+    
+    return appointments;
+  } catch (error) {
+    console.error('Error getting appointments by date range:', error);
+    throw error;
+  }
+};
+
+export const getCurrentMonthAppointments = async (): Promise<Appointment[]> => {
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+  
+  return getAppointmentsByDateRange(startOfMonth, endOfMonth);
+};
+
+export const getRecentAppointments = async (days: number = 30): Promise<Appointment[]> => {
+  const now = new Date();
+  const startDate = new Date(now.getTime() - (days * 24 * 60 * 60 * 1000));
+  
+  return getAppointmentsByDateRange(startDate, now);
+};
+
+export const getUpcomingAppointments = async (days: number = 30): Promise<Appointment[]> => {
+  const now = new Date();
+  const endDate = new Date(now.getTime() + (days * 24 * 60 * 60 * 1000));
+  
+  return getAppointmentsByDateRange(now, endDate);
+};
+
 // Gallery functions
 export const getGalleryImages = async (): Promise<GalleryImage[]> => {
   try {
@@ -770,12 +851,13 @@ export const getImageUrl = async (imagePath: string): Promise<string | null> => 
 
 export const getAllStorageImages = async () => {
   try {
-    const [galleryImages, backgroundImages, splashImages, workersImages, aboutusImages] = await Promise.all([
+    const [galleryImages, backgroundImages, splashImages, workersImages, aboutusImages, shopImages] = await Promise.all([
       getStorageImages('gallery'),
       getStorageImages('backgrounds'), 
       getStorageImages('splash'),
       getStorageImages('workers'),
-      getStorageImages('aboutus')
+      getStorageImages('aboutus'),
+      getStorageImages('shop')
     ]);
     
     return {
@@ -783,7 +865,8 @@ export const getAllStorageImages = async () => {
       backgrounds: backgroundImages,
       splash: splashImages,
       workers: workersImages,
-      aboutus: aboutusImages
+      aboutus: aboutusImages,
+      shop: shopImages
     };
   } catch (error) {
     console.error('Error getting all storage images:', error);
@@ -792,7 +875,8 @@ export const getAllStorageImages = async () => {
       backgrounds: [],
       splash: [],
       workers: [],
-      aboutus: []
+      aboutus: [],
+      shop: []
     };
   }
 };
@@ -801,20 +885,115 @@ export const getAllStorageImages = async () => {
 export const uploadImageToStorage = async (
   imageUri: string, 
   folderPath: string, 
-  fileName: string
+  fileName: string,
+  compress: boolean = true
 ): Promise<string> => {
   try {
-    const response = await fetch(imageUri);
+    let finalImageUri = imageUri;
+    
+    // Compress image before upload if requested
+    if (compress) {
+      console.log('🗜️ Compressing image before upload...');
+      const preset = folderPath === 'profiles' ? 'PROFILE' : 
+                    folderPath === 'gallery' ? 'GALLERY' : 
+                    folderPath === 'atmosphere' ? 'ATMOSPHERE' : 'GALLERY';
+      finalImageUri = await ImageOptimizer.compressImage(imageUri, ImageOptimizer.PRESETS[preset]);
+    }
+    
+    const response = await fetch(finalImageUri);
     const blob = await response.blob();
     
+    console.log(`📤 Uploading ${compress ? 'compressed' : 'original'} image to ${folderPath}/${fileName}`);
     const imageRef = ref(storage, `${folderPath}/${fileName}`);
     await uploadBytes(imageRef, blob);
     
     const downloadURL = await getDownloadURL(imageRef);
+    console.log('✅ Image uploaded successfully:', downloadURL);
     return downloadURL;
   } catch (error) {
     console.error('Error uploading image:', error);
     throw error;
+  }
+};
+
+// Optimized image upload with automatic compression
+export const uploadOptimizedImage = async (
+  imageUri: string,
+  folderPath: string,
+  fileName: string,
+  preset: keyof typeof ImageOptimizer.PRESETS = 'GALLERY'
+): Promise<string> => {
+  try {
+    console.log('🚀 Starting optimized image upload...');
+    
+    // Compress image with specific preset
+    const compressedUri = await ImageOptimizer.compressImage(imageUri, ImageOptimizer.PRESETS[preset]);
+    
+    // Upload compressed image
+    const response = await fetch(compressedUri);
+    const blob = await response.blob();
+    
+    console.log(`📤 Uploading optimized image (${preset}) to ${folderPath}/${fileName}`);
+    const imageRef = ref(storage, `${folderPath}/${fileName}`);
+    await uploadBytes(imageRef, blob);
+    
+    const downloadURL = await getDownloadURL(imageRef);
+    console.log('✅ Optimized image uploaded successfully:', downloadURL);
+    return downloadURL;
+  } catch (error) {
+    console.error('Error uploading optimized image:', error);
+    throw error;
+  }
+};
+
+// Get available time slots for a barber on a specific date
+export const getBarberAvailableSlots = async (barberId: string, date: string): Promise<string[]> => {
+  try {
+    const docRef = doc(db, 'barberAvailability', barberId);
+    const snap = await getDoc(docRef);
+    
+    if (!snap.exists()) {
+      return []; // No availability set
+    }
+    
+    const availability = snap.data().availability;
+    const dayData = availability.find((day: any) => day.date === date);
+    
+    if (!dayData || !dayData.isAvailable) {
+      return []; // Day not available
+    }
+    
+    return dayData.timeSlots || [];
+  } catch (error) {
+    console.error('Error getting barber available slots:', error);
+    return [];
+  }
+};
+
+// Check if a specific time slot is available for booking
+export const isTimeSlotAvailable = async (barberId: string, date: string, time: string): Promise<boolean> => {
+  try {
+    // First check if barber has this time slot available
+    const availableSlots = await getBarberAvailableSlots(barberId, date);
+    if (!availableSlots.includes(time)) {
+      return false; // Barber not available at this time
+    }
+    
+    // Then check if there's already an appointment at this time
+    const appointmentsRef = collection(db, 'appointments');
+    const q = query(
+      appointmentsRef,
+      where('barberId', '==', barberId),
+      where('date', '==', date),
+      where('time', '==', time),
+      where('status', '!=', 'cancelled')
+    );
+    
+    const snapshot = await getDocs(q);
+    return snapshot.empty; // Available if no conflicting appointments
+  } catch (error) {
+    console.error('Error checking time slot availability:', error);
+    return false;
   }
 };
 
@@ -831,6 +1010,7 @@ export const listAllStorageImages = async () => {
     console.log('Splash folder:', storageImages.splash);
     console.log('Workers folder:', storageImages.workers);
     console.log('About us folder:', storageImages.aboutus);
+    console.log('Shop folder:', storageImages.shop);
     
     return storageImages;
   } catch (error) {
@@ -893,6 +1073,19 @@ export const restoreGalleryFromStorage = async () => {
         isActive: true
       });
       console.log('➕ Added about us image:', imageUrl);
+      addedCount++;
+    }
+    
+    // Add shop images
+    for (let i = 0; i < storageImages.shop.length; i++) {
+      const imageUrl = storageImages.shop[i];
+      await addGalleryImage({
+        imageUrl,
+        type: 'shop',
+        order: storageImages.gallery.length + storageImages.backgrounds.length + storageImages.aboutus.length + i,
+        isActive: true
+      });
+      console.log('➕ Added shop image:', imageUrl);
       addedCount++;
     }
     

@@ -137,11 +137,6 @@ const TeamScreen: React.FC<TeamScreenProps> = ({ onNavigate, onBack }) => {
                         <Text style={styles.barberPlaceholder}>✂️</Text>
                       )}
                     </View>
-                    {!barber.available && (
-                      <View style={styles.unavailableBadge}>
-                        <Text style={styles.unavailableText}>לא זמין</Text>
-                      </View>
-                    )}
                   </View>
                   
                   <View style={styles.barberInfo}>
@@ -217,7 +212,7 @@ const TeamScreen: React.FC<TeamScreenProps> = ({ onNavigate, onBack }) => {
                 <View style={styles.modalSpecialties}>
                   <Text style={styles.modalSpecialtiesTitle}>התמחויות:</Text>
                   <View style={styles.specialtiesGrid}>
-                    {selectedBarber.specialties.map((specialty, index) => (
+                    {(selectedBarber.specialties || []).map((specialty, index) => (
                       <View key={index} style={styles.modalSpecialtyTag}>
                         <Text style={styles.modalSpecialtyText}>{specialty}</Text>
                       </View>
@@ -227,15 +222,11 @@ const TeamScreen: React.FC<TeamScreenProps> = ({ onNavigate, onBack }) => {
 
                 <View style={styles.modalActions}>
                   <TouchableOpacity
-                    style={[
-                      styles.bookButton,
-                      !selectedBarber.available && styles.bookButtonDisabled
-                    ]}
+                    style={styles.bookButton}
                     onPress={handleBookWithBarber}
-                    disabled={!selectedBarber.available}
                   >
                     <Text style={styles.bookButtonText}>
-                      {selectedBarber.available ? 'הזמן תור' : 'לא זמין'}
+                      הזמן תור
                     </Text>
                   </TouchableOpacity>
                 </View>

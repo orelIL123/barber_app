@@ -15,7 +15,9 @@ import {
 } from 'react-native';
 import { 
   Appointment, 
-  getAllAppointments, 
+  getAllAppointments,
+  getCurrentMonthAppointments,
+  getRecentAppointments, 
   getBarbers, 
   updateAppointment, 
   deleteAppointment,
@@ -66,7 +68,7 @@ const AdminAppointmentsScreen: React.FC<AdminAppointmentsScreenProps> = ({ onNav
     try {
       setLoading(true);
       const [appointmentsData, barbersData, usersData, treatmentsData] = await Promise.all([
-        getAllAppointments(),
+        getCurrentMonthAppointments(), // Only load current month for better performance
         getBarbers(),
         getAllUsers(),
         getTreatments()

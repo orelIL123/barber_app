@@ -9,6 +9,7 @@ import {
   Dimensions,
   Image,
   ImageBackground,
+  InteractionManager,
   Linking,
   SafeAreaView,
   ScrollView,
@@ -57,7 +58,6 @@ const NeonButton: React.FC<{
 export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
-  const [imageLoaded, setImageLoaded] = useState(false);
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [notificationPanelVisible, setNotificationPanelVisible] = useState(false);
   const [galleryIndex, setGalleryIndex] = useState(0);
@@ -140,43 +140,49 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
   }, []);
 
   useEffect(() => {
-    if (!loading && imageLoaded) {
-      // Start animations
+    if (!loading) {
+      // Start animations immediately (don't wait for image load)
       Animated.sequence([
         Animated.timing(fadeAnim, {
           toValue: 1,
-          duration: 800,
+          duration: 400,
           useNativeDriver: true,
         }),
         Animated.parallel([
           Animated.timing(headerFade, {
             toValue: 1,
-            duration: 600,
+            duration: 300,
             useNativeDriver: true,
           }),
           Animated.timing(slideAnim, {
             toValue: 0,
-            duration: 600,
+            duration: 300,
             useNativeDriver: true,
           }),
         ]),
         Animated.timing(ctaFade, {
           toValue: 1,
-          duration: 500,
+          duration: 250,
           useNativeDriver: true,
         }),
         Animated.timing(cardsFade, {
           toValue: 1,
-          duration: 400,
+          duration: 200,
           useNativeDriver: true,
         }),
       ]).start();
     }
-  }, [loading, imageLoaded]);
+  }, [loading]);
 
   useEffect(() => {
-    // Fetch images from Firebase gallery collection and settings
-    const fetchImages = async () => {
+    // Fetch images after interactions are complete
+    InteractionManager.runAfterInteractions(() => {
+      fetchImages();
+    });
+  }, []);
+
+  // Fetch images from Firebase gallery collection and settings
+  const fetchImages = async () => {
       try {
         const db = getFirestore();
         
@@ -331,8 +337,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
         console.warn('Failed to fetch Firebase images:', err);
       }
     };
-    fetchImages();
-  }, []);
 
   // Remove auto-scroll for manual control
   // useEffect(() => {
@@ -461,8 +465,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
           source={settingsImages.atmosphere ? { uri: settingsImages.atmosphere } : require('../../assets/images/atmosphere/atmosphere.png')}
           style={styles.atmosphereImage}
           resizeMode="cover"
-          onLoad={() => setImageLoaded(true)}
-          onError={() => setImageLoaded(true)}
         >
           <View style={styles.overlay} />
           <View style={styles.designElements}>
@@ -596,7 +598,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
                 <Text style={styles.aboutText}>
                   ברוכים הבאים למספרה של רון תורג׳מן! כאן תיהנו מחוויה אישית, מקצועית ומפנקת, עם יחס חם לכל לקוח. רון, בעל ניסיון של שנים בתחום, מזמין אתכם להתרווח, להתחדש ולהרגיש בבית. 
                   {"\n\n"}
-                  ✂️ AI: "המספרה שלנו היא לא רק מקום להסתפר, אלא מקום להרגיש בו טוב, להירגע ולצאת עם חיוך. כל תספורת היא יצירת אמנות!"
+                  ✂️ AI: &quot;המספרה שלנו היא לא רק מקום להסתפר, אלא מקום להרגיש בו טוב, להירגע ולצאת עם חיוך. כל תספורת היא יצירת אמנות!&quot;
                 </Text>
                 <TouchableOpacity 
                   style={styles.wazeButton} 

@@ -1,17 +1,18 @@
 import React, { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
+import AdminAppointmentsScreen from '../screens/AdminAppointmentsScreen';
+import AdminAvailabilityScreen from '../screens/AdminAvailabilityScreen';
+import AdminGalleryScreen from '../screens/AdminGalleryScreen';
+import AdminHomeScreen from '../screens/AdminHomeScreen';
+import AdminTeamScreen from '../screens/AdminTeamScreen';
+import AdminTreatmentsScreen from '../screens/AdminTreatmentsScreen';
 import BookingScreen from '../screens/BookingScreen';
 import { HomeScreen } from '../screens/HomeScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import TeamScreen from '../screens/TeamScreen';
-import AdminHomeScreen from '../screens/AdminHomeScreen';
-import AdminAppointmentsScreen from '../screens/AdminAppointmentsScreen';
-import AdminTreatmentsScreen from '../screens/AdminTreatmentsScreen';
-import AdminTeamScreen from '../screens/AdminTeamScreen';
-import AdminGalleryScreen from '../screens/AdminGalleryScreen';
 
-export type Screen = 'home' | 'profile' | 'team' | 'booking' | 'settings' | 'admin-home' | 'admin-appointments' | 'admin-treatments' | 'admin-team' | 'admin-gallery';
+export type Screen = 'home' | 'profile' | 'team' | 'booking' | 'settings' | 'admin-home' | 'admin-appointments' | 'admin-treatments' | 'admin-team' | 'admin-gallery' | 'admin-availability';
 
 export const AppNavigator: React.FC = () => {
   const [currentScreen, setCurrentScreen] = useState<Screen>('home');
@@ -70,6 +71,11 @@ export const AppNavigator: React.FC = () => {
         />;
       case 'admin-gallery':
         return <AdminGalleryScreen 
+          onNavigate={handleNavigate}
+          onBack={() => handleNavigate('admin-home')}
+        />;
+      case 'admin-availability':
+        return <AdminAvailabilityScreen 
           onNavigate={handleNavigate}
           onBack={() => handleNavigate('admin-home')}
         />;

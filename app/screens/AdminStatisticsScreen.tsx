@@ -13,6 +13,8 @@ import {
 import {
     checkIsAdmin,
     getAllAppointments,
+    getRecentAppointments,
+    getCurrentMonthAppointments,
     getBarbers,
     getTreatments,
     onAuthStateChange,
@@ -86,7 +88,8 @@ const AdminStatisticsScreen: React.FC<AdminStatisticsScreenProps> = ({ onNavigat
 
   const checkAndCompleteAppointments = async () => {
     try {
-      const appointments = await getAllAppointments();
+      // Only check appointments from last 2 days for auto-completion (much faster)
+      const appointments = await getRecentAppointments(2);
       const now = new Date();
       let completedCount = 0;
       
@@ -137,11 +140,11 @@ const AdminStatisticsScreen: React.FC<AdminStatisticsScreenProps> = ({ onNavigat
     try {
       setLoading(true);
       
-      // Load all data
+      // Load optimized data (current month appointments + cached static data)
       const [appointments, barbers, treatments] = await Promise.all([
-        getAllAppointments(),
-        getBarbers(),
-        getTreatments()
+        getCurrentMonthAppointments(), // Only current month for faster loading
+        getBarbers(), // Uses cache
+        getTreatments() // Uses cache
       ]);
 
       // Calculate statistics

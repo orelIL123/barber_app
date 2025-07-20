@@ -43,10 +43,13 @@
         {
           "icon": "./assets/images/notification-icon.png",
           "color": "#ffffff",
-          "sounds": ["./assets/sounds/notification.wav"]
+          "sounds": [
+            "./assets/sounds/notification.wav"
+          ]
         }
       ],
-      "@react-native-firebase/app"
+      "@react-native-firebase/app",
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true
