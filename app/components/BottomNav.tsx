@@ -145,9 +145,9 @@ const styles = StyleSheet.create({
   },
   fabWrapper: {
     position: "absolute",
-    left: "57%", // היה 50%
+    left: "50%",
     top: -28,
-    transform: [{ translateX: -40 }], // היה -36, כדי לשמור על מרכזיות יחסית
+    transform: [{ translateX: -36 }], // half of fab width (72/2)
     zIndex: 10,
     shadowColor: "#3b82f6",
     shadowOffset: { width: 0, height: 0 },
