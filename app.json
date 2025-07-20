@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "barber_app",
+    "name": "Barber App",
     "slug": "barber_app",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -10,7 +10,8 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.barberapp.app"
+      "bundleIdentifier": "com.barberapp.app",
+      "googleServicesFile": "./app/GoogleService-Info.plist"
     },
     "android": {
       "adaptiveIcon": {
@@ -18,7 +19,8 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.barberapp.app"
+      "package": "com.barberapp.app",
+      "googleServicesFile": "./app/google-services.json"
     },
     "web": {
       "bundler": "metro",
@@ -43,7 +45,8 @@
           "color": "#ffffff",
           "sounds": ["./assets/sounds/notification.wav"]
         }
-      ]
+      ],
+      "@react-native-firebase/app"
     ],
     "experiments": {
       "typedRoutes": true

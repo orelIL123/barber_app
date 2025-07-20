@@ -1,6 +1,8 @@
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Notifications from 'expo-notifications';
 import { Timestamp } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
     Alert,
     Dimensions,
@@ -13,20 +15,19 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
-import { useTranslation } from 'react-i18next';
 import {
     Barber,
     createAppointment,
-    getBarbers,
     getBarberAppointmentsForDay,
     getBarberAvailability,
+    getBarbers,
     getCurrentUser,
     getTreatments,
-    Treatment,
-    initializeBarberAvailability
+    initializeBarberAvailability,
+    Treatment
 } from '../../services/firebase';
-import TopNav from '../components/TopNav';
 import ConfirmationModal from '../components/ConfirmationModal';
+import TopNav from '../components/TopNav';
 
 const { width, height } = Dimensions.get('window');
 
@@ -456,6 +457,15 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
         time: selectedTime 
       }));
       setShowSuccessModal(true);
+
+      // אחרי יצירת התור בהצלחה:
+      if (selectedDate && selectedTime && selectedTreatment) {
+        const [hours, minutes] = selectedTime.split(":").map(Number);
+        const appointmentDate = new Date(selectedDate);
+        appointmentDate.setHours(hours, minutes, 0, 0);
+        await scheduleAppointmentReminders(appointmentDate, selectedTreatment.name);
+      }
+
     } catch (error) {
       console.error('Error creating appointment:', error);
       Alert.alert(t('common.error'), t('booking.booking_error'));
@@ -511,6 +521,41 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
       case 3: return 'בחר תאריך';
       case 4: return 'בחר שעה';
       default: return 'הזמנת תור';
+    }
+  };
+
+  // פונקציה לתזמון התראות פוש ללקוח שעה ורבע שעה לפני התור
+  const scheduleAppointmentReminders = async (appointmentDate: Date, treatmentName: string) => {
+    // Calculate seconds until notification
+    const now = new Date();
+    const hourBefore = new Date(appointmentDate.getTime() - 60 * 60 * 1000);
+    const quarterBefore = new Date(appointmentDate.getTime() - 15 * 60 * 1000);
+
+    const secondsUntilHour = Math.floor((hourBefore.getTime() - now.getTime()) / 1000);
+    const secondsUntilQuarter = Math.floor((quarterBefore.getTime() - now.getTime()) / 1000);
+
+    // Only schedule if in the future
+    if (secondsUntilHour > 0) {
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: 'תזכורת לתור! 💈',
+          body: `יש לך תור ל-${treatmentName} בעוד שעה!`,
+          sound: true,
+          priority: Notifications.AndroidNotificationPriority.HIGH,
+        },
+        trigger: { seconds: secondsUntilHour, repeats: false, channelId: 'default' },
+      });
+    }
+    if (secondsUntilQuarter > 0) {
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: 'תזכורת לתור! 💈',
+          body: `יש לך תור ל-${treatmentName} בעוד רבע שעה!`,
+          sound: true,
+          priority: Notifications.AndroidNotificationPriority.HIGH,
+        },
+        trigger: { seconds: secondsUntilQuarter, repeats: false, channelId: 'default' },
+      });
     }
   };
 

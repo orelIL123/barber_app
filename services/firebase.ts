@@ -1,3 +1,5 @@
+import * as Device from 'expo-device';
+import * as Notifications from 'expo-notifications';
 import {
     createUserWithEmailAndPassword,
     onAuthStateChanged,
@@ -25,9 +27,6 @@ import {
 import { deleteObject, getDownloadURL, listAll, ref, uploadBytes } from 'firebase/storage';
 import { auth, db, storage } from '../config/firebase';
 
-// TODO: Add these imports when expo-notifications and expo-device are installed
-// import * as Device from 'expo-device';
-// import * as Notifications from 'expo-notifications';
 
 export interface UserProfile {
   uid: string;
@@ -70,6 +69,7 @@ export interface Appointment {
   status: 'pending' | 'confirmed' | 'completed' | 'cancelled';
   notes?: string;
   createdAt: Timestamp;
+  duration: number; // משך טיפול בדקות
 }
 
 export interface GalleryImage {
@@ -102,6 +102,10 @@ export interface AppSettings {
 export const loginUser = async (email: string, password: string) => {
   try {
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    
+    // Register for push notifications after successful login
+    await registerForPushNotifications(userCredential.user.uid);
+    
     return userCredential.user;
   } catch (error) {
     throw error;
@@ -130,6 +134,20 @@ export const registerUser = async (email: string, password: string, displayName:
     };
     
     await setDoc(doc(db, 'users', user.uid), userProfile);
+    
+    // Register for push notifications after successful registration
+    await registerForPushNotifications(user.uid);
+    
+    // Send welcome notification
+    await sendWelcomeNotification(user.uid);
+    
+    // Send notification to admin about new user
+    try {
+      await sendNewUserNotificationToAdmin(displayName, email);
+    } catch (adminNotificationError) {
+      console.log('Failed to send new user notification to admin:', adminNotificationError);
+    }
+    
     return user;
   } catch (error) {
     throw error;
@@ -341,6 +359,31 @@ export const createAppointment = async (appointmentData: Omit<Appointment, 'id' 
     };
     
     const docRef = await addDoc(collection(db, 'appointments'), appointment);
+    console.log('Appointment created with ID:', docRef.id);
+    
+    // Send notification to user about new appointment
+    try {
+      await sendNotificationToUser(
+        appointmentData.userId,
+        'תור חדש נוצר! 📅',
+        `התור שלך נוצר בהצלחה. תאריך: ${appointmentData.date.toDate().toLocaleDateString('he-IL')}`,
+        { appointmentId: docRef.id }
+      );
+    } catch (notificationError) {
+      console.log('Failed to send appointment notification:', notificationError);
+    }
+    
+    // Send notification to admin about new appointment
+    try {
+      await sendNotificationToAdmin(
+        'תור חדש! 📅',
+        `תור חדש נוצר עבור ${appointmentData.date.toDate().toLocaleDateString('he-IL')}`,
+        { appointmentId: docRef.id }
+      );
+    } catch (adminNotificationError) {
+      console.log('Failed to send admin notification:', adminNotificationError);
+    }
+    
     return docRef.id;
   } catch (error) {
     throw error;
@@ -385,6 +428,55 @@ export const updateAppointment = async (appointmentId: string, updates: Partial<
   try {
     const docRef = doc(db, 'appointments', appointmentId);
     await updateDoc(docRef, updates);
+    
+    // Send notification about appointment update
+    try {
+      const appointmentDoc = await getDoc(docRef);
+      if (appointmentDoc.exists()) {
+        const appointmentData = appointmentDoc.data() as Appointment;
+        
+        let notificationTitle = 'התור שלך עודכן! 📅';
+        let notificationBody = 'התור שלך עודכן בהצלחה.';
+        
+        if (updates.status) {
+          switch (updates.status) {
+            case 'confirmed':
+              notificationTitle = 'התור שלך אושר! ✅';
+              notificationBody = 'התור שלך אושר בהצלחה.';
+              // Send notification to admin about appointment confirmation
+              try {
+                await sendAppointmentConfirmationToAdmin(appointmentId);
+              } catch (adminNotificationError) {
+                console.log('Failed to send appointment confirmation to admin:', adminNotificationError);
+              }
+              break;
+            case 'completed':
+              notificationTitle = 'התור הושלם! 🎉';
+              notificationBody = 'התור שלך הושלם בהצלחה.';
+              // Send notification to admin about appointment completion
+              try {
+                await sendAppointmentCompletionToAdmin(appointmentId);
+              } catch (adminNotificationError) {
+                console.log('Failed to send appointment completion to admin:', adminNotificationError);
+              }
+              break;
+            case 'cancelled':
+              notificationTitle = 'התור בוטל! ❌';
+              notificationBody = 'התור שלך בוטל.';
+              break;
+          }
+        }
+        
+        await sendNotificationToUser(
+          appointmentData.userId,
+          notificationTitle,
+          notificationBody,
+          { appointmentId: appointmentId }
+        );
+      }
+    } catch (notificationError) {
+      console.log('Failed to send appointment update notification:', notificationError);
+    }
   } catch (error) {
     throw error;
   }
@@ -392,6 +484,35 @@ export const updateAppointment = async (appointmentId: string, updates: Partial<
 
 export const deleteAppointment = async (appointmentId: string) => {
   try {
+    // Get appointment data before deleting
+    const appointmentDoc = await getDoc(doc(db, 'appointments', appointmentId));
+    if (appointmentDoc.exists()) {
+      const appointmentData = appointmentDoc.data() as Appointment;
+      
+      // Send notification to user about appointment cancellation
+      try {
+        await sendNotificationToUser(
+          appointmentData.userId,
+          'התור בוטל! ❌',
+          'התור שלך בוטל בהצלחה.',
+          { appointmentId: appointmentId }
+        );
+      } catch (notificationError) {
+        console.log('Failed to send cancellation notification:', notificationError);
+      }
+      
+      // Send notification to admin about appointment cancellation
+      try {
+        await sendNotificationToAdmin(
+          'תור בוטל! ❌',
+          `תור בוטל עבור ${appointmentData.date.toDate().toLocaleDateString('he-IL')}`,
+          { appointmentId: appointmentId }
+        );
+      } catch (adminNotificationError) {
+        console.log('Failed to send admin cancellation notification:', adminNotificationError);
+      }
+    }
+    
     await deleteDoc(doc(db, 'appointments', appointmentId));
   } catch (error) {
     throw error;
@@ -551,6 +672,14 @@ export const deleteGalleryImage = async (imageId: string) => {
 export const addTreatment = async (treatmentData: Omit<Treatment, 'id'>) => {
   try {
     const docRef = await addDoc(collection(db, 'treatments'), treatmentData);
+    
+    // Send notification about new treatment
+    try {
+      await sendNewTreatmentNotification(treatmentData.name);
+    } catch (notificationError) {
+      console.log('Failed to send new treatment notification:', notificationError);
+    }
+    
     return docRef.id;
   } catch (error) {
     throw error;
@@ -578,6 +707,14 @@ export const deleteTreatment = async (treatmentId: string) => {
 export const addBarberProfile = async (barberData: Omit<Barber, 'id'>) => {
   try {
     const docRef = await addDoc(collection(db, 'barbers'), barberData);
+    
+    // Send notification about new barber
+    try {
+      await sendNewBarberNotification(barberData.name);
+    } catch (notificationError) {
+      console.log('Failed to send new barber notification:', notificationError);
+    }
+    
     return docRef.id;
   } catch (error) {
     throw error;
@@ -1441,8 +1578,6 @@ export const replaceAppGalleryImage = async (oldImageUrl: string, newImageUri: s
 };
 
 // Push Notification functions
-// TODO: Uncomment when expo-notifications and expo-device are installed
-/*
 export const registerForPushNotifications = async (userId: string) => {
   try {
     // Check if device supports notifications
@@ -1545,4 +1680,351 @@ export const sendNotificationToAllUsers = async (title: string, body: string, da
     return 0;
   }
 };
-*/
+
+// Send appointment reminder notification
+export const sendAppointmentReminder = async (appointmentId: string) => {
+  try {
+    const appointmentDoc = await getDoc(doc(db, 'appointments', appointmentId));
+    if (!appointmentDoc.exists()) {
+      console.log('Appointment not found');
+      return false;
+    }
+    
+    const appointmentData = appointmentDoc.data() as Appointment;
+    const appointmentDate = appointmentData.date.toDate();
+    const now = new Date();
+    const timeDiff = appointmentDate.getTime() - now.getTime();
+    const hoursUntilAppointment = timeDiff / (1000 * 60 * 60);
+    
+    // Send reminder if appointment is within 24 hours
+    if (hoursUntilAppointment > 0 && hoursUntilAppointment <= 24) {
+      await sendNotificationToUser(
+        appointmentData.userId,
+        'תזכורת לתור! ⏰',
+        `התור שלך מחר ב-${appointmentDate.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}`,
+        { appointmentId: appointmentId }
+      );
+      return true;
+    }
+    
+    return false;
+  } catch (error) {
+    console.error('Error sending appointment reminder:', error);
+    return false;
+  }
+};
+
+// Send reminder to all users with upcoming appointments
+export const sendRemindersToAllUsers = async () => {
+  try {
+    const appointments = await getAllAppointments();
+    const now = new Date();
+    const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    
+    const upcomingAppointments = appointments.filter(appointment => {
+      const appointmentDate = appointment.date.toDate();
+      return appointmentDate >= now && appointmentDate <= tomorrow && appointment.status === 'confirmed';
+    });
+    
+    console.log(`📱 Sending reminders for ${upcomingAppointments.length} appointments`);
+    
+    const results = await Promise.allSettled(
+      upcomingAppointments.map(appointment => 
+        sendAppointmentReminder(appointment.id)
+      )
+    );
+    
+    const successful = results.filter(result => result.status === 'fulfilled' && result.value).length;
+    console.log(`✅ Successfully sent ${successful} reminders`);
+    
+    return successful;
+  } catch (error) {
+    console.error('Error sending reminders to all users:', error);
+    return 0;
+  }
+};
+
+// Send notification to admin about new appointment
+export const sendNotificationToAdmin = async (title: string, body: string, data?: any) => {
+  try {
+    const users = await getAllUsers();
+    const adminUsers = users.filter(user => user.isAdmin && user.pushToken);
+    
+    console.log(`📱 Sending notification to ${adminUsers.length} admin users`);
+    
+    const results = await Promise.allSettled(
+      adminUsers.map(user => 
+        sendPushNotification(user.pushToken!, title, body, data)
+      )
+    );
+    
+    const successful = results.filter(result => result.status === 'fulfilled').length;
+    console.log(`✅ Successfully sent to ${successful}/${adminUsers.length} admin users`);
+    
+    return successful;
+  } catch (error) {
+    console.error('Error sending notification to admin:', error);
+    return 0;
+  }
+};
+
+// Send welcome notification to new user
+export const sendWelcomeNotification = async (userId: string) => {
+  try {
+    await sendNotificationToUser(
+      userId,
+      'ברוכים הבאים! 🎉',
+      'תודה שנרשמת לאפליקציה שלנו! אנחנו שמחים לראות אותך.',
+      { type: 'welcome' }
+    );
+  } catch (error) {
+    console.error('Error sending welcome notification:', error);
+  }
+};
+
+// Send promotional notification
+export const sendPromotionalNotification = async (title: string, body: string, data?: any) => {
+  try {
+    const users = await getAllUsers();
+    const usersWithTokens = users.filter(user => user.pushToken && !user.isAdmin); // Don't send to admins
+    
+    console.log(`📱 Sending promotional notification to ${usersWithTokens.length} users`);
+    
+    const results = await Promise.allSettled(
+      usersWithTokens.map(user => 
+        sendPushNotification(user.pushToken!, title, body, data)
+      )
+    );
+    
+    const successful = results.filter(result => result.status === 'fulfilled').length;
+    console.log(`✅ Successfully sent promotional notification to ${successful}/${usersWithTokens.length} users`);
+    
+    return successful;
+  } catch (error) {
+    console.error('Error sending promotional notification:', error);
+    return 0;
+  }
+};
+
+// Send notification about new treatment
+export const sendNewTreatmentNotification = async (treatmentName: string) => {
+  try {
+    await sendPromotionalNotification(
+      'טיפול חדש! ✂️',
+      `טיפול חדש נוסף: ${treatmentName}. בואו לנסות!`,
+      { type: 'new_treatment', treatmentName: treatmentName }
+    );
+  } catch (error) {
+    console.error('Error sending new treatment notification:', error);
+  }
+};
+
+// Send notification about special offer
+export const sendSpecialOfferNotification = async (offerTitle: string, offerDescription: string) => {
+  try {
+    await sendPromotionalNotification(
+      `מבצע מיוחד! 🎁`,
+      `${offerTitle}: ${offerDescription}`,
+      { type: 'special_offer', offerTitle: offerTitle }
+    );
+  } catch (error) {
+    console.error('Error sending special offer notification:', error);
+  }
+};
+
+// Send notification about new barber
+export const sendNewBarberNotification = async (barberName: string) => {
+  try {
+    await sendPromotionalNotification(
+      'ספר חדש! ✂️',
+      `ספר חדש הצטרף: ${barberName}. בואו להכיר!`,
+      { type: 'new_barber', barberName: barberName }
+    );
+  } catch (error) {
+    console.error('Error sending new barber notification:', error);
+  }
+};
+
+// Send notification about maintenance
+export const sendMaintenanceNotification = async (message: string) => {
+  try {
+    await sendNotificationToAllUsers(
+      'תחזוקה מתוכננת! 🔧',
+      message,
+      { type: 'maintenance' }
+    );
+  } catch (error) {
+    console.error('Error sending maintenance notification:', error);
+  }
+};
+
+// Send notification about system update
+export const sendSystemUpdateNotification = async (updateDetails: string) => {
+  try {
+    await sendNotificationToAllUsers(
+      'עדכון מערכת! 📱',
+      updateDetails,
+      { type: 'system_update' }
+    );
+  } catch (error) {
+    console.error('Error sending system update notification:', error);
+  }
+};
+
+// Send notification about appointment reminder to admin
+export const sendAppointmentReminderToAdmin = async (appointmentId: string) => {
+  try {
+    const appointmentDoc = await getDoc(doc(db, 'appointments', appointmentId));
+    if (!appointmentDoc.exists()) {
+      console.log('Appointment not found');
+      return false;
+    }
+    
+    const appointmentData = appointmentDoc.data() as Appointment;
+    const appointmentDate = appointmentData.date.toDate();
+    
+    await sendNotificationToAdmin(
+      'תזכורת לתור! ⏰',
+      `תור מחר ב-${appointmentDate.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}`,
+      { appointmentId: appointmentId }
+    );
+    
+    return true;
+  } catch (error) {
+    console.error('Error sending appointment reminder to admin:', error);
+    return false;
+  }
+};
+
+// Send notification about daily summary to admin
+export const sendDailySummaryToAdmin = async () => {
+  try {
+    const appointments = await getAllAppointments();
+    const today = new Date();
+    const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
+    
+    const todayAppointments = appointments.filter(appointment => {
+      const appointmentDate = appointment.date.toDate();
+      return appointmentDate >= todayStart && appointmentDate < todayEnd;
+    });
+    
+    const confirmedAppointments = todayAppointments.filter(app => app.status === 'confirmed');
+    const completedAppointments = todayAppointments.filter(app => app.status === 'completed');
+    const cancelledAppointments = todayAppointments.filter(app => app.status === 'cancelled');
+    
+    const summary = `סיכום יומי: ${confirmedAppointments.length} תורים מאושרים, ${completedAppointments.length} הושלמו, ${cancelledAppointments.length} בוטלו`;
+    
+    await sendNotificationToAdmin(
+      'סיכום יומי 📊',
+      summary,
+      { type: 'daily_summary' }
+    );
+    
+    return true;
+  } catch (error) {
+    console.error('Error sending daily summary to admin:', error);
+    return false;
+  }
+};
+
+// Send notification about new user registration to admin
+export const sendNewUserNotificationToAdmin = async (userName: string, userEmail: string) => {
+  try {
+    await sendNotificationToAdmin(
+      'משתמש חדש! 👤',
+      `משתמש חדש נרשם: ${userName} (${userEmail})`,
+      { type: 'new_user', userName: userName, userEmail: userEmail }
+    );
+  } catch (error) {
+    console.error('Error sending new user notification to admin:', error);
+  }
+};
+
+// Send notification about low appointment slots
+export const sendLowSlotsNotificationToAdmin = async (barberName: string, availableSlots: number) => {
+  try {
+    await sendNotificationToAdmin(
+      'פחות מקומות פנויים! ⚠️',
+      `לספר ${barberName} נשארו רק ${availableSlots} מקומות פנויים`,
+      { type: 'low_slots', barberName: barberName, availableSlots: availableSlots }
+    );
+  } catch (error) {
+    console.error('Error sending low slots notification to admin:', error);
+  }
+};
+
+// Send notification about appointment confirmation to admin
+export const sendAppointmentConfirmationToAdmin = async (appointmentId: string) => {
+  try {
+    const appointmentDoc = await getDoc(doc(db, 'appointments', appointmentId));
+    if (!appointmentDoc.exists()) {
+      console.log('Appointment not found');
+      return false;
+    }
+    
+    const appointmentData = appointmentDoc.data() as Appointment;
+    const appointmentDate = appointmentData.date.toDate();
+    
+    await sendNotificationToAdmin(
+      'תור אושר! ✅',
+      `תור אושר עבור ${appointmentDate.toLocaleDateString('he-IL')} ב-${appointmentDate.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}`,
+      { appointmentId: appointmentId }
+    );
+    
+    return true;
+  } catch (error) {
+    console.error('Error sending appointment confirmation to admin:', error);
+    return false;
+  }
+};
+
+// Send notification about appointment completion to admin
+export const sendAppointmentCompletionToAdmin = async (appointmentId: string) => {
+  try {
+    const appointmentDoc = await getDoc(doc(db, 'appointments', appointmentId));
+    if (!appointmentDoc.exists()) {
+      console.log('Appointment not found');
+      return false;
+    }
+    
+    const appointmentData = appointmentDoc.data() as Appointment;
+    const appointmentDate = appointmentData.date.toDate();
+    
+    await sendNotificationToAdmin(
+      'תור הושלם! 🎉',
+      `תור הושלם עבור ${appointmentDate.toLocaleDateString('he-IL')} ב-${appointmentDate.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}`,
+      { appointmentId: appointmentId }
+    );
+    
+    return true;
+  } catch (error) {
+    console.error('Error sending appointment completion to admin:', error);
+    return false;
+  }
+};
+
+// Send notification about appointment cancellation to admin
+export const sendAppointmentCancellationToAdmin = async (appointmentId: string) => {
+  try {
+    const appointmentDoc = await getDoc(doc(db, 'appointments', appointmentId));
+    if (!appointmentDoc.exists()) {
+      console.log('Appointment not found');
+      return false;
+    }
+    
+    const appointmentData = appointmentDoc.data() as Appointment;
+    const appointmentDate = appointmentData.date.toDate();
+    
+    await sendNotificationToAdmin(
+      'תור בוטל! ❌',
+      `תור בוטל עבור ${appointmentDate.toLocaleDateString('he-IL')} ב-${appointmentDate.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}`,
+      { appointmentId: appointmentId }
+    );
+    
+    return true;
+  } catch (error) {
+    console.error('Error sending appointment cancellation to admin:', error);
+    return false;
+  }
+};

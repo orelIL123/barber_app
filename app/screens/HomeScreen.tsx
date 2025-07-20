@@ -87,6 +87,50 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
   const cardSpacing = 4;
   const centerOffset = width / 2 - cardWidth / 2;
   const scrollX = useRef(new Animated.Value(0)).current;
+  
+  // Get original images array
+  const originalImages = settingsImages.gallery.length > 0 ? settingsImages.gallery : [
+    require('../../assets/images/gallery/1.jpg'),
+    require('../../assets/images/gallery/2.jpg'),
+    require('../../assets/images/gallery/3.jpg'),
+    require('../../assets/images/gallery/4.jpg'),
+  ];
+  
+  // Create infinite scroll data by duplicating images
+  const infiniteImages = [...originalImages, ...originalImages, ...originalImages];
+  const originalLength = originalImages.length;
+  const itemWidth = cardWidth + cardSpacing;
+  
+  // Handle infinite scroll
+  const handleScroll = (event: any) => {
+    const offsetX = event.nativeEvent.contentOffset.x;
+    const totalWidth = originalLength * itemWidth;
+    
+    // If scrolled past the end, reset to beginning + offset
+    if (offsetX >= totalWidth * 2) {
+      carousel3DRef.current?.scrollTo({
+        x: offsetX - totalWidth,
+        animated: false,
+      });
+    }
+    // If scrolled before the beginning, reset to end - offset
+    else if (offsetX <= 0) {
+      carousel3DRef.current?.scrollTo({
+        x: offsetX + totalWidth,
+        animated: false,
+      });
+    }
+  };
+
+  // Start at middle section for infinite scroll
+  useEffect(() => {
+    setTimeout(() => {
+      carousel3DRef.current?.scrollTo({
+        x: originalLength * itemWidth,
+        animated: false,
+      });
+    }, 100);
+  }, [originalLength, itemWidth]);
 
   useEffect(() => {
     // Simulate loading (splash) for 3 seconds
@@ -327,25 +371,25 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
     const translateX = scrollXValue.interpolate({
       inputRange,
       outputRange: [cardWidth / 2, 0, -cardWidth / 2],
-      extrapolate: 'clamp',
+      extrapolate: 'extend',
     });
     
     const scale = scrollXValue.interpolate({
       inputRange,
       outputRange: [0.8, 1, 0.8],
-      extrapolate: 'clamp',
+      extrapolate: 'extend',
     });
     
     const rotateY = scrollXValue.interpolate({
       inputRange,
       outputRange: ['-45deg', '0deg', '45deg'],
-      extrapolate: 'clamp',
+      extrapolate: 'extend',
     });
     
     const opacity = scrollXValue.interpolate({
       inputRange,
       outputRange: [0.5, 1, 0.5],
-      extrapolate: 'clamp',
+      extrapolate: 'extend',
     });
 
     return {
@@ -510,16 +554,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
                 decelerationRate="normal"
                 onScroll={Animated.event(
                   [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-                  { useNativeDriver: false }
+                  { useNativeDriver: false, listener: handleScroll }
                 )}
                 scrollEventThrottle={16}
               >
-                {(settingsImages.gallery.length > 0 ? settingsImages.gallery : [
-                  require('../../assets/images/gallery/1.jpg'),
-                  require('../../assets/images/gallery/2.jpg'),
-                  require('../../assets/images/gallery/3.jpg'),
-                  require('../../assets/images/gallery/4.jpg'),
-                ]).map((img, index) => (
+                {infiniteImages.map((img, index) => (
                   <Animated.View 
                     key={index} 
                     style={[
