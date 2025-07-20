@@ -155,6 +155,13 @@ const AdminHomeScreen: React.FC<AdminHomeScreenProps> = ({ onNavigate, onBack })
       color: '#17a2b8'
     },
     {
+      title: 'ניהול התראות',
+      subtitle: 'שלח הודעות למשתמשים',
+      icon: 'notifications',
+      screen: 'admin-notifications',
+      color: '#6c757d'
+    },
+    {
       title: 'צפה כלקוח',
       subtitle: 'צפה באפליקציה כמשתמש רגיל',
       icon: 'eye',

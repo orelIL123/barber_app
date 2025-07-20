@@ -2,7 +2,6 @@ import {
     createUserWithEmailAndPassword,
     onAuthStateChanged,
     PhoneAuthProvider,
-    RecaptchaVerifier,
     signInWithCredential,
     signInWithEmailAndPassword,
     signInWithPhoneNumber,
@@ -26,6 +25,10 @@ import {
 import { deleteObject, getDownloadURL, listAll, ref, uploadBytes } from 'firebase/storage';
 import { auth, db, storage } from '../config/firebase';
 
+// TODO: Add these imports when expo-notifications and expo-device are installed
+// import * as Device from 'expo-device';
+// import * as Notifications from 'expo-notifications';
+
 export interface UserProfile {
   uid: string;
   email?: string; // Make email optional for phone auth
@@ -34,6 +37,7 @@ export interface UserProfile {
   profileImage?: string;
   isAdmin?: boolean;
   createdAt: Timestamp;
+  pushToken?: string; // Added for push notifications
 }
 
 export interface Barber {
@@ -149,7 +153,7 @@ export const onAuthStateChange = (callback: (user: User | null) => void) => {
 };
 
 // Phone authentication functions
-export const sendSMSVerification = async (phoneNumber: string, recaptchaVerifier?: RecaptchaVerifier | null) => {
+export const sendSMSVerification = async (phoneNumber: string) => {
   try {
     // For React Native, we don't need reCAPTCHA
     // The phone number should be in international format
@@ -166,9 +170,8 @@ export const sendSMSVerification = async (phoneNumber: string, recaptchaVerifier
     
     console.log('📱 Sending SMS to:', formattedPhone);
     
-    // For React Native, we'll use a different approach
-    // You might need to implement this differently based on your Firebase setup
-    const confirmationResult = await signInWithPhoneNumber(auth, formattedPhone, recaptchaVerifier as any);
+    // For React Native, we'll use a simpler approach without reCAPTCHA
+    const confirmationResult = await signInWithPhoneNumber(auth, formattedPhone);
     return confirmationResult;
   } catch (error) {
     console.error('Error sending SMS:', error);
@@ -1436,3 +1439,110 @@ export const replaceAppGalleryImage = async (oldImageUrl: string, newImageUri: s
     throw error;
   }
 };
+
+// Push Notification functions
+// TODO: Uncomment when expo-notifications and expo-device are installed
+/*
+export const registerForPushNotifications = async (userId: string) => {
+  try {
+    // Check if device supports notifications
+    if (!Device.isDevice) {
+      console.log('📱 Not a physical device, skipping push notification registration');
+      return null;
+    }
+
+    // Check existing permissions
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    let finalStatus = existingStatus;
+
+    // Request permissions if not granted
+    if (existingStatus !== 'granted') {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
+
+    if (finalStatus !== 'granted') {
+      console.log('❌ Failed to get push notification permissions');
+      return null;
+    }
+
+    // Get push token
+    const token = (await Notifications.getExpoPushTokenAsync()).data;
+    console.log('📱 Push token:', token);
+
+    // Save token to user profile
+    await updateUserProfile(userId, { pushToken: token });
+
+    return token;
+  } catch (error) {
+    console.error('Error registering for push notifications:', error);
+    return null;
+  }
+};
+
+export const sendPushNotification = async (pushToken: string, title: string, body: string, data?: any) => {
+  try {
+    const message = {
+      to: pushToken,
+      sound: 'default',
+      title: title,
+      body: body,
+      data: data || {},
+    };
+
+    await fetch('https://exp.host/--/api/v2/push/send', {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Accept-encoding': 'gzip, deflate',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(message),
+    });
+
+    console.log('✅ Push notification sent successfully');
+  } catch (error) {
+    console.error('Error sending push notification:', error);
+    throw error;
+  }
+};
+
+export const sendNotificationToUser = async (userId: string, title: string, body: string, data?: any) => {
+  try {
+    const userProfile = await getUserProfile(userId);
+    if (!userProfile || !userProfile.pushToken) {
+      console.log('❌ User not found or no push token');
+      return false;
+    }
+
+    await sendPushNotification(userProfile.pushToken, title, body, data);
+    return true;
+  } catch (error) {
+    console.error('Error sending notification to user:', error);
+    return false;
+  }
+};
+
+export const sendNotificationToAllUsers = async (title: string, body: string, data?: any) => {
+  try {
+    const users = await getAllUsers();
+    const usersWithTokens = users.filter(user => user.pushToken);
+    
+    console.log(`📱 Sending notification to ${usersWithTokens.length} users`);
+    
+    const results = await Promise.allSettled(
+      usersWithTokens.map(user => 
+        sendPushNotification(user.pushToken!, title, body, data)
+      )
+    );
+    
+    const successful = results.filter(result => result.status === 'fulfilled').length;
+    console.log(`✅ Successfully sent to ${successful}/${usersWithTokens.length} users`);
+    
+    return successful;
+  } catch (error) {
+    console.error('Error sending notification to all users:', error);
+    return 0;
+  }
+};
+*/
