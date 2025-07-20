@@ -42,6 +42,19 @@ export interface UserProfile {
   pushToken?: string; // Added for push notifications
 }
 
+export interface ShopItem {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  imageUrl: string;
+  category: string;
+  isActive: boolean;
+  stock?: number;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
 export interface Barber {
   id: string;
   name: string;
@@ -1081,7 +1094,7 @@ export const restoreGalleryFromStorage = async () => {
       const imageUrl = storageImages.shop[i];
       await addGalleryImage({
         imageUrl,
-        type: 'shop',
+        type: 'gallery', // Shop items go to gallery for now
         order: storageImages.gallery.length + storageImages.backgrounds.length + storageImages.aboutus.length + i,
         isActive: true
       });
@@ -1093,6 +1106,83 @@ export const restoreGalleryFromStorage = async () => {
     return addedCount;
   } catch (error) {
     console.error('❌ Error restoring gallery from storage:', error);
+    throw error;
+  }
+};
+
+// Shop Items Management
+export const addShopItem = async (shopItem: Omit<ShopItem, 'id' | 'createdAt' | 'updatedAt'>) => {
+  try {
+    const docRef = doc(collection(db, 'shopItems'));
+    const newShopItem: ShopItem = {
+      ...shopItem,
+      id: docRef.id,
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now()
+    };
+    await setDoc(docRef, newShopItem);
+    console.log('✅ Shop item added successfully:', newShopItem.name);
+    return newShopItem;
+  } catch (error) {
+    console.error('❌ Error adding shop item:', error);
+    throw error;
+  }
+};
+
+export const getShopItems = async (): Promise<ShopItem[]> => {
+  try {
+    const q = query(
+      collection(db, 'shopItems'),
+      orderBy('createdAt', 'desc')
+    );
+    const snapshot = await getDocs(q);
+    const items = snapshot.docs.map(doc => doc.data() as ShopItem);
+    console.log('📦 Loaded', items.length, 'shop items');
+    return items;
+  } catch (error) {
+    console.error('❌ Error loading shop items:', error);
+    return [];
+  }
+};
+
+export const getActiveShopItems = async (): Promise<ShopItem[]> => {
+  try {
+    const q = query(
+      collection(db, 'shopItems'),
+      where('isActive', '==', true),
+      orderBy('createdAt', 'desc')
+    );
+    const snapshot = await getDocs(q);
+    const items = snapshot.docs.map(doc => doc.data() as ShopItem);
+    console.log('🛍️ Loaded', items.length, 'active shop items');
+    return items;
+  } catch (error) {
+    console.error('❌ Error loading active shop items:', error);
+    return [];
+  }
+};
+
+export const updateShopItem = async (id: string, updates: Partial<ShopItem>) => {
+  try {
+    const docRef = doc(db, 'shopItems', id);
+    await updateDoc(docRef, {
+      ...updates,
+      updatedAt: Timestamp.now()
+    });
+    console.log('✅ Shop item updated successfully:', id);
+  } catch (error) {
+    console.error('❌ Error updating shop item:', error);
+    throw error;
+  }
+};
+
+export const deleteShopItem = async (id: string) => {
+  try {
+    const docRef = doc(db, 'shopItems', id);
+    await deleteDoc(docRef);
+    console.log('🗑️ Shop item deleted successfully:', id);
+  } catch (error) {
+    console.error('❌ Error deleting shop item:', error);
     throw error;
   }
 };

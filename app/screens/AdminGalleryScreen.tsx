@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { addDoc, collection, deleteDoc, doc, getDocs, getFirestore, updateDoc } from 'firebase/firestore';
+import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, getFirestore, setDoc, updateDoc } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
 import {
     Alert,
@@ -21,7 +21,12 @@ import {
     GalleryImage,
     getAllStorageImages,
     getGalleryImages,
-    uploadImageToStorage
+    uploadImageToStorage,
+    addShopItem,
+    getShopItems,
+    updateShopItem,
+    deleteShopItem,
+    ShopItem
 } from '../../services/firebase';
 import ToastMessage from '../components/ToastMessage';
 import TopNav from '../components/TopNav';
@@ -62,13 +67,25 @@ const AdminGalleryScreen: React.FC<AdminGalleryScreenProps> = ({ onNavigate, onB
     order: '0'
   });
 
-  // הוסף state למוצרים
-  const [shopProducts, setShopProducts] = useState<any[]>([]);
+  // Shop state
+  const [shopProducts, setShopProducts] = useState<ShopItem[]>([]);
   const [shopLoading, setShopLoading] = useState(false);
-  const [shopForm, setShopForm] = useState({ name: '', price: '', imageUrl: '', editingId: null });
+  const [shopForm, setShopForm] = useState({ 
+    name: '', 
+    description: '',
+    price: '', 
+    category: '',
+    imageUrl: '', 
+    stock: '',
+    editingId: null as string | null
+  });
 
   // הוסף state לתמונות shop מהסטורג'
   const [shopStorageImages, setShopStorageImages] = useState<string[]>([]);
+
+  // Add state for about us text
+  const [aboutUsText, setAboutUsText] = useState('ברוכים הבאים ל-TURGI – מספרה משפחתית עם יחס אישי, מקצועיות ואווירה חמה. נשמח לראותכם!');
+  const [editingAboutUs, setEditingAboutUs] = useState(false);
 
   useEffect(() => {
     loadImages();
@@ -80,6 +97,33 @@ const AdminGalleryScreen: React.FC<AdminGalleryScreenProps> = ({ onNavigate, onB
       fetchShopStorageImages();
     }
   }, [selectedTab]);
+
+  // Load about us text from Firestore
+  useEffect(() => {
+    const fetchAboutUsText = async () => {
+      try {
+        const db = getFirestore();
+        const docRef = doc(db, 'settings', 'aboutUsText');
+        const snap = await getDoc(docRef);
+        if (snap.exists()) {
+          setAboutUsText(snap.data().text || aboutUsText);
+        }
+      } catch (e) { /* ignore */ }
+    };
+    fetchAboutUsText();
+  }, []);
+
+  // Save about us text to Firestore
+  const saveAboutUsText = async () => {
+    try {
+      const db = getFirestore();
+      await setDoc(doc(db, 'settings', 'aboutUsText'), { text: aboutUsText });
+      setEditingAboutUs(false);
+      showToast('הטקסט עודכן!');
+    } catch (e) {
+      showToast('שגיאה בעדכון הטקסט', 'error');
+    }
+  };
 
   const loadImages = async () => {
     try {
@@ -433,9 +477,8 @@ const AdminGalleryScreen: React.FC<AdminGalleryScreenProps> = ({ onNavigate, onB
   const fetchShopProducts = async () => {
     setShopLoading(true);
     try {
-      const db = getFirestore();
-      const snap = await getDocs(collection(db, 'shop'));
-      setShopProducts(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      const items = await getShopItems();
+      setShopProducts(items);
     } catch (e) {
       showToast('שגיאה בטעינת מוצרים', 'error');
     } finally {
@@ -477,24 +520,38 @@ const AdminGalleryScreen: React.FC<AdminGalleryScreenProps> = ({ onNavigate, onB
     }
     setShopLoading(true);
     try {
-      const db = getFirestore();
       if (shopForm.editingId) {
-        await updateDoc(doc(db, 'shop', shopForm.editingId), {
+        await updateShopItem(shopForm.editingId, {
           name: shopForm.name.trim(),
+          description: shopForm.description.trim(),
           price: Number(shopForm.price),
-          imageUrl: shopForm.imageUrl
+          category: shopForm.category.trim(),
+          imageUrl: shopForm.imageUrl,
+          stock: shopForm.stock ? Number(shopForm.stock) : undefined,
+          isActive: true
         });
         showToast('המוצר עודכן!');
       } else {
-        await addDoc(collection(db, 'shop'), {
+        await addShopItem({
           name: shopForm.name.trim(),
+          description: shopForm.description.trim(),
           price: Number(shopForm.price),
+          category: shopForm.category.trim(),
           imageUrl: shopForm.imageUrl,
-          createdAt: new Date()
+          stock: shopForm.stock ? Number(shopForm.stock) : undefined,
+          isActive: true
         });
         showToast('המוצר נוסף!');
       }
-      setShopForm({ name: '', price: '', imageUrl: '', editingId: null });
+      setShopForm({ 
+        name: '', 
+        description: '',
+        price: '', 
+        category: '',
+        imageUrl: '', 
+        stock: '',
+        editingId: null 
+      });
       fetchShopProducts();
     } catch (e) {
       showToast('שגיאה בשמירת מוצר', 'error');
@@ -507,8 +564,7 @@ const AdminGalleryScreen: React.FC<AdminGalleryScreenProps> = ({ onNavigate, onB
   const handleDeleteShopProduct = async (id: string) => {
     setShopLoading(true);
     try {
-      const db = getFirestore();
-      await deleteDoc(doc(db, 'shop', id));
+      await deleteShopItem(id);
       showToast('המוצר נמחק!');
       fetchShopProducts();
     } catch (e) {
@@ -875,6 +931,29 @@ const AdminGalleryScreen: React.FC<AdminGalleryScreenProps> = ({ onNavigate, onB
                   />
                 </View>
                 <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>תיאור</Text>
+                  <TextInput
+                    style={[styles.textInput, { height: 80 }]}
+                    value={shopForm.description}
+                    onChangeText={text => setShopForm(f => ({ ...f, description: text }))}
+                    placeholder="תיאור המוצר"
+                    placeholderTextColor="#aaa"
+                    multiline
+                    textAlign="right"
+                  />
+                </View>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>קטגוריה</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    value={shopForm.category}
+                    onChangeText={text => setShopForm(f => ({ ...f, category: text }))}
+                    placeholder="קטגוריה (למשל: שמפו, מוצרי טיפוח)"
+                    placeholderTextColor="#aaa"
+                    textAlign="right"
+                  />
+                </View>
+                <View style={styles.inputGroup}>
                   <Text style={styles.inputLabel}>מחיר</Text>
                   <TextInput
                     style={styles.textInput}
@@ -882,6 +961,17 @@ const AdminGalleryScreen: React.FC<AdminGalleryScreenProps> = ({ onNavigate, onB
                     onChangeText={text => setShopForm(f => ({ ...f, price: text }))}
                     keyboardType="numeric"
                     placeholder="מחיר"
+                    placeholderTextColor="#aaa"
+                  />
+                </View>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>מלאי (אופציונלי)</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    value={shopForm.stock}
+                    onChangeText={text => setShopForm(f => ({ ...f, stock: text }))}
+                    keyboardType="numeric"
+                    placeholder="כמות במלאי"
                     placeholderTextColor="#aaa"
                   />
                 </View>
@@ -929,9 +1019,20 @@ const AdminGalleryScreen: React.FC<AdminGalleryScreenProps> = ({ onNavigate, onB
                     <Image source={{ uri: prod.imageUrl }} style={{width:60,height:60,borderRadius:8,marginRight:8}} />
                     <View style={{flex:1}}>
                       <Text style={{color:'#fff',fontWeight:'bold'}}>{prod.name}</Text>
+                      <Text style={{color:'#aaa',fontSize:12}}>{prod.description}</Text>
                       <Text style={{color:'#fff'}}>{prod.price} ₪</Text>
+                      <Text style={{color:'#aaa',fontSize:11}}>קטגוריה: {prod.category}</Text>
+                      {prod.stock && <Text style={{color:'#aaa',fontSize:11}}>מלאי: {prod.stock}</Text>}
                     </View>
-                    <TouchableOpacity onPress={()=>setShopForm({ name: prod.name, price: String(prod.price), imageUrl: prod.imageUrl, editingId: prod.id })} style={{marginHorizontal:4}}>
+                    <TouchableOpacity onPress={()=>setShopForm({ 
+                      name: prod.name, 
+                      description: prod.description || '',
+                      price: String(prod.price), 
+                      category: prod.category || '',
+                      imageUrl: prod.imageUrl, 
+                      stock: prod.stock ? String(prod.stock) : '',
+                      editingId: prod.id 
+                    })} style={{marginHorizontal:4}}>
                       <Ionicons name="create-outline" size={24} color="#007bff" />
                     </TouchableOpacity>
                     <TouchableOpacity onPress={()=>handleDeleteShopProduct(prod.id)} style={{marginHorizontal:4}}>
@@ -949,7 +1050,15 @@ const AdminGalleryScreen: React.FC<AdminGalleryScreenProps> = ({ onNavigate, onB
                     shopStorageImages.filter(url => !shopProducts.some(prod => prod.imageUrl === url)).map((url, idx) => (
                       <View key={url} style={{flexDirection:'row',alignItems:'center',backgroundColor:'#222',borderRadius:8,padding:8,marginBottom:8}}>
                         <Image source={{ uri: url }} style={{width:60,height:60,borderRadius:8,marginRight:8}} />
-                        <TouchableOpacity onPress={()=>setShopForm({ name: '', price: '', imageUrl: url, editingId: null })} style={{marginHorizontal:4,backgroundColor:'#007bff',borderRadius:6,padding:8}}>
+                        <TouchableOpacity onPress={()=>setShopForm({ 
+                          name: '', 
+                          description: '',
+                          price: '', 
+                          category: '',
+                          imageUrl: url, 
+                          stock: '',
+                          editingId: null 
+                        })} style={{marginHorizontal:4,backgroundColor:'#007bff',borderRadius:6,padding:8}}>
                           <Text style={{color:'#fff'}}>הפוך למוצר</Text>
                         </TouchableOpacity>
                       </View>
@@ -957,6 +1066,61 @@ const AdminGalleryScreen: React.FC<AdminGalleryScreenProps> = ({ onNavigate, onB
                   )}
                 </View>
               )}
+            </View>
+          </View>
+        </Modal>
+      )}
+
+      {selectedTab === 'aboutus' && (
+        <Modal
+          animationType="slide"
+          transparent={true}
+          visible={modalVisible}
+          onRequestClose={() => setModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>
+                  {editingAboutUs ? 'עריכת טקסט אודותינו' : 'אודותינו'}
+                </Text>
+                <TouchableOpacity onPress={() => setModalVisible(false)}>
+                  <Ionicons name="close" size={24} color="#666" />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView style={styles.modalBody}>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>טקסט אודותינו</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    value={aboutUsText}
+                    onChangeText={setAboutUsText}
+                    multiline
+                    placeholder="כתוב טקסט אודותינו כאן..."
+                    placeholderTextColor="#aaa"
+                    textAlign="right"
+                  />
+                </View>
+              </ScrollView>
+
+              <View style={styles.modalActions}>
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.cancelButton]}
+                  onPress={() => setModalVisible(false)}
+                >
+                  <Text style={styles.cancelButtonText}>ביטול</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.saveButton]}
+                  onPress={saveAboutUsText}
+                >
+                  <Text style={styles.saveButtonText}>
+                    {editingAboutUs ? 'שמור טקסט' : 'ערוך טקסט'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         </Modal>
