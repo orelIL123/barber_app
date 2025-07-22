@@ -11,6 +11,7 @@ import {
     ImageBackground,
     InteractionManager,
     Linking,
+    Modal,
     SafeAreaView,
     ScrollView,
     StyleSheet,
@@ -55,7 +56,7 @@ const NeonButton: React.FC<{
   );
 };
 
-export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
+function HomeScreen({ onNavigate }: HomeScreenProps) {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
@@ -70,6 +71,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
     aboutUs: '',
     gallery: [],
   });
+  
+  // Dynamic content states
+  const [welcomeMessage, setWelcomeMessage] = useState('');
+  const [subtitleMessage, setSubtitleMessage] = useState('');
+  const [aboutUsMessage, setAboutUsMessage] = useState('');
+  const [showPopup, setShowPopup] = useState(false);
+  const [popupMessage, setPopupMessage] = useState('');
 
   // Animation refs
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -171,11 +179,55 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
   }, [loading]);
 
   useEffect(() => {
-    // Fetch images after interactions are complete
+    // Fetch images and dynamic content after interactions are complete
     InteractionManager.runAfterInteractions(() => {
       fetchImages();
+      fetchDynamicContent();
     });
   }, []);
+
+  // Fetch dynamic content from Firebase
+  const fetchDynamicContent = async () => {
+    try {
+      const db = getFirestore();
+      
+      // Load welcome messages
+      const welcomeDoc = await getDoc(doc(db, 'settings', 'homeMessages'));
+      if (welcomeDoc.exists()) {
+        const data = welcomeDoc.data();
+        setWelcomeMessage(data.welcome || t('home.welcome'));
+        setSubtitleMessage(data.subtitle || t('home.subtitle'));
+      } else {
+        setWelcomeMessage(t('home.welcome'));
+        setSubtitleMessage(t('home.subtitle'));
+      }
+
+      // Load about us text
+      const aboutDoc = await getDoc(doc(db, 'settings', 'aboutUsText'));
+      if (aboutDoc.exists()) {
+        const data = aboutDoc.data();
+        setAboutUsMessage(data.text || 'ברוכים הבאים למספרה של רון תורג׳מן! כאן תיהנו מחוויה אישית, מקצועית ומפנקת, עם יחס חם לכל לקוח. רון, בעל ניסיון של שנים בתחום, מזמין אתכם להתרווח, להתחדש ולהרגיש בבית.');
+      } else {
+        setAboutUsMessage('ברוכים הבאים למספרה של רון תורג׳מן! כאן תיהנו מחוויה אישית, מקצועית ומפנקת, עם יחס חם לכל לקוח. רון, בעל ניסיון של שנים בתחום, מזמין אתכם להתרווח, להתחדש ולהרגיש בבית.');
+      }
+
+      // Check for popup message
+      const popupDoc = await getDoc(doc(db, 'settings', 'popupMessage'));
+      if (popupDoc.exists()) {
+        const data = popupDoc.data();
+        if (data.isActive && data.message && data.expiresAt && data.expiresAt.toDate() > new Date()) {
+          setPopupMessage(data.message);
+          setShowPopup(true);
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to fetch dynamic content:', error);
+      // Fallback to translation values
+      setWelcomeMessage(t('home.welcome'));
+      setSubtitleMessage(t('home.subtitle'));
+      setAboutUsMessage('ברוכים הבאים למספרה של רון תורג׳מן! כאן תיהנו מחוויה אישית, מקצועית ומפנקת, עם יחס חם לכל לקוח. רון, בעל ניסיון של שנים בתחום, מזמין אתכם להתרווח, להתחדש ולהרגיש בבית.');
+    }
+  };
 
   // Fetch images from Firebase gallery collection and settings
   const fetchImages = async () => {
@@ -501,8 +553,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
               style={styles.ctaButton}
             />
             <View style={styles.greetingContainer}>
-              <Text style={styles.greeting}>{t('home.welcome')}</Text>
-              <Text style={styles.subtitle}>{t('home.subtitle')}</Text>
+              <Text style={styles.greeting}>{welcomeMessage || t('home.welcome')}</Text>
+              <Text style={styles.subtitle}>{subtitleMessage || t('home.subtitle')}</Text>
             </View>
           </Animated.View>
 
@@ -592,9 +644,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
               />
               <View style={styles.aboutContent}>
                 <Text style={styles.aboutText}>
-                  ברוכים הבאים למספרה של רון תורג׳מן! כאן תיהנו מחוויה אישית, מקצועית ומפנקת, עם יחס חם לכל לקוח. רון, בעל ניסיון של שנים בתחום, מזמין אתכם להתרווח, להתחדש ולהרגיש בבית. 
-                  {"\n\n"}
-                  ✂️ AI: &quot;המספרה שלנו היא לא רק מקום להסתפר, אלא מקום להרגיש בו טוב, להירגע ולצאת עם חיוך. כל תספורת היא יצירת אמנות!&quot;
+                  {aboutUsMessage || `ברוכים הבאים למספרה של רון תורג׳מן! כאן תיהנו מחוויה אישית, מקצועית ומפנקת, עם יחס חם לכל לקוח. רון, בעל ניסיון של שנים בתחום, מזמין אתכם להתרווח, להתחדש ולהרגיש בבית. 
+                  
+✂️ AI: "המספרה שלנו היא לא רק מקום להסתפר, אלא מקום להרגיש בו טוב, להירגע ולצאת עם חיוך. כל תספורת היא יצירת אמנות!"`}
                 </Text>
                 <TouchableOpacity 
                   style={styles.wazeButton} 
@@ -635,7 +687,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
 
           {/* Footer */}
           <View style={styles.footerCard}>
-            <Text style={styles.footerText}>{t('home.address')}</Text>
+            <Text style={styles.footerText}>מושב יושיביה 1</Text>
             <TouchableOpacity onPress={handleWaze}>
               <Text style={styles.footerWaze}>{t('home.navigate_waze')}</Text>
             </TouchableOpacity>
@@ -662,9 +714,37 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
         onClose={() => setNotificationPanelVisible(false)}
       />
       <TermsModal visible={showTerms} onClose={() => setShowTerms(false)} />
+      
+      {/* Admin Popup Message */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={showPopup}
+        onRequestClose={() => setShowPopup(false)}
+      >
+        <View style={styles.popupOverlay}>
+          <View style={styles.popupContent}>
+            <View style={styles.popupHeader}>
+              <Text style={styles.popupTitle}>הודעה מהמספרה</Text>
+              <TouchableOpacity onPress={() => setShowPopup(false)}>
+                <Ionicons name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.popupMessage}>{popupMessage}</Text>
+            <TouchableOpacity 
+              style={styles.popupButton} 
+              onPress={() => setShowPopup(false)}
+            >
+              <Text style={styles.popupButtonText}>הבנתי</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
+
+export default HomeScreen;
 
 const styles = StyleSheet.create({
   container: {
@@ -704,6 +784,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     justifyContent: 'flex-end',
+    marginTop: 60, // move image down so overlay covers less
   },
   overlay: {
     ...StyleSheet.absoluteFillObject,
@@ -1108,5 +1189,55 @@ const styles = StyleSheet.create({
     color: '#007bff',
     textDecorationLine: 'underline',
     marginTop: 4,
+  },
+  popupOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  popupContent: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 24,
+    width: '100%',
+    maxWidth: 400,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  popupHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  popupTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#222',
+    textAlign: 'right',
+  },
+  popupMessage: {
+    fontSize: 16,
+    color: '#444',
+    lineHeight: 24,
+    textAlign: 'right',
+    marginBottom: 24,
+  },
+  popupButton: {
+    backgroundColor: '#007bff',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  popupButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });

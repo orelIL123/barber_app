@@ -1,8 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useState } from 'react';
 import {
+  Alert,
   Dimensions,
   Image,
+  Linking,
   Modal,
   SafeAreaView,
   ScrollView,
@@ -67,10 +69,16 @@ const ShopScreen: React.FC<ShopScreenProps> = ({ onNavigate, onBack }) => {
   };
 
   const handleOrderItem = () => {
-    // Here you can integrate with WhatsApp or any ordering system
+    if (selectedItem) {
+      const message = `היי רון! 👋\nאני מעוניין להזמין את ${selectedItem.name} במחיר ${selectedItem.price}₪\n\nתודה!`;
+      const encodedMessage = encodeURIComponent(message);
+      const whatsappUrl = `https://wa.me/972542280222?text=${encodedMessage}`;
+      
+      Linking.openURL(whatsappUrl).catch(() => {
+        Alert.alert('שגיאה', 'לא ניתן לפתוח את WhatsApp');
+      });
+    }
     closeModal();
-    // Example: Open WhatsApp with pre-filled message
-    // Linking.openURL(`whatsapp://send?phone=+972XXXXXXXXX&text=היי, אני מעוניין להזמין את ${selectedItem?.name}`);
   };
 
   return (
@@ -79,7 +87,14 @@ const ShopScreen: React.FC<ShopScreenProps> = ({ onNavigate, onBack }) => {
         title="חנות המספרה"
         onBellPress={() => {}}
         onMenuPress={() => {}}
-        showBackButton={false}
+        showBackButton={true}
+        onBackPress={onBack || (() => {
+          if (onNavigate) {
+            onNavigate('home');
+          } else {
+            console.log('No navigation function provided');
+          }
+        })}
       />
       
       <View style={styles.content}>

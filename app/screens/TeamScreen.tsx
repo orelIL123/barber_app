@@ -338,25 +338,26 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   barbersGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
+    flexDirection: 'column', // Single column for Ron
+    alignItems: 'center',
+    paddingVertical: 16,
   },
   barberCard: {
-    width: (width - 48) / 2,
+    width: Math.min((width - 32), 350), // Make it bigger and centered
     backgroundColor: '#fff',
-    borderRadius: 16,
-    marginBottom: 16,
+    borderRadius: 20,
+    marginBottom: 24,
+    alignSelf: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
     overflow: 'hidden',
   },
   barberImageContainer: {
     position: 'relative',
-    height: 160,
+    height: 240, // Much bigger photo for Ron
   },
   barberImage: {
     width: '100%',

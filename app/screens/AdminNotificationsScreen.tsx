@@ -1,17 +1,20 @@
-import { Ionicons } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
+
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useState } from 'react';
 import {
     Alert,
     Dimensions,
+    KeyboardAvoidingView,
     Modal,
+    Platform,
     SafeAreaView,
     ScrollView,
     StyleSheet,
     Text,
     TextInput,
     TouchableOpacity,
-    View,
+    View
 } from 'react-native';
 import {
     checkIsAdmin,
@@ -148,74 +151,81 @@ const AdminNotificationsScreen: React.FC<AdminNotificationsScreenProps> = ({ onN
         showBackButton={true}
         onBackPress={onBack || (() => onNavigate('admin-home'))}
       />
-      
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        <View style={styles.content}>
-          {/* Header */}
-          <View style={styles.header}>
-            <LinearGradient
-              colors={['#6c757d', '#495057']}
-              style={styles.headerGradient}
-            >
-              <Text style={styles.headerTitle}>שליחת התראות</Text>
-              <Text style={styles.headerSubtitle}>שלח הודעות למשתמשי האפליקציה</Text>
-            </LinearGradient>
-          </View>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={32}
+      >
+        <View style={{ flex: 1 }}>
+          <ScrollView
+            style={styles.scrollView}
+            contentContainerStyle={{ flexGrow: 1, paddingBottom: 24 }}
+            keyboardShouldPersistTaps="handled"
+          >
+            <View style={styles.content}>
+              {/* Header */}
+              <View style={styles.header}>
+                <LinearGradient
+                  colors={['#6c757d', '#495057']}
+                  style={styles.headerGradient}
+                >
+                  <Text style={styles.headerTitle}>שליחת התראות</Text>
+                  <Text style={styles.headerSubtitle}>שלח הודעות למשתמשי האפליקציה</Text>
+                </LinearGradient>
+              </View>
 
-          {/* Statistics */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>סטטיסטיקות משתמשים</Text>
-            <View style={styles.statsGrid}>
-              <View style={styles.statCard}>
-                <Ionicons name="people" size={24} color="#007bff" />
-                <Text style={styles.statValue}>{users.length}</Text>
-                <Text style={styles.statLabel}>סה"כ משתמשים</Text>
+              {/* Statistics */}
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>סטטיסטיקות משתמשים</Text>
+                <View style={styles.statsGrid}>
+                  <View style={styles.statCard}>
+                    <Ionicons name="people" size={24} color="#007bff" />
+                    <Text style={styles.statValue}>{users.length}</Text>
+                    <Text style={styles.statLabel}>סה"כ משתמשים</Text>
+                  </View>
+                  <View style={styles.statCard}>
+                    <Ionicons name="notifications" size={24} color="#28a745" />
+                    <Text style={styles.statValue}>{getUsersWithTokens().length}</Text>
+                    <Text style={styles.statLabel}>עם התראות</Text>
+                  </View>
+                  <View style={styles.statCard}>
+                    <Ionicons name="close-circle" size={24} color="#dc3545" />
+                    <Text style={styles.statValue}>{getUsersWithoutTokens().length}</Text>
+                    <Text style={styles.statLabel}>ללא התראות</Text>
+                  </View>
+                </View>
               </View>
-              <View style={styles.statCard}>
-                <Ionicons name="notifications" size={24} color="#28a745" />
-                <Text style={styles.statValue}>{getUsersWithTokens().length}</Text>
-                <Text style={styles.statLabel}>עם התראות</Text>
-              </View>
-              <View style={styles.statCard}>
-                <Ionicons name="close-circle" size={24} color="#dc3545" />
-                <Text style={styles.statValue}>{getUsersWithoutTokens().length}</Text>
-                <Text style={styles.statLabel}>ללא התראות</Text>
+
+              {/* Users List */}
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>רשימת משתמשים</Text>
+                {users.map((user) => (
+                  <View key={user.uid} style={styles.userCard}>
+                    <View style={styles.userInfo}>
+                      <Text style={styles.userName}>{user.displayName}</Text>
+                      <Text style={styles.userPhone}>{user.phone}</Text>
+                    </View>
+                    <View style={styles.userStatus}>
+                      {user.pushToken ? (
+                        <Ionicons name="notifications" size={20} color="#28a745" />
+                      ) : (
+                        <Ionicons name="notifications-off" size={20} color="#dc3545" />
+                      )}
+                    </View>
+                  </View>
+                ))}
               </View>
             </View>
-          </View>
-
-          {/* Send Notification Button */}
-          <View style={styles.section}>
-            <TouchableOpacity 
-              style={styles.sendButton}
-              onPress={() => setModalVisible(true)}
-            >
-              <Ionicons name="send" size={24} color="#fff" />
+          </ScrollView>
+          {/* Send Button always visible at bottom */}
+          <View style={{ padding: 16, backgroundColor: '#fff', borderTopWidth: 1, borderColor: '#eee' }}>
+            <TouchableOpacity style={styles.sendButton} onPress={() => setModalVisible(true)}>
+              <Feather name="send" size={24} color="#fff" />
               <Text style={styles.sendButtonText}>שלח הודעה חדשה</Text>
             </TouchableOpacity>
           </View>
-
-          {/* Users List */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>רשימת משתמשים</Text>
-            {users.map((user) => (
-              <View key={user.uid} style={styles.userCard}>
-                <View style={styles.userInfo}>
-                  <Text style={styles.userName}>{user.displayName}</Text>
-                  <Text style={styles.userPhone}>{user.phone}</Text>
-                </View>
-                <View style={styles.userStatus}>
-                  {user.pushToken ? (
-                    <Ionicons name="notifications" size={20} color="#28a745" />
-                  ) : (
-                    <Ionicons name="notifications-off" size={20} color="#dc3545" />
-                  )}
-                </View>
-              </View>
-            ))}
-          </View>
         </View>
-      </ScrollView>
+      </KeyboardAvoidingView>
 
       {/* Send Notification Modal */}
       <Modal
@@ -224,8 +234,15 @@ const AdminNotificationsScreen: React.FC<AdminNotificationsScreenProps> = ({ onN
         visible={modalVisible}
         onRequestClose={() => setModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+        <KeyboardAvoidingView 
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <ScrollView
+            contentContainerStyle={styles.modalScrollContainer}
+            keyboardShouldPersistTaps="handled"
+          >
+            <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>שלח הודעה חדשה</Text>
               <TouchableOpacity onPress={() => setModalVisible(false)}>
@@ -305,8 +322,9 @@ const AdminNotificationsScreen: React.FC<AdminNotificationsScreenProps> = ({ onN
                 <Text style={styles.sendButtonText}>שלח הודעה</Text>
               </TouchableOpacity>
             </View>
-          </View>
-        </View>
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
@@ -467,15 +485,25 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  modalScrollContainer: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingVertical: 50,
+    paddingHorizontal: 20,
   },
   modalContent: {
     backgroundColor: '#fff',
     borderRadius: 16,
     padding: 24,
-    width: '90%',
-    maxHeight: '80%',
+    width: '100%',
+    maxWidth: 400,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
   },
   modalHeader: {
     flexDirection: 'row',

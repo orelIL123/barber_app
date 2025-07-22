@@ -16,15 +16,18 @@ import {
 } from 'react-native';
 import {
     Appointment,
+    checkPhoneUserExists,
     createUserProfileFromAuth,
     getUserAppointments,
     getUserProfile,
     loginUser,
+    loginWithPhoneAndPassword,
     logoutUser,
     onAuthStateChange,
     registerUser,
     registerUserWithPhone,
     sendSMSVerification,
+    setPasswordForPhoneUser,
     updateUserProfile,
     UserProfile,
     verifySMSCode
@@ -60,6 +63,11 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate, onBack }) => 
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [phone, setPhone] = useState('');
+  
+  // New states for improved phone auth
+  const [phoneUserExists, setPhoneUserExists] = useState(false);
+  const [phoneUserHasPassword, setPhoneUserHasPassword] = useState(false);
+  const [showSetPassword, setShowSetPassword] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChange(async (currentUser) => {
@@ -88,6 +96,25 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate, onBack }) => 
 
   // Utility: validate phone format (simple, Israeli +972-5X...)
   const isValidPhone = (phone: string) => /^\+972-5\d{1}-\d{3}-\d{4}$/.test(phone.trim());
+  
+  // Check if phone user exists and has password
+  const checkPhoneUser = async (phoneNumber: string) => {
+    if (!isValidPhone(phoneNumber)) {
+      setPhoneUserExists(false);
+      setPhoneUserHasPassword(false);
+      return;
+    }
+    
+    try {
+      const userCheck = await checkPhoneUserExists(phoneNumber);
+      setPhoneUserExists(userCheck.exists);
+      setPhoneUserHasPassword(userCheck.hasPassword);
+    } catch (error) {
+      console.error('Error checking phone user:', error);
+      setPhoneUserExists(false);
+      setPhoneUserHasPassword(false);
+    }
+  };
 
   const handleSendSMSVerification = async () => {
     if (!phone.trim()) {
@@ -150,6 +177,36 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate, onBack }) => 
 
   const handleLogin = async () => {
     if (authMethod === 'phone') {
+      // Validate phone format first
+      if (!isValidPhone(phone)) {
+        Alert.alert('שגיאה', 'מספר הטלפון אינו תקין');
+        return;
+      }
+
+      // Always check if user exists before login attempt
+      await checkPhoneUser(phone);
+
+      // If user exists and has password, REQUIRE password (no SMS option)
+      if (phoneUserExists && phoneUserHasPassword) {
+        if (!password.trim()) {
+          Alert.alert('שגיאה', 'משתמש רשום - נא להזין סיסמה');
+          return;
+        }
+
+        setLoading(true);
+        try {
+          await loginWithPhoneAndPassword(phone, password);
+          setPhone('');
+          setPassword('');
+        } catch (error: any) {
+          Alert.alert('שגיאה', 'פרטי הכניסה שגויים');
+        } finally {
+          setLoading(false);
+        }
+        return;
+      }
+      
+      // Only use SMS if user doesn't exist or has no password (first time)
       handleSendSMSVerification();
       return;
     }
@@ -376,16 +433,40 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate, onBack }) => 
                 {step === 'input' ? (
                   <>
                     {authMethod === 'phone' ? (
-                      <View style={styles.inputContainer}>
-                        <Text style={styles.inputLabel}>מספר טלפון</Text>
-                        <TextInput 
-                          style={styles.input} 
-                          placeholder="+972-50-123-4567" 
-                          value={phone} 
-                          onChangeText={setPhone} 
-                          keyboardType="phone-pad" 
-                        />
-                      </View>
+                      <>
+                        <View style={styles.inputContainer}>
+                          <Text style={styles.inputLabel}>מספר טלפון</Text>
+                          <TextInput 
+                            style={styles.input} 
+                            placeholder="+972-50-123-4567" 
+                            value={phone} 
+                            onChangeText={(text) => {
+                              setPhone(text);
+                              if (text.length > 10) checkPhoneUser(text);
+                            }}
+                            keyboardType="phone-pad" 
+                          />
+                          {phoneUserExists && (
+                            <Text style={styles.helperText}>
+                              {phoneUserHasPassword ? '✅ משתמש קיים - הזן סיסמה' : 'ℹ️ משתמש קיים - יישלח SMS'}
+                            </Text>
+                          )}
+                        </View>
+                        
+                        {/* Show password field if user exists and has password */}
+                        {phoneUserExists && phoneUserHasPassword && (
+                          <View style={styles.inputContainer}>
+                            <Text style={styles.inputLabel}>סיסמה</Text>
+                            <TextInput 
+                              style={styles.input} 
+                              placeholder="הזן סיסמה" 
+                              value={password} 
+                              onChangeText={setPassword} 
+                              secureTextEntry 
+                            />
+                          </View>
+                        )}
+                      </>
                     ) : (
                       <>
                         <View style={styles.inputContainer}>
@@ -1183,6 +1264,12 @@ const styles = StyleSheet.create({
   },
   activeAuthMethodText: {
     color: '#fff',
+  },
+  helperText: {
+    fontSize: 12,
+    color: '#007bff',
+    marginTop: 4,
+    textAlign: 'right',
   },
   backButton: {
     backgroundColor: '#f8f9fa',

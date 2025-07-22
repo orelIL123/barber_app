@@ -1,6 +1,8 @@
 import { useRouter } from 'expo-router';
+import { onAuthStateChanged } from 'firebase/auth';
 import React, { useEffect } from 'react';
 import { Animated, Dimensions, Image, StyleSheet, View } from 'react-native';
+import { auth } from './config/firebase';
 
 const { width, height } = Dimensions.get('window');
 
@@ -24,8 +26,14 @@ export default function SplashScreen() {
     ]).start();
 
     const timer = setTimeout(() => {
-      router.replace('/(tabs)');
-    }, 2000);
+      onAuthStateChanged(auth, (user) => {
+        if (user) {
+          router.replace('/(tabs)');
+        } else {
+          router.replace('/screens/WelcomeAuthScreen');
+        }
+      });
+    }, 1800);
 
     return () => clearTimeout(timer);
   }, []);

@@ -12,7 +12,7 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
-import { checkIsAdmin, initializeCollections, initializeGalleryImages, listAllStorageImages, onAuthStateChange, replaceGalleryPlaceholders, resetGalleryWithRealImages, restoreGalleryFromStorage } from '../../services/firebase';
+import { checkIsAdmin, createAdminUser, db, initializeCollections, initializeGalleryImages, listAllStorageImages, makeCurrentUserAdmin, onAuthStateChange, replaceGalleryPlaceholders, resetGalleryWithRealImages, restoreGalleryFromStorage } from '../../services/firebase';
 import ToastMessage from '../components/ToastMessage';
 import TopNav from '../components/TopNav';
 
@@ -29,19 +29,22 @@ const AdminHomeScreen: React.FC<AdminHomeScreenProps> = ({ onNavigate, onBack })
   const [toast, setToast] = useState({ visible: false, message: '', type: 'success' as 'success' | 'error' });
   const [aboutUsText, setAboutUsText] = useState('');
   const [aboutUsLoading, setAboutUsLoading] = useState(true);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChange(async (user) => {
       if (user) {
+        setCurrentUserId(user.uid);
         const adminStatus = await checkIsAdmin(user.uid);
         setIsAdmin(adminStatus);
         if (!adminStatus) {
           setToast({
             visible: true,
-            message: 'אין לך הרשאות מנהל',
+            message: `אין לך הרשאות מנהל (UID: ${user.uid})`,
             type: 'error'
           });
-          setTimeout(() => onNavigate('home'), 2000);
+          // Give user more time to see the UID and debug
+          setTimeout(() => onNavigate('home'), 5000);
         }
       } else {
         onNavigate('home');
@@ -198,6 +201,13 @@ const AdminHomeScreen: React.FC<AdminHomeScreenProps> = ({ onNavigate, onBack })
       color: '#6c757d'
     },
     {
+      title: 'הגדרות מנהל',
+      subtitle: 'עריכת הודעות ברכה, טקסטים ושליחת הודעות',
+      icon: 'settings',
+      screen: 'admin-settings',
+      color: '#fd7e14'
+    },
+    {
       title: 'צפה כלקוח',
       subtitle: 'צפה באפליקציה כמשתמש רגיל',
       icon: 'eye',
@@ -222,6 +232,24 @@ const AdminHomeScreen: React.FC<AdminHomeScreenProps> = ({ onNavigate, onBack })
         <View style={styles.errorContainer}>
           <Ionicons name="warning" size={64} color="#dc3545" />
           <Text style={styles.errorText}>אין לך הרשאות מנהל</Text>
+          <Text style={styles.debugText}>UID: {currentUserId}</Text>
+          <TouchableOpacity 
+            style={[styles.backButton, { backgroundColor: '#28a745', marginBottom: 12 }]} 
+            onPress={async () => {
+              try {
+                await makeCurrentUserAdmin();
+                showToast('נוצרו הרשאות מנהל! רענן את האפליקציה', 'success');
+                // Force refresh by reloading the component
+                setTimeout(() => {
+                  onNavigate('admin-home');
+                }, 1000);
+              } catch (error) {
+                showToast('שגיאה ביצירת הרשאות מנהל', 'error');
+              }
+            }}
+          >
+            <Text style={styles.backButtonText}>הפוך אותי למנהל (DEBUG)</Text>
+          </TouchableOpacity>
           <TouchableOpacity style={styles.backButton} onPress={() => onNavigate('home')}>
             <Text style={styles.backButtonText}>חזור לעמוד הבית</Text>
           </TouchableOpacity>
@@ -421,8 +449,15 @@ const styles = StyleSheet.create({
     fontSize: 20,
     color: '#dc3545',
     marginTop: 16,
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  debugText: {
+    fontSize: 14,
+    color: '#666',
     marginBottom: 24,
     textAlign: 'center',
+    fontFamily: 'monospace',
   },
   backButton: {
     backgroundColor: '#007bff',

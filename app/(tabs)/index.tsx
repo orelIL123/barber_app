@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import React from 'react';
-import { HomeScreen } from '../screens/HomeScreen';
+import HomeScreen from '../screens/HomeScreen';
 
 export default function HomeTab() {
   const router = useRouter();
@@ -40,6 +40,9 @@ export default function HomeTab() {
         break;
       case 'admin-availability':
         router.replace('/admin-availability');
+        break;
+      case 'admin-settings':
+        router.replace('/admin-settings');
         break;
       case 'home':
         router.replace('/(tabs)');

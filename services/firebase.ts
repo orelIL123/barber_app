@@ -2,6 +2,8 @@ import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import {
     createUserWithEmailAndPassword,
+    EmailAuthProvider,
+    linkWithCredential,
     onAuthStateChanged,
     PhoneAuthProvider,
     signInWithCredential,
@@ -27,6 +29,74 @@ import {
 } from 'firebase/firestore';
 import { deleteObject, getDownloadURL, listAll, ref, uploadBytes } from 'firebase/storage';
 import { auth, db, storage } from '../config/firebase';
+
+// Export db for use in other components
+export { db };
+
+// Create admin user function for development/first setup
+export const createAdminUser = async (email: string, password: string, displayName: string, phone: string): Promise<boolean> => {
+  try {
+    // Create user with email and password
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    const user = userCredential.user;
+
+    // Create admin profile in Firestore
+    const userProfile: UserProfile = {
+      uid: user.uid,
+      email: email,
+      displayName: displayName,
+      phone: phone,
+      isAdmin: true, // Make this user an admin
+      createdAt: Timestamp.now(),
+    };
+
+    await setDoc(doc(db, 'users', user.uid), userProfile);
+    console.log('Admin user created successfully:', email);
+    return true;
+  } catch (error) {
+    console.error('Error creating admin user:', error);
+    return false;
+  }
+};
+
+// Make current logged-in user an admin (for development)
+export const makeCurrentUserAdmin = async (): Promise<boolean> => {
+  try {
+    const currentUser = getCurrentUser();
+    if (!currentUser) {
+      throw new Error('לא מחובר משתמש');
+    }
+
+    // Check if user profile exists, if not create it
+    const userDocRef = doc(db, 'users', currentUser.uid);
+    const userDoc = await getDoc(userDocRef);
+    
+    if (!userDoc.exists()) {
+      // Create user profile if it doesn't exist
+      const newProfile: UserProfile = {
+        uid: currentUser.uid,
+        email: currentUser.email || '',
+        displayName: currentUser.displayName || 'Admin User',
+        phone: currentUser.phoneNumber || '',
+        isAdmin: true,
+        createdAt: Timestamp.now(),
+      };
+      await setDoc(userDocRef, newProfile);
+      console.log('Created new admin profile for:', currentUser.uid);
+    } else {
+      // Update existing user profile to be admin
+      await updateDoc(userDocRef, {
+        isAdmin: true
+      });
+      console.log('Updated existing user to admin:', currentUser.uid);
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error making current user admin:', error);
+    return false;
+  }
+};
 import { CacheUtils } from './cache';
 import { ImageOptimizer } from './imageOptimization';
 
@@ -38,6 +108,7 @@ export interface UserProfile {
   phone: string;
   profileImage?: string;
   isAdmin?: boolean;
+  hasPassword?: boolean; // Added for phone auth with password
   createdAt: Timestamp;
   pushToken?: string; // Added for push notifications
 }
@@ -235,14 +306,15 @@ export const registerUserWithPhone = async (phoneNumber: string, displayName: st
       displayName: displayName
     });
     
-    // Check if this is the admin phone number (replace with your admin phone)
-    const isAdminPhone = phoneNumber === '+972523456789'; // Replace with actual admin phone
+    // Check if this is the admin phone number
+    const isAdminPhone = phoneNumber === '+972542280222';
     
     const userProfile: UserProfile = {
       uid: user.uid,
       displayName: displayName,
       phone: phoneNumber,
       isAdmin: isAdminPhone,
+      hasPassword: false, // New field to track if user has password
       createdAt: Timestamp.now()
     };
     
@@ -250,6 +322,112 @@ export const registerUserWithPhone = async (phoneNumber: string, displayName: st
     return user;
   } catch (error) {
     console.error('Error registering user with phone:', error);
+    throw error;
+  }
+};
+
+// New function to check if phone user exists and has password
+export const checkPhoneUserExists = async (phoneNumber: string): Promise<{ exists: boolean; hasPassword: boolean; uid?: string }> => {
+  try {
+    const usersRef = collection(db, 'users');
+    const q = query(usersRef, where('phone', '==', phoneNumber));
+    const querySnapshot = await getDocs(q);
+    
+    if (querySnapshot.empty) {
+      return { exists: false, hasPassword: false };
+    }
+    
+    const userDoc = querySnapshot.docs[0];
+    const userData = userDoc.data();
+    
+    return {
+      exists: true,
+      hasPassword: userData.hasPassword || false,
+      uid: userDoc.id
+    };
+  } catch (error) {
+    console.error('Error checking phone user:', error);
+    return { exists: false, hasPassword: false };
+  }
+};
+
+// New function to login with phone + password (no SMS)
+export const loginWithPhoneAndPassword = async (phoneNumber: string, password: string) => {
+  try {
+    // First check if user exists with this phone
+    const userCheck = await checkPhoneUserExists(phoneNumber);
+    if (!userCheck.exists || !userCheck.hasPassword) {
+      throw new Error('משתמש לא נמצא או לא הוגדרה סיסמה');
+    }
+
+    // Get user profile
+    const userProfile = await getUserProfile(userCheck.uid!);
+    if (!userProfile) {
+      throw new Error('פרופיל משתמש לא נמצא');
+    }
+
+    // If user has email, use email+password login
+    if (userProfile.email) {
+      const userCredential = await signInWithEmailAndPassword(auth, userProfile.email, password);
+      return userCredential.user;
+    } else {
+      // For phone-only users, create a temporary email and login
+      const tempEmail = `${phoneNumber.replace(/[^0-9]/g, '')}@temp.turgi.com`;
+      try {
+        // First try to login with temp email
+        const userCredential = await signInWithEmailAndPassword(auth, tempEmail, password);
+        return userCredential.user;
+      } catch (error) {
+        // If temp email doesn't exist, create user with temp email
+        const userCredential = await createUserWithEmailAndPassword(auth, tempEmail, password);
+        
+        // Update the user profile with the new auth UID
+        await updateDoc(doc(db, 'users', userCredential.user.uid), {
+          email: tempEmail,
+        });
+        
+        return userCredential.user;
+      }
+    }
+  } catch (error) {
+    console.error('Error login with phone and password:', error);
+    throw error;
+  }
+};
+
+// New function to set password for phone user
+export const setPasswordForPhoneUser = async (phoneNumber: string, password: string) => {
+  try {
+    const userCheck = await checkPhoneUserExists(phoneNumber);
+    if (!userCheck.exists) {
+      throw new Error('משתמש לא נמצא');
+    }
+
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      throw new Error('משתמש לא מחובר');
+    }
+
+    // Create email from phone number for Firebase Auth
+    const email = `${phoneNumber.replace(/[^0-9]/g, '')}@phonesign.local`;
+    
+    // Link email/password credential to existing phone user
+    const emailCredential = EmailAuthProvider.credential(email, password);
+    await linkWithCredential(currentUser, emailCredential);
+    
+    // Update user profile
+    const userProfile = await getUserProfile(userCheck.uid!);
+    if (userProfile) {
+      await updateUserProfile(userCheck.uid!, {
+        ...userProfile,
+        email: email,
+        hasPassword: true
+      });
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error setting password for phone user:', error);
     throw error;
   }
 };
@@ -311,32 +489,48 @@ export const getAllUsers = async (): Promise<UserProfile[]> => {
 };
 
 // Barbers functions
-export const getBarbers = async (useCache: boolean = true): Promise<Barber[]> => {
+export const getBarbers = async (useCache: boolean = false): Promise<Barber[]> => {
   try {
-    // Try cache first if enabled
-    if (useCache) {
-      const cached = await CacheUtils.getBarbers();
-      if (cached) {
-        console.log('📦 Barbers loaded from cache');
-        return cached;
-      }
-    }
+    // DISABLE cache for barbers to ensure fresh data
+    console.log('🔄 Loading fresh barber data (no cache)');
 
     const querySnapshot = await getDocs(collection(db, 'barbers'));
     const barbers: Barber[] = [];
     
     querySnapshot.forEach((doc) => {
-      barbers.push({
-        id: doc.id,
-        ...doc.data()
-      } as Barber);
+      const barberData = { id: doc.id, ...doc.data() } as Barber;
+      // ONLY show Ron Turgeman - be very strict
+      const name = barberData.name?.toLowerCase() || '';
+      if (name.includes('רון') || 
+          name.includes('ron') || 
+          name.includes('תורג') || 
+          name.includes('turg') ||
+          barberData.id === 'ron-turgeman' ||
+          barberData.name === 'רון תורג׳מן' ||
+          barberData.name === 'Ron Turgeman') {
+        barbers.push(barberData);
+      }
     });
-    
-    // Cache the results for 60 minutes
-    if (useCache) {
-      await CacheUtils.setBarbers(barbers, 60);
-      console.log('💾 Barbers cached for 60 minutes');
+
+    // If no Ron found, create a default one
+    if (barbers.length === 0) {
+      console.log('🔧 No Ron found, creating default barber');
+      const defaultRon: Barber = {
+        id: 'ron-turgeman-default',
+        name: 'רון תורג׳מן',
+        image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&h=300&fit=crop&crop=face',
+        specialties: ['תספורת גברים', 'עיצוב זקן', 'תספורת ילדים'],
+        experience: '10+ שנות ניסיון',
+        rating: 5,
+        available: true,
+        pricing: {},
+        phone: '+972542280222',
+        photoUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&h=300&fit=crop&crop=face'
+      };
+      barbers.push(defaultRon);
     }
+    
+    console.log('✅ Returning', barbers.length, 'barber(s): Ron Turgeman only');
     
     return barbers;
   } catch (error) {
@@ -1149,18 +1343,60 @@ export const getShopItems = async (): Promise<ShopItem[]> => {
 
 export const getActiveShopItems = async (): Promise<ShopItem[]> => {
   try {
-    const q = query(
+    console.log('🛍️ Loading shop items...');
+    
+    // First try with just the isActive filter
+    let q = query(
       collection(db, 'shopItems'),
-      where('isActive', '==', true),
-      orderBy('createdAt', 'desc')
+      where('isActive', '==', true)
     );
-    const snapshot = await getDocs(q);
-    const items = snapshot.docs.map(doc => doc.data() as ShopItem);
+    
+    let snapshot = await getDocs(q);
+    let items = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    } as ShopItem));
+    
+    // Sort manually by createdAt if available
+    items.sort((a, b) => {
+      if (a.createdAt && b.createdAt) {
+        return b.createdAt.toDate().getTime() - a.createdAt.toDate().getTime();
+      }
+      return 0;
+    });
+    
     console.log('🛍️ Loaded', items.length, 'active shop items');
+    
+    // If no items found, try loading all items
+    if (items.length === 0) {
+      console.log('🔍 No active items found, loading all shop items...');
+      const allSnapshot = await getDocs(collection(db, 'shopItems'));
+      const allItems = allSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as ShopItem));
+      console.log('📋 Found', allItems.length, 'total shop items');
+      return allItems;
+    }
+    
     return items;
   } catch (error) {
-    console.error('❌ Error loading active shop items:', error);
-    return [];
+    console.error('❌ Error loading shop items:', error);
+    console.log('🔄 Fallback: Loading all shop items...');
+    
+    // Fallback - load all items without filters
+    try {
+      const allSnapshot = await getDocs(collection(db, 'shopItems'));
+      const allItems = allSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as ShopItem));
+      console.log('✅ Fallback loaded', allItems.length, 'shop items');
+      return allItems;
+    } catch (fallbackError) {
+      console.error('❌ Fallback also failed:', fallbackError);
+      return [];
+    }
   }
 };
 
