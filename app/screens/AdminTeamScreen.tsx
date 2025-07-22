@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
     Alert,
     Image,
@@ -36,6 +37,7 @@ interface AdminTeamScreenProps {
 }
 
 const AdminTeamScreen: React.FC<AdminTeamScreenProps> = ({ onNavigate, onBack }) => {
+  const { t } = useTranslation();
   const [barbers, setBarbers] = useState<Barber[]>([]);
   const [treatments, setTreatments] = useState<Treatment[]>([]);
   const [workerImages, setWorkerImages] = useState<string[]>([]);
@@ -356,7 +358,7 @@ const AdminTeamScreen: React.FC<AdminTeamScreenProps> = ({ onNavigate, onBack })
   return (
     <SafeAreaView style={styles.container}>
       <TopNav 
-        title="ניהול הצוות"
+        title={t('team.admin.title')}
         onBellPress={() => {}}
         onMenuPress={() => {}}
         showBackButton={true}
@@ -368,23 +370,23 @@ const AdminTeamScreen: React.FC<AdminTeamScreenProps> = ({ onNavigate, onBack })
         <View style={styles.header}>
           <TouchableOpacity style={styles.addButton} onPress={openAddModal}>
             <Ionicons name="add" size={24} color="#fff" />
-            <Text style={styles.addButtonText}>הוסף ספר חדש</Text>
+            <Text style={styles.addButtonText}>{t('team.admin.add_barber')}</Text>
           </TouchableOpacity>
         </View>
 
         {/* Barbers List */}
         {loading ? (
           <View style={styles.loadingContainer}>
-            <Text style={styles.loadingText}>טוען ספרים...</Text>
+            <Text style={styles.loadingText}>{t('team.admin.loading_barbers') || ''}</Text>
           </View>
         ) : (
           <ScrollView style={styles.barbersList}>
             {barbers.length === 0 ? (
               <View style={styles.emptyState}>
                 <Ionicons name="people-outline" size={64} color="#ccc" />
-                <Text style={styles.emptyStateText}>אין ספרים במערכת</Text>
+                <Text style={styles.emptyStateText}>{t('team.admin.no_barbers') || ''}</Text>
                 <TouchableOpacity style={styles.emptyAddButton} onPress={openAddModal}>
-                  <Text style={styles.emptyAddButtonText}>הוסף ספר ראשון</Text>
+                  <Text style={styles.emptyAddButtonText}>{t('team.admin.add_first_barber') || ''}</Text>
                 </TouchableOpacity>
               </View>
             ) : (
@@ -503,7 +505,7 @@ const AdminTeamScreen: React.FC<AdminTeamScreenProps> = ({ onNavigate, onBack })
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
-                {editingBarber ? 'עריכת ספר' : 'הוספת ספר חדש'}
+                {editingBarber ? t('team.admin.edit_barber') || '' : t('team.admin.add_barber') || ''}
               </Text>
               <TouchableOpacity onPress={() => setModalVisible(false)}>
                 <Ionicons name="close" size={24} color="#666" />
@@ -512,60 +514,60 @@ const AdminTeamScreen: React.FC<AdminTeamScreenProps> = ({ onNavigate, onBack })
 
             <ScrollView style={styles.modalBody}>
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>שם הספר</Text>
+                <Text style={styles.inputLabel}>{t('team.admin.barber_name')}</Text>
                 <TextInput
                   style={styles.textInput}
                   value={formData.name}
                   onChangeText={(text) => setFormData({ ...formData, name: text })}
-                  placeholder="לדוגמה: דוד כהן"
+                  placeholder={t('team.admin.barber_name_placeholder')}
                   textAlign="right"
                 />
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>ניסיון</Text>
+                <Text style={styles.inputLabel}>{t('team.admin.experience')}</Text>
                 <TextInput
                   style={styles.textInput}
                   value={formData.experience}
                   onChangeText={(text) => setFormData({ ...formData, experience: text })}
-                  placeholder="לדוגמה: 5 שנות ניסיון"
+                  placeholder={t('team.admin.experience_placeholder')}
                   textAlign="right"
                 />
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>מספר טלפון</Text>
+                <Text style={styles.inputLabel}>{t('team.admin.phone')}</Text>
                 <TextInput
                   style={styles.textInput}
                   value={formData.phone}
                   onChangeText={(text) => setFormData({ ...formData, phone: text })}
-                  placeholder="לדוגמה: 0542280222"
+                  placeholder={t('team.admin.phone_placeholder')}
                   keyboardType="phone-pad"
                   textAlign="right"
                 />
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>דירוג (1-5)</Text>
+                <Text style={styles.inputLabel}>{t('team.admin.rating')}</Text>
                 <TextInput
                   style={styles.textInput}
                   value={formData.rating}
                   onChangeText={(text) => setFormData({ ...formData, rating: text })}
-                  placeholder="5"
+                  placeholder={t('team.admin.rating_placeholder')}
                   keyboardType="numeric"
                   textAlign="right"
                 />
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>התמחויות</Text>
+                <Text style={styles.inputLabel}>{t('team.admin.specialties')}</Text>
                 {formData.specialties.map((specialty, index) => (
                   <View key={index} style={styles.specialtyInput}>
                     <TextInput
                       style={[styles.textInput, styles.specialtyTextInput]}
                       value={specialty}
                       onChangeText={(text) => updateSpecialty(index, text)}
-                      placeholder="לדוגמה: תספורת קלאסית"
+                      placeholder={t('team.admin.specialty_placeholder')}
                       textAlign="right"
                     />
                     {formData.specialties.length > 1 && (
@@ -580,12 +582,12 @@ const AdminTeamScreen: React.FC<AdminTeamScreenProps> = ({ onNavigate, onBack })
                 ))}
                 <TouchableOpacity style={styles.addSpecialtyButton} onPress={addSpecialty}>
                   <Ionicons name="add" size={20} color="#007bff" />
-                  <Text style={styles.addSpecialtyText}>הוסף התמחות</Text>
+                  <Text style={styles.addSpecialtyText}>{t('team.admin.add_specialty')}</Text>
                 </TouchableOpacity>
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>תמונה</Text>
+                <Text style={styles.inputLabel}>{t('team.admin.image')}</Text>
                 
                 {/* Upload from device button */}
                 <TouchableOpacity
@@ -593,12 +595,12 @@ const AdminTeamScreen: React.FC<AdminTeamScreenProps> = ({ onNavigate, onBack })
                   onPress={uploadWorkerImageFromDevice}
                 >
                   <Ionicons name="cloud-upload" size={20} color="#007bff" />
-                  <Text style={styles.uploadButtonText}>העלה תמונה מהמכשיר</Text>
+                  <Text style={styles.uploadButtonText}>{t('team.admin.upload_image')}</Text>
                 </TouchableOpacity>
                 
                 {workerImages.length > 0 && (
                   <View>
-                    <Text style={styles.orText}>או בחר מתמונות קיימות</Text>
+                    <Text style={styles.orText}>{t('team.admin.or_choose_existing')}</Text>
                     <View style={styles.imageSelector}>
                       <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                         {workerImages.map((imageUrl, index) => (
@@ -617,7 +619,7 @@ const AdminTeamScreen: React.FC<AdminTeamScreenProps> = ({ onNavigate, onBack })
                           </TouchableOpacity>
                         ))}
                       </ScrollView>
-                      <Text style={styles.imageHint}>בחר תמונה מ-Firebase Storage</Text>
+                      <Text style={styles.imageHint}>{t('team.admin.choose_from_storage')}</Text>
                     </View>
                   </View>
                 )}
@@ -625,7 +627,7 @@ const AdminTeamScreen: React.FC<AdminTeamScreenProps> = ({ onNavigate, onBack })
                 {/* Current image preview */}
                 {formData.image && (
                   <View style={styles.currentImageContainer}>
-                    <Text style={styles.currentImageLabel}>תמונה נבחרת:</Text>
+                    <Text style={styles.currentImageLabel}>{t('team.admin.selected_image')}</Text>
                     <Image
                       source={{ uri: formData.image }}
                       style={styles.currentImagePreview}
@@ -635,15 +637,13 @@ const AdminTeamScreen: React.FC<AdminTeamScreenProps> = ({ onNavigate, onBack })
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>מחירים מותאמים אישית</Text>
-                <Text style={styles.pricingHint}>
-                  כאן תוכל להגדיר מחירים מיוחדים עבור הספר הזה. אם לא תגדיר מחיר, ישתמש במחיר הברירת מחדל של הטיפול.
-                </Text>
+                <Text style={styles.inputLabel}>{t('team.admin.custom_pricing')}</Text>
+                <Text style={styles.pricingHint}>{t('team.admin.custom_pricing_hint')}</Text>
                 {treatments.map((treatment) => (
                   <View key={treatment.id} style={styles.pricingRow}>
                     <View style={styles.pricingInfo}>
                       <Text style={styles.treatmentName}>{treatment.name}</Text>
-                      <Text style={styles.defaultPrice}>מחיר בסיס: ₪{treatment.price}</Text>
+                      <Text style={styles.defaultPrice}>{t('team.admin.base_price', { price: treatment.price })}</Text>
                     </View>
                     <TextInput
                       style={styles.priceInput}
@@ -671,7 +671,7 @@ const AdminTeamScreen: React.FC<AdminTeamScreenProps> = ({ onNavigate, onBack })
                   style={styles.availabilityToggle}
                   onPress={() => setFormData({ ...formData, available: !formData.available })}
                 >
-                  <Text style={styles.inputLabel}>זמין לתורים</Text>
+                  <Text style={styles.inputLabel}>{t('team.admin.available_for_appointments')}</Text>
                   <View style={[
                     styles.toggleSwitch,
                     formData.available ? styles.toggleOn : styles.toggleOff
@@ -690,14 +690,14 @@ const AdminTeamScreen: React.FC<AdminTeamScreenProps> = ({ onNavigate, onBack })
                 style={[styles.actionButton, styles.cancelButton]}
                 onPress={() => setModalVisible(false)}
               >
-                <Text style={styles.cancelButtonText}>ביטול</Text>
+                <Text style={styles.cancelButtonText}>{t('common.cancel')}</Text>
               </TouchableOpacity>
               
               <TouchableOpacity
                 style={[styles.actionButton, styles.saveButton]}
                 onPress={handleSave}
               >
-                <Text style={styles.saveButtonText}>שמור</Text>
+                <Text style={styles.saveButtonText}>{t('common.save')}</Text>
               </TouchableOpacity>
             </View>
           </View>

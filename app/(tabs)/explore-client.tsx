@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   Alert,
@@ -23,12 +24,45 @@ interface ShopScreenProps {
   onBack?: () => void;
 }
 
-const ShopScreen: React.FC<ShopScreenProps> = ({ onNavigate, onBack }) => {
+const ShopScreen: React.FC<ShopScreenProps> = ({ 
+  onNavigate, 
+  onBack
+}) => {
+  const router = useRouter();
   const [shopItems, setShopItems] = useState<ShopItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedItem, setSelectedItem] = useState<ShopItem | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+
+  // Safe navigation functions with fallbacks
+  const safeNavigate = (screen: string) => {
+    console.log('Navigate to:', screen);
+    try {
+      if (onNavigate && typeof onNavigate === 'function') {
+        onNavigate(screen);
+      } else {
+        router.replace('/(tabs)');
+      }
+    } catch (error) {
+      console.error('Navigation error:', error);
+      router.replace('/(tabs)');
+    }
+  };
+
+  const safeBack = () => {
+    console.log('Back pressed');
+    try {
+      if (onBack && typeof onBack === 'function') {
+        onBack();
+      } else {
+        router.replace('/(tabs)');
+      }
+    } catch (error) {
+      console.error('Back navigation error:', error);
+      router.replace('/(tabs)');
+    }
+  };
 
   useEffect(() => {
     loadShopItems();
@@ -37,10 +71,13 @@ const ShopScreen: React.FC<ShopScreenProps> = ({ onNavigate, onBack }) => {
   const loadShopItems = async () => {
     try {
       setLoading(true);
+      console.log('🛒 Loading shop items...');
       const items = await getActiveShopItems();
+      console.log('📦 Shop items loaded:', items.length);
+      console.log('🖼️ First item image URL:', items[0]?.imageUrl);
       setShopItems(items);
     } catch (error) {
-      console.error('Error loading shop items:', error);
+      console.error('❌ Error loading shop items:', error);
     } finally {
       setLoading(false);
     }
@@ -88,13 +125,7 @@ const ShopScreen: React.FC<ShopScreenProps> = ({ onNavigate, onBack }) => {
         onBellPress={() => {}}
         onMenuPress={() => {}}
         showBackButton={true}
-        onBackPress={onBack || (() => {
-          if (onNavigate) {
-            onNavigate('home');
-          } else {
-            console.log('No navigation function provided');
-          }
-        })}
+        onBackPress={safeBack}
       />
       
       <View style={styles.content}>
@@ -140,9 +171,17 @@ const ShopScreen: React.FC<ShopScreenProps> = ({ onNavigate, onBack }) => {
                   <TouchableOpacity
                     key={item.id}
                     style={styles.itemCard}
-                    onPress={() => openItemModal(item)}
+                    onPress={() => {
+                      console.log('🔥 Item clicked:', item.name);
+                      openItemModal(item);
+                    }}
                   >
-                    <Image source={{ uri: item.imageUrl }} style={styles.itemImage} />
+                    <Image 
+                      source={{ uri: item.imageUrl }} 
+                      style={styles.itemImage}
+                      onLoad={() => console.log('✅ Image loaded:', item.name)}
+                      onError={(error) => console.error('❌ Image load error:', item.name, error)}
+                    />
                     <View style={styles.itemInfo}>
                       <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
                       <Text style={styles.itemCategory}>{item.category}</Text>
