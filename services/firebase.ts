@@ -65,6 +65,8 @@ export interface Barber {
   available: boolean;
   pricing?: { [treatmentId: string]: number }; // Custom pricing per treatment
   phone?: string; // Phone number for contact
+  photoUrl?: string; // Photo URL for profile image
+  bio?: string; // Biography description
 }
 
 export interface Treatment {

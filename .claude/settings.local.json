@@ -10,7 +10,10 @@
       "Bash(npm run:*)",
       "Bash(find:*)",
       "Bash(eas whoami:*)",
-      "Bash(eas build:*)"
+      "Bash(eas build:*)",
+      "Bash(npx expo install:*)",
+      "Bash(grep:*)",
+      "Bash(npm uninstall:*)"
     ],
     "deny": []
   }

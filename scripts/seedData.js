@@ -29,27 +29,11 @@ const seedData = async () => {
       console.log('Adding barbers...');
       const barbers = [
       {
-        name: "אלי כהן",
-        experience: "8 שנות ניסיון",
-        rating: 4.8,
+        name: "Ron turgeman",
+        experience: "15 שנות ניסיון",
+        rating: 5.0,
         available: true,
-        specialties: ["תספורת קלאסית", "עיצוב זקן", "טיפוח שיער"],
-        image: ""
-      },
-      {
-        name: "דוד לוי",
-        experience: "5 שנות ניסיון",
-        rating: 4.6,
-        available: true,
-        specialties: ["תספורת מודרנית", "הדבקת שיער", "עיצוב גברי"],
-        image: ""
-      },
-      {
-        name: "יוסי אברהם",
-        experience: "10 שנות ניסיון",
-        rating: 4.9,
-        available: false,
-        specialties: ["תספורת מקצועית", "עיצוב זקן", "טיפוח פנים"],
+        specialties: ["תספורת מקצועית", "עיצוב זקן", "טיפוח גברי", "תספורת מודרנית"],
         image: ""
       }
     ];

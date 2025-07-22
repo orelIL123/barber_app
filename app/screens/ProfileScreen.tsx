@@ -1,6 +1,8 @@
 import { LinearGradient } from 'expo-linear-gradient';
+import { RecaptchaVerifier } from 'firebase/auth';
 import React, { useEffect, useState } from 'react';
 import {
+    ActivityIndicator,
     Alert,
     Dimensions,
     Image,
@@ -14,22 +16,19 @@ import {
 } from 'react-native';
 import {
     Appointment,
+    createUserProfileFromAuth,
     getUserAppointments,
     getUserProfile,
     loginUser,
     logoutUser,
-    makeUserAdmin,
     onAuthStateChange,
     registerUser,
+    registerUserWithPhone,
+    sendSMSVerification,
     updateUserProfile,
     UserProfile,
-    createUserProfileFromAuth,
-    sendSMSVerification,
-    verifySMSCode,
-    registerUserWithPhone,
-    loginWithPhone
+    verifySMSCode
 } from '../../services/firebase';
-import { RecaptchaVerifier } from 'firebase/auth';
 import { NeonButton } from '../components/NeonButton';
 import TopNav from '../components/TopNav';
 
@@ -87,9 +86,20 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate, onBack }) => 
     return unsubscribe;
   }, []);
 
+  // Utility: validate phone format (simple, Israeli +972-5X...)
+  const isValidPhone = (phone: string) => /^\+972-5\d{1}-\d{3}-\d{4}$/.test(phone.trim());
+
   const handleSendSMSVerification = async () => {
     if (!phone.trim()) {
       Alert.alert('שגיאה', 'נא להזין מספר טלפון');
+      return;
+    }
+    if (!displayName.trim()) {
+      Alert.alert('שגיאה', 'נא להזין שם מלא');
+      return;
+    }
+    if (!isValidPhone(phone)) {
+      Alert.alert('שגיאה', 'נא להזין מספר טלפון בפורמט +972-5X-XXX-XXXX');
       return;
     }
     
@@ -102,7 +112,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate, onBack }) => 
       Alert.alert('הצלחה', 'קוד אימות נשלח לטלפון שלך');
     } catch (error: any) {
       console.error('Error sending SMS:', error);
-      Alert.alert('שגיאה', 'לא ניתן לשלוח קוד אימות. נסה שוב.');
+      Alert.alert('שגיאה', 'לא ניתן לשלוח קוד אימות. ודא שהמספר תקין ונסה שוב.');
     } finally {
       setLoading(false);
     }
@@ -183,6 +193,10 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate, onBack }) => 
     if (authMethod === 'phone') {
       if (!phone.trim()) {
         Alert.alert('שגיאה', 'נא להזין מספר טלפון');
+        return;
+      }
+      if (!isValidPhone(phone)) {
+        Alert.alert('שגיאה', 'נא להזין מספר טלפון בפורמט +972-5X-XXX-XXXX');
         return;
       }
       handleSendSMSVerification();
@@ -401,6 +415,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate, onBack }) => 
                       title={authMethod === 'phone' ? 'שלח קוד אימות' : 'התחברות'} 
                       onPress={handleLogin} 
                       disabled={loading} 
+                      {...(loading ? { textStyle: { opacity: 0.5 }, children: <ActivityIndicator color="#fff" /> } : {})}
                     />
                   </>
                 ) : (
@@ -420,6 +435,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate, onBack }) => 
                       title="אמת קוד" 
                       onPress={handleVerifyCode} 
                       disabled={loading} 
+                      {...(loading ? { textStyle: { opacity: 0.5 }, children: <ActivityIndicator color="#fff" /> } : {})}
                     />
                     <TouchableOpacity 
                       style={styles.backButton} 
@@ -520,6 +536,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate, onBack }) => 
                       title={authMethod === 'phone' ? 'שלח קוד אימות' : 'הרשמה'} 
                       onPress={handleRegister} 
                       disabled={loading} 
+                      {...(loading ? { textStyle: { opacity: 0.5 }, children: <ActivityIndicator color="#fff" /> } : {})}
                     />
                   </>
                 ) : (
@@ -539,6 +556,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate, onBack }) => 
                       title="אמת קוד והירשם" 
                       onPress={handleVerifyCode} 
                       disabled={loading} 
+                      {...(loading ? { textStyle: { opacity: 0.5 }, children: <ActivityIndicator color="#fff" /> } : {})}
                     />
                     <TouchableOpacity 
                       style={styles.backButton} 

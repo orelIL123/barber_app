@@ -227,6 +227,7 @@ const AdminAppointmentsScreen: React.FC<AdminAppointmentsScreenProps> = ({ onNav
       const [hours, minutes] = selectedTime.split(':').map(Number);
       appointmentDateTime.setHours(hours, minutes, 0, 0);
 
+      const selectedTreatmentObj = treatments.find(t => t.id === selectedTreatment);
       const appointmentData = {
         userId: inputMethod === 'manual' ? 'manual-client' : selectedUser,
         barberId: selectedBarber,
@@ -234,6 +235,7 @@ const AdminAppointmentsScreen: React.FC<AdminAppointmentsScreenProps> = ({ onNav
         date: Timestamp.fromDate(appointmentDateTime),
         status: 'confirmed' as const, // Changed from 'pending' to 'confirmed'
         notes: appointmentNotes,
+        duration: selectedTreatmentObj?.duration || 60, // Default to 60 minutes if not found
         // Add manual client info if using manual input
         ...(inputMethod === 'manual' && {
           clientName: manualClientName.trim(),

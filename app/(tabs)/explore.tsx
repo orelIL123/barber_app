@@ -1,14 +1,17 @@
 import React, { useEffect, useState } from 'react';
-import { getCurrentUser } from '../../services/firebase';
+import { getCurrentUser, getUserProfile } from '../../services/firebase';
 import AdminGalleryScreen from '../screens/AdminGalleryScreen';
-import ShopScreen from './explore-client'; // (create this file for the client shop UI, move current code there)
+import ShopScreen from './explore-client';
 
 export default function ExploreTab() {
   const [isAdmin, setIsAdmin] = useState(false);
   useEffect(() => {
     (async () => {
       const user = getCurrentUser();
-      setIsAdmin(user?.type === 'admin');
+      if (user) {
+        const profile = await getUserProfile(user.uid);
+        setIsAdmin(profile?.isAdmin === true);
+      }
     })();
   }, []);
 

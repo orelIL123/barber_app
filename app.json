@@ -10,8 +10,11 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.barberapp.app",
-      "googleServicesFile": "./app/GoogleService-Info.plist"
+      "bundleIdentifier": "com.orelaharon.rontugemanbarber",
+      "googleServicesFile": "./app/GoogleService-Info.plist",
+      "config": {
+        "usesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -19,7 +22,7 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.barberapp.app",
+      "package": "com.orelaharon.rontugemanbarber",
       "googleServicesFile": "./app/google-services.json"
     },
     "web": {
@@ -39,7 +42,6 @@
         }
       ],
       "expo-notifications",
-      "@react-native-firebase/app",
       "expo-font"
     ],
     "experiments": {

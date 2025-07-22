@@ -2,29 +2,28 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import React, { useEffect, useState } from 'react';
 import {
-  Alert,
-  Dimensions,
-  Image,
-  Linking,
-  Modal,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    Alert,
+    Image,
+    Linking,
+    Modal,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
-import { 
-  Barber, 
-  getBarbers, 
-  addBarberProfile, 
-  updateBarberProfile, 
-  deleteBarberProfile,
-  getTreatments,
-  Treatment,
-  getStorageImages,
-  uploadImageToStorage
+import {
+    addBarberProfile,
+    Barber,
+    deleteBarberProfile,
+    getBarbers,
+    getStorageImages,
+    getTreatments,
+    Treatment,
+    updateBarberProfile,
+    uploadImageToStorage
 } from '../../services/firebase';
 import ToastMessage from '../components/ToastMessage';
 import TopNav from '../components/TopNav';
@@ -535,7 +534,7 @@ const AdminTeamScreen: React.FC<AdminTeamScreenProps> = ({ onNavigate, onBack })
                   style={styles.textInput}
                   value={formData.phone}
                   onChangeText={(text) => setFormData({ ...formData, phone: text })}
-                  placeholder="לדוגמה: 0501234567"
+                  placeholder="לדוגמה: 0542280222"
                   keyboardType="phone-pad"
                   textAlign="right"
                 />

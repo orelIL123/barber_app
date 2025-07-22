@@ -4,26 +4,26 @@ import { collection, doc, getDoc, getDocs, getFirestore, query, where } from 'fi
 import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  Alert,
-  Animated,
-  Dimensions,
-  Image,
-  ImageBackground,
-  InteractionManager,
-  Linking,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Alert,
+    Animated,
+    Dimensions,
+    Image,
+    ImageBackground,
+    InteractionManager,
+    Linking,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import NotificationPanel from '../components/NotificationPanel';
 import SideMenu from '../components/SideMenu';
 import TermsModal from '../components/TermsModal';
 import TopNav from '../components/TopNav';
 
-const { width, height } = Dimensions.get('window');
+const { height } = Dimensions.get('window');
 
 interface HomeScreenProps {
   onNavigate: (screen: string) => void;
@@ -60,7 +60,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
   const [loading, setLoading] = useState(true);
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [notificationPanelVisible, setNotificationPanelVisible] = useState(false);
-  const [galleryIndex, setGalleryIndex] = useState(0);
   const [showTerms, setShowTerms] = useState(false);
   const [settingsImages, setSettingsImages] = useState<{
     atmosphere: string;
@@ -78,14 +77,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
   const headerFade = useRef(new Animated.Value(0)).current;
   const ctaFade = useRef(new Animated.Value(0)).current;
   const cardsFade = useRef(new Animated.Value(0)).current;
-  const galleryScrollRef = useRef<ScrollView>(null);
   
   // 3D Carousel refs
   const carousel3DRef = useRef<ScrollView>(null);
   const cardWidth = 140;
-  const cardHeight = 200;
   const cardSpacing = 4;
-  const centerOffset = width / 2 - cardWidth / 2;
   const scrollX = useRef(new Animated.Value(0)).current;
   
   // Get original images array
@@ -408,13 +404,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
   };
 
   const handlePhoneCall = () => {
-    Linking.openURL('tel:+972501234567').catch(() => {
+    Linking.openURL('tel:+972542280222').catch(() => {
       Alert.alert(t('common.error'), t('errors.phone_error'));
     });
   };
 
   const handleWhatsApp = () => {
-    Linking.openURL('https://wa.me/972501234567').catch(() => {
+    Linking.openURL('https://wa.me/972542280222').catch(() => {
       Alert.alert(t('common.error'), t('errors.whatsapp_error'));
     });
   };
