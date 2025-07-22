@@ -265,13 +265,7 @@ function HomeScreen({ onNavigate }: HomeScreenProps) {
           const settingsData = settingsDocSnap.data();
           atmosphereImage = settingsData.atmosphereImage || '';
           aboutUsImage = settingsData.aboutUsImage || '';
-          console.log('📁 Settings document contains:', {
-            atmosphereImage: atmosphereImage ? '✅ Found' : '❌ Not found',
-            aboutUsImage: aboutUsImage ? '✅ Found' : '❌ Not found',
-            allData: settingsData
-          });
         } else {
-          console.log('📁 No settings/images document found');
         }
         
         // Also check gallery collection for background/aboutus images
@@ -293,13 +287,6 @@ function HomeScreen({ onNavigate }: HomeScreenProps) {
           gallery: galleryImages,
         });
         
-        console.log('✅ Loaded Firebase images:', {
-          atmosphere: atmosphereImage ? '✅ Found' : '❌ Not found',
-          aboutUs: aboutUsImage ? '✅ Found' : '❌ Not found', 
-          galleryCount: galleryImages.length,
-          galleryImages: galleryImages.slice(0, 2) // Show first 2 URLs
-        });
-
         // Check if we have placeholder images
         const hasPlaceholders = galleryImages.some(url => 
           url && (url.includes('placeholder') || url.includes('via.placeholder'))
@@ -482,10 +469,12 @@ function HomeScreen({ onNavigate }: HomeScreenProps) {
       case 'instagram':
         url = 'https://www.instagram.com/turgibarber';
         break;
+      case 'ronturgeman':
+        url = 'https://www.instagram.com/ronturgeman_17/';
+        break;
       default:
         return;
     }
-    
     Linking.openURL(url).catch(() => {
       Alert.alert(t('common.error'), t('errors.link_error'));
     });
@@ -682,6 +671,10 @@ function HomeScreen({ onNavigate }: HomeScreenProps) {
               <TouchableOpacity onPress={() => handleSocialMedia('instagram')} style={styles.socialButton}>
                 <Ionicons name="logo-instagram" size={28} color="#e4405f" />
               </TouchableOpacity>
+              <TouchableOpacity onPress={() => handleSocialMedia('ronturgeman')} style={styles.socialButton}>
+                <Ionicons name="logo-instagram" size={28} color="#e4405f" />
+                <Text style={{fontSize:12, color:'#e4405f', marginTop:2}}>@ronturgeman_17</Text>
+              </TouchableOpacity>
             </View>
           </Animated.View>
 
@@ -703,7 +696,6 @@ function HomeScreen({ onNavigate }: HomeScreenProps) {
         visible={sideMenuVisible}
         onClose={() => setSideMenuVisible(false)}
         onNavigate={(screen) => {
-          console.log('HomeScreen onNavigate called with:', screen);
           onNavigate(screen);
         }}
         onNotificationPress={() => setNotificationPanelVisible(true)}
