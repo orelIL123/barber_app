@@ -13,7 +13,9 @@
       "Bash(eas build:*)",
       "Bash(npx expo install:*)",
       "Bash(grep:*)",
-      "Bash(npm uninstall:*)"
+      "Bash(npm uninstall:*)",
+      "Bash(git push:*)",
+      "Bash(npx expo:*)"
     ],
     "deny": []
   }

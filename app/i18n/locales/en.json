@@ -199,5 +199,29 @@
     "waze_error": "Cannot open Waze",
     "link_error": "Cannot open link",
     "load_data_error": "Cannot load data"
+  },
+  "terms": {
+    "title": "Terms of Use – ron turgeman",
+    "section1": "Welcome to the appointment management app of ron turgeman. By using the app, you fully agree to these terms.",
+    "heading1": "1. General",
+    "section2": "The terms are written in masculine form but apply to everyone.\nUsing the app (from any device) constitutes agreement to these terms.\nIf you do not agree – please refrain from using.",
+    "heading2": "2. About the App",
+    "section3": "The app is used for managing and scheduling appointments for businesses. It is operated and maintained independently by ron turgeman.",
+    "heading3": "3. Registration and Use",
+    "section4": "To use the app, you will be required to provide details such as name, phone, and/or email.\nThe information you provide will be kept securely and will not be shared with third parties, except for operational needs.\nProviding false information is prohibited and may result in blocking your use.",
+    "heading4": "4. User Responsibility",
+    "section5": "Any action you take in the app is your sole responsibility.\nDo not use the app for illegal or harmful activities.\nDo not share your login details with others.",
+    "heading5": "5. Limitation of Liability",
+    "section6": "The app is provided as-is.\nThere may be malfunctions or limited availability. ron turgeman is not responsible for any direct or indirect damage.\nTransfer of usage rights is not allowed without prior approval.",
+    "heading6": "6. Privacy and Security",
+    "section7": "Data is stored on secure servers.\nMeasures are taken to prevent unauthorized access, but there is no full guarantee against failures or breaches.",
+    "heading7": "7. Intellectual Property",
+    "section8": "All rights to the design, development, and content in the app belong to ron turgeman.\nCopying, duplicating, or using the content without written permission is prohibited.",
+    "heading8": "8. Communication and Marketing",
+    "section9": "You may receive messages regarding the service. You can remove yourself from the mailing list at any time.",
+    "heading9": "9. Changes to Terms",
+    "section10": "ron turgeman reserves the right to update the terms of use without prior notice.",
+    "heading10": "10. Contact",
+    "section10": "For questions or inquiries:\n✉️ orel895@gmail.com\n�� 052-398-5505"
   }
 }

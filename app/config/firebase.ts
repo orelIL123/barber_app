@@ -5,14 +5,21 @@ import { getStorage } from 'firebase/storage';
 
 // Your Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyBiDFQNbnExTE03YS_6xoNE6_RrX4HBN4Q",
-  authDomain: "barber-app-template.firebaseapp.com",
-  projectId: "barber-app-template",
-  storageBucket: "barber-app-template.firebasestorage.app",
-  messagingSenderId: "246646930767",
-  appId: "1:246646930767:web:d1bdd3b156eda443f2193a",
-  measurementId: "G-S6VSPNP5LH"
+  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY!,
+  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN!,
+  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID!,
+  storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET!,
+  messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID!,
+  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID!,
+  measurementId: process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID!,
 };
+
+// בדיקת משתני סביבה
+Object.entries(firebaseConfig).forEach(([key, value]) => {
+  if (!value) {
+    throw new Error(`Missing Firebase env variable: ${key}`);
+  }
+});
 
 // Initialize Firebase
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();

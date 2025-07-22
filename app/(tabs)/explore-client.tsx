@@ -70,7 +70,7 @@ const ShopScreen: React.FC<ShopScreenProps> = ({ onNavigate, onBack }) => {
 
   const handleOrderItem = () => {
     if (selectedItem) {
-      const message = `היי רון! 👋\nאני מעוניין להזמין את ${selectedItem.name} במחיר ${selectedItem.price}₪\n\nתודה!`;
+      const message = `שלום רון! 👋\n\nאני מעוניין/ת לרכוש את המוצר הבא:\n📦 ${selectedItem.name}\n💰 מחיר: ${selectedItem.price}₪\n\n${selectedItem.description ? `📝 תיאור: ${selectedItem.description}\n\n` : ''}אשמח לפרטים נוספים.\nתודה!`;
       const encodedMessage = encodeURIComponent(message);
       const whatsappUrl = `https://wa.me/972542280222?text=${encodedMessage}`;
       

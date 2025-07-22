@@ -1,4 +1,4 @@
-import { FirebaseRecaptchaVerifierModal } from 'expo-firebase-recaptcha';
+// Recaptcha removed - using ProfileScreen for auth instead
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ConfirmationResult, createUserWithEmailAndPassword, onAuthStateChanged, signInWithEmailAndPassword, signInWithPhoneNumber } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
@@ -17,7 +17,7 @@ export default function AuthPhoneScreen() {
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [authMethod, setAuthMethod] = useState<'phone' | 'email'>('phone');
   const router = useRouter();
-  const recaptchaVerifier = useRef<FirebaseRecaptchaVerifierModal>(null);
+  // const recaptchaVerifier = useRef<FirebaseRecaptchaVerifierModal>(null);
   const { mode } = useLocalSearchParams<{ mode?: string }>();
   const isRegister = mode === 'register';
 
@@ -73,7 +73,8 @@ export default function AuthPhoneScreen() {
     }
     setLoading(true);
     try {
-      const confirmation = await signInWithPhoneNumber(auth, formatted, recaptchaVerifier.current as any);
+      // const confirmation = await signInWithPhoneNumber(auth, formatted, recaptchaVerifier.current as any);
+      throw new Error('SMS auth temporarily disabled - use ProfileScreen instead');
       setConfirm(confirmation);
       Alert.alert('קוד נשלח!', 'הזן את הקוד שקיבלת ב-SMS');
     } catch (error: any) {
@@ -171,10 +172,10 @@ export default function AuthPhoneScreen() {
             <Text style={[styles.methodBtnText, authMethod === 'email' && styles.methodBtnTextActive]}>אימייל</Text>
           </TouchableOpacity>
         </View>
-        <FirebaseRecaptchaVerifierModal
+        {/* <FirebaseRecaptchaVerifierModal
           ref={recaptchaVerifier}
           firebaseConfig={auth.app.options}
-        />
+        /> */}
         <Text style={styles.title}>{isRegister ? (authMethod === 'email' ? 'הרשמה עם אימייל' : 'הרשמה עם SMS') : (authMethod === 'email' ? 'התחברות עם אימייל' : 'התחברות עם SMS')}</Text>
         {isRegister && (
           <TextInput
