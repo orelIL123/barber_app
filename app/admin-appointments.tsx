@@ -12,7 +12,7 @@ export default function AdminAppointmentsTab() {
         router.replace('/admin-home');
         break;
       case 'home':
-        router.replace('/');
+        router.replace('/(tabs)');
         break;
       default:
         router.replace('/admin-home');

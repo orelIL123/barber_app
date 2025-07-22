@@ -8,7 +8,7 @@ export default function ProfileTab() {
   const handleNavigate = (screen: string) => {
     switch (screen) {
       case 'home':
-        router.replace('/');
+        router.replace('/(tabs)');
         break;
       case 'team':
         router.replace('/team');
@@ -28,7 +28,7 @@ export default function ProfileTab() {
     if (router.canGoBack()) {
       router.back();
     } else {
-      router.replace('/');
+      router.replace('/(tabs)');
     }
   };
 

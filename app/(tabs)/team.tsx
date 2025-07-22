@@ -8,7 +8,7 @@ export default function TeamTab() {
   const handleNavigate = (screen: string, params?: any) => {
     switch (screen) {
       case 'home':
-        router.replace('/');
+        router.replace('/(tabs)');
         break;
       case 'profile':
         router.replace('/profile');
@@ -35,7 +35,7 @@ export default function TeamTab() {
     if (router.canGoBack()) {
       router.back();
     } else {
-      router.replace('/');
+      router.replace('/(tabs)');
     }
   };
 

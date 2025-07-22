@@ -9,7 +9,7 @@ export default function AdminHomeTab() {
     console.log('Admin Home navigating to:', screen);
     switch (screen) {
       case 'home':
-        router.replace('/');
+        router.replace('/(tabs)');
         break;
       case 'admin-appointments':
         router.replace('/admin-appointments');

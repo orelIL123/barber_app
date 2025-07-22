@@ -12,7 +12,7 @@ export default function AdminGalleryTab() {
         router.replace('/admin-home');
         break;
       case 'home':
-        router.replace('/');
+        router.replace('/(tabs)');
         break;
       default:
         router.replace('/admin-home');

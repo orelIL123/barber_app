@@ -8,7 +8,7 @@ export default function BookingTab() {
   const handleNavigate = (screen: string) => {
     switch (screen) {
       case 'home':
-        router.replace('/');
+        router.replace('/(tabs)');
         break;
       case 'profile':
         router.replace('/profile');
@@ -28,12 +28,12 @@ export default function BookingTab() {
     if (router.canGoBack()) {
       router.back();
     } else {
-      router.replace('/');
+      router.replace('/(tabs)');
     }
   };
 
   const handleClose = () => {
-    router.replace('/');
+    router.replace('/(tabs)');
   };
 
   return (

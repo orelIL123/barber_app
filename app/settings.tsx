@@ -9,7 +9,7 @@ export default function SettingsTab() {
     console.log('Settings navigating to:', screen);
     switch (screen) {
       case 'home':
-        router.replace('/');
+        router.replace('/(tabs)');
         break;
       case 'profile':
         router.replace('/profile');
@@ -29,7 +29,7 @@ export default function SettingsTab() {
   };
 
   const handleBack = () => {
-    router.replace('/');
+    router.replace('/(tabs)');
   };
 
   return (
