@@ -784,7 +784,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     justifyContent: 'flex-end',
-    marginTop: 60, // move image down so overlay covers less
+    marginTop: 90, // move image down so overlay covers less
   },
   overlay: {
     ...StyleSheet.absoluteFillObject,

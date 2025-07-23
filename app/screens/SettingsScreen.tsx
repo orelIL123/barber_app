@@ -27,6 +27,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onNavigate, onBack }) =
   const [appointmentReminders, setAppointmentReminders] = useState(true);
   const [generalNotifications, setGeneralNotifications] = useState(true);
   const [showTerms, setShowTerms] = useState(false);
+  const [fontSize, setFontSize] = useState(16);
 
   const languages = [
     { code: 'he', name: t('settings.hebrew'), flag: '🇮🇱' },
@@ -87,6 +88,10 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onNavigate, onBack }) =
     });
   };
 
+  const handleFontSizeChange = () => {
+    setFontSize(prevSize => prevSize === 16 ? 20 : 16);
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <TopNav 
@@ -114,13 +119,25 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onNavigate, onBack }) =
               >
                 <View style={styles.settingLeft}>
                   <Text style={styles.languageFlag}>{lang.flag}</Text>
-                  <Text style={styles.settingText}>{lang.name}</Text>
+                  <Text style={[styles.settingText, { fontSize }]}>{lang.name}</Text>
                 </View>
                 {i18n.language === lang.code && (
                   <Ionicons name="checkmark" size={20} color="#007bff" />
                 )}
               </TouchableOpacity>
             ))}
+          </View>
+
+          {/* Accessibility Settings */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>{t('settings.accessibility') || 'נגישות'}</Text>
+            <TouchableOpacity style={styles.settingItem} onPress={handleFontSizeChange}>
+              <View style={styles.settingLeft}>
+                <Ionicons name="eye" size={20} color="#666" style={styles.settingIcon} />
+                <Text style={[styles.settingText, { fontSize }]}>{t('settings.large_font') || 'הגדל גופן'}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#999" />
+            </TouchableOpacity>
           </View>
 
           {/* Notification Settings */}
@@ -130,7 +147,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onNavigate, onBack }) =
             <View style={styles.settingItem}>
               <View style={styles.settingLeft}>
                 <Ionicons name="notifications" size={20} color="#666" style={styles.settingIcon} />
-                <Text style={styles.settingText}>{t('settings.general_notifications')}</Text>
+                <Text style={[styles.settingText, { fontSize }]}>{t('settings.general_notifications')}</Text>
               </View>
               <Switch
                 value={notifications}
@@ -143,7 +160,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onNavigate, onBack }) =
             <View style={styles.settingItem}>
               <View style={styles.settingLeft}>
                 <Ionicons name="time" size={20} color="#666" style={styles.settingIcon} />
-                <Text style={styles.settingText}>{t('settings.appointment_reminders')}</Text>
+                <Text style={[styles.settingText, { fontSize }]}>{t('settings.appointment_reminders')}</Text>
               </View>
               <Switch
                 value={appointmentReminders}
@@ -156,7 +173,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onNavigate, onBack }) =
             <View style={styles.settingItem}>
               <View style={styles.settingLeft}>
                 <Ionicons name="megaphone" size={20} color="#666" style={styles.settingIcon} />
-                <Text style={styles.settingText}>{t('settings.barber_messages') || 'הודעות מהספר'}</Text>
+                <Text style={[styles.settingText, { fontSize }]}>{t('settings.barber_messages') || 'הודעות מהספר'}</Text>
               </View>
               <Switch
                 value={generalNotifications}
@@ -174,7 +191,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onNavigate, onBack }) =
             <TouchableOpacity style={styles.settingItem} onPress={handlePrivacyPolicy}>
               <View style={styles.settingLeft}>
                 <Ionicons name="shield-checkmark" size={20} color="#666" style={styles.settingIcon} />
-                <Text style={styles.settingText}>{t('settings.privacy_policy')}</Text>
+                <Text style={[styles.settingText, { fontSize }]}>{t('settings.privacy_policy')}</Text>
               </View>
               <Ionicons name="chevron-forward" size={20} color="#999" />
             </TouchableOpacity>
@@ -183,7 +200,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onNavigate, onBack }) =
               <View style={styles.settingItem}>
                 <View style={styles.settingLeft}>
                   <Ionicons name="document-text" size={20} color="#666" style={styles.settingIcon} />
-                  <Text style={styles.settingText}>{t('settings.terms_of_service')}</Text>
+                  <Text style={[styles.settingText, { fontSize }]}>{t('settings.terms_of_service')}</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={20} color="#999" />
               </View>
@@ -193,7 +210,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onNavigate, onBack }) =
             <TouchableOpacity style={styles.settingItem} onPress={handleSupport}>
               <View style={styles.settingLeft}>
                 <Ionicons name="help-circle" size={20} color="#666" style={styles.settingIcon} />
-                <Text style={styles.settingText}>{t('settings.support') || 'תמיכה'}</Text>
+                <Text style={[styles.settingText, { fontSize }]}>{t('settings.support') || 'תמיכה'}</Text>
               </View>
               <Ionicons name="chevron-forward" size={20} color="#999" />
             </TouchableOpacity>
@@ -206,7 +223,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onNavigate, onBack }) =
             <TouchableOpacity style={styles.dangerItem} onPress={handleDeleteAccount}>
               <View style={styles.settingLeft}>
                 <Ionicons name="trash" size={20} color="#F44336" style={styles.settingIcon} />
-                <Text style={styles.dangerText}>{t('settings.delete_account')}</Text>
+                <Text style={[styles.dangerText, { fontSize }]}>{t('settings.delete_account')}</Text>
               </View>
               <Ionicons name="chevron-forward" size={20} color="#F44336" />
             </TouchableOpacity>

@@ -16,13 +16,13 @@ export default function AuthChoiceScreen() {
       <Text style={styles.subtitle}>בחר פעולה:</Text>
       <TouchableOpacity
         style={styles.button}
-        onPress={() => router.replace({ pathname: '/screens/AuthPhoneScreen', params: { mode: 'login' } })}
+        onPress={() => router.replace('/profile')}
       >
         <Text style={styles.buttonText}>התחברות</Text>
       </TouchableOpacity>
       <TouchableOpacity
         style={[styles.button, { backgroundColor: '#6366f1' }]}
-        onPress={() => router.replace({ pathname: '/screens/AuthPhoneScreen', params: { mode: 'register' } })}
+        onPress={() => router.replace('/profile')}
       >
         <Text style={styles.buttonText}>הרשמה</Text>
       </TouchableOpacity>

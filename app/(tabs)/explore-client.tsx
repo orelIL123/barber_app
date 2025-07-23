@@ -186,7 +186,7 @@ const ShopScreen: React.FC<ShopScreenProps> = ({
                       <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
                       <Text style={styles.itemCategory}>{item.category}</Text>
                       <Text style={styles.itemPrice}>{item.price} ₪</Text>
-                      {item.stock && item.stock <= 5 && (
+                      {item.stock && Number(item.stock) <= 5 && Number(item.stock) > 0 && (
                         <Text style={styles.lowStockText}>נותרו {item.stock} יחידות</Text>
                       )}
                     </View>
@@ -230,7 +230,7 @@ const ShopScreen: React.FC<ShopScreenProps> = ({
                       </View>
                     )}
                     
-                    {selectedItem.stock && (
+                    {selectedItem.stock && Number(selectedItem.stock) > 0 && (
                       <Text style={styles.stockText}>
                         זמין במלאי: {selectedItem.stock} יחידות
                       </Text>

@@ -1,7 +1,7 @@
-import { Feather, Ionicons, MaterialIcons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRef } from "react";
-import { Animated, Dimensions, StyleSheet, TouchableOpacity, View } from "react-native";
+import { Animated, Dimensions, Linking, StyleSheet, TouchableOpacity, View } from "react-native";
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -25,6 +25,11 @@ export default function BottomNav({ onOrderPress, onTabPress, activeTab }: {
     
     // Call the original onOrderPress
     onOrderPress?.();
+  };
+
+  const handleCallPress = () => {
+    const phoneNumber = '+972542280222';
+    Linking.openURL(`tel:${phoneNumber}`);
   };
 
   const spin = spinValue.interpolate({
@@ -61,13 +66,13 @@ export default function BottomNav({ onOrderPress, onTabPress, activeTab }: {
         </View>
       </View>
       <View style={styles.navBar}>
-        {/* Left side - Home and Shop */}
+        {/* Left side - Home and Call */}
         <View style={styles.leftSide}>
           <TouchableOpacity style={styles.iconBtn} onPress={() => onTabPress && onTabPress('home')}>
             <Ionicons name="home" size={26} color={activeTab === 'home' ? "#3b82f6" : "#ccc"} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.iconBtn} onPress={() => onTabPress && onTabPress('shop')}>
-            <Feather name="shopping-bag" size={26} color={activeTab === 'shop' ? "#3b82f6" : "#ccc"} />
+          <TouchableOpacity style={styles.iconBtn} onPress={handleCallPress}>
+            <Ionicons name="call" size={26} color="#ccc" />
           </TouchableOpacity>
         </View>
 
@@ -89,10 +94,10 @@ export default function BottomNav({ onOrderPress, onTabPress, activeTab }: {
           </LinearGradient>
         </View>
 
-        {/* Right side - Profile and Team */}
+        {/* Right side - Settings and Profile */}
         <View style={styles.rightSide}>
-          <TouchableOpacity style={styles.iconBtn} onPress={() => onTabPress && onTabPress('team')}>
-            <MaterialIcons name="people-outline" size={26} color={activeTab === 'team' ? "#3b82f6" : "#ccc"} />
+          <TouchableOpacity style={styles.iconBtn} onPress={() => onTabPress && onTabPress('settings')}>
+            <Ionicons name="settings" size={26} color={activeTab === 'settings' ? "#3b82f6" : "#ccc"} />
           </TouchableOpacity>
           <TouchableOpacity style={styles.iconBtn} onPress={() => onTabPress && onTabPress('profile')}>
             <Ionicons name="person" size={26} color={activeTab === 'profile' ? "#3b82f6" : "#ccc"} />
@@ -136,16 +141,16 @@ const styles = StyleSheet.create({
   leftSide: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 30, // מרווח שווה בין האייקונים
-    flex: 1,
-    justifyContent: "flex-start",
+    gap: 30, // מרווח קבוע בין האייקונים
+    flex: 2, // תופס 2 יחידות (לשני אייקונים)
+    justifyContent: "center",
   },
   rightSide: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 30, // מרווח שווה בין האייקונים
-    flex: 1,
-    justifyContent: "flex-end",
+    gap: 30, // מרווח קבוע בין האייקונים
+    flex: 2, // תופס 2 יחידות (לשני אייקונים)
+    justifyContent: "center",
   },
   iconBtn: {
     alignItems: "center",
@@ -211,7 +216,7 @@ const styles = StyleSheet.create({
     opacity: 0.5, // lighter
   },
   centerFab: {
-    flex: 0,
+    flex: 1, // תופס 1 יחידה (לכפתור האמצע)
     alignItems: 'center',
     justifyContent: 'flex-end',
     marginBottom: 0,

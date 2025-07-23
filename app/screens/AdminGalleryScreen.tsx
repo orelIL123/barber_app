@@ -527,7 +527,7 @@ const AdminGalleryScreen: React.FC<AdminGalleryScreenProps> = ({ onNavigate, onB
           price: Number(shopForm.price),
           category: shopForm.category.trim(),
           imageUrl: shopForm.imageUrl,
-          stock: shopForm.stock ? Number(shopForm.stock) : undefined,
+          stock: shopForm.stock && !isNaN(Number(shopForm.stock)) ? Number(shopForm.stock) : 0,
           isActive: true
         });
         showToast('המוצר עודכן!');
@@ -538,7 +538,7 @@ const AdminGalleryScreen: React.FC<AdminGalleryScreenProps> = ({ onNavigate, onB
           price: Number(shopForm.price),
           category: shopForm.category.trim(),
           imageUrl: shopForm.imageUrl,
-          stock: shopForm.stock ? Number(shopForm.stock) : undefined,
+          stock: shopForm.stock && !isNaN(Number(shopForm.stock)) ? Number(shopForm.stock) : 0,
           isActive: true
         });
         showToast('המוצר נוסף!');
@@ -595,7 +595,7 @@ const AdminGalleryScreen: React.FC<AdminGalleryScreenProps> = ({ onNavigate, onB
         onBellPress={() => {}}
         onMenuPress={() => {}}
         showBackButton={true}
-        onBackPress={onBack || (() => onNavigate('admin-home'))}
+        onBackPress={onBack || (() => onNavigate && onNavigate('home'))}
       />
       
       <View style={styles.content}>
@@ -1030,7 +1030,7 @@ const AdminGalleryScreen: React.FC<AdminGalleryScreenProps> = ({ onNavigate, onB
                       price: String(prod.price), 
                       category: prod.category || '',
                       imageUrl: prod.imageUrl, 
-                      stock: prod.stock ? String(prod.stock) : '',
+                      stock: prod.stock ? String(prod.stock) : '0',
                       editingId: prod.id 
                     })} style={{marginHorizontal:4}}>
                       <Ionicons name="create-outline" size={24} color="#007bff" />
@@ -1048,7 +1048,7 @@ const AdminGalleryScreen: React.FC<AdminGalleryScreenProps> = ({ onNavigate, onB
                     <Text style={{color:'#aaa'}}>כל התמונות כבר משויכות למוצרים.</Text>
                   ) : (
                     shopStorageImages.filter(url => !shopProducts.some(prod => prod.imageUrl === url)).map((url, idx) => (
-                      <View key={url} style={{flexDirection:'row',alignItems:'center',backgroundColor:'#222',borderRadius:8,padding:8,marginBottom:8}}>
+                      <View key={`shop-storage-${idx}`} style={{flexDirection:'row',alignItems:'center',backgroundColor:'#222',borderRadius:8,padding:8,marginBottom:8}}>
                         <Image source={{ uri: url }} style={{width:60,height:60,borderRadius:8,marginRight:8}} />
                         <TouchableOpacity onPress={()=>setShopForm({ 
                           name: '', 

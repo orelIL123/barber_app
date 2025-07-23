@@ -1,9 +1,9 @@
-// Recaptcha removed - using ProfileScreen for auth instead
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ConfirmationResult, createUserWithEmailAndPassword, onAuthStateChanged, signInWithEmailAndPassword, signInWithPhoneNumber } from 'firebase/auth';
+import { ConfirmationResult, createUserWithEmailAndPassword, onAuthStateChanged, signInWithEmailAndPassword } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { sendSMSVerification, verifySMSCode } from '../../services/firebase';
 import { auth, collections, db } from '../config/firebase';
 
 export default function AuthPhoneScreen() {
@@ -17,7 +17,6 @@ export default function AuthPhoneScreen() {
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [authMethod, setAuthMethod] = useState<'phone' | 'email'>('phone');
   const router = useRouter();
-  // const recaptchaVerifier = useRef<FirebaseRecaptchaVerifierModal>(null);
   const { mode } = useLocalSearchParams<{ mode?: string }>();
   const isRegister = mode === 'register';
 
@@ -73,8 +72,7 @@ export default function AuthPhoneScreen() {
     }
     setLoading(true);
     try {
-      // const confirmation = await signInWithPhoneNumber(auth, formatted, recaptchaVerifier.current as any);
-      throw new Error('SMS auth temporarily disabled - use ProfileScreen instead');
+      const confirmation = await sendSMSVerification(formatted);
       setConfirm(confirmation);
       Alert.alert('קוד נשלח!', 'הזן את הקוד שקיבלת ב-SMS');
     } catch (error: any) {
@@ -93,7 +91,7 @@ export default function AuthPhoneScreen() {
     setLoading(true);
     try {
       if (confirm) {
-        await confirm.confirm(code);
+        await verifySMSCode(confirm, code);
         // onAuthStateChanged יטפל בניווט ושמירה
       }
     } catch (error: any) {

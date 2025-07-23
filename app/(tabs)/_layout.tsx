@@ -13,8 +13,7 @@ export default function TabLayout() {
     const last = segments[segments.length - 1];
     if (String(last) === 'index') return 'home';
     if (String(last) === 'profile') return 'profile';
-    if (String(last) === 'explore') return 'shop';
-    if (String(last) === 'team') return 'team';
+    if (String(last) === 'settings') return 'settings';
     return 'home';
   }, [segments]);
 
@@ -22,8 +21,7 @@ export default function TabLayout() {
   const handleTabPress = (tab: string) => {
     if (tab === 'home') router.replace('/(tabs)');
     else if (tab === 'profile') router.replace('/profile');
-    else if (tab === 'shop') router.replace('/explore');
-    else if (tab === 'team') router.replace('/team');
+    else if (tab === 'settings') router.replace('/(tabs)/settings');
   };
 
   // ניווט מהיר מה־FAB - מנתב לספר בוקינג
@@ -41,8 +39,7 @@ export default function TabLayout() {
       >
         <Tabs.Screen name="index" options={{ title: 'בית' }} />
         <Tabs.Screen name="profile" options={{ title: 'פרופיל' }} />
-        <Tabs.Screen name="explore" options={{ title: 'חנות' }} />
-        <Tabs.Screen name="team" options={{ title: 'צוות' }} />
+        <Tabs.Screen name="settings" options={{ title: 'הגדרות' }} />
         <Tabs.Screen name="booking" options={{ title: 'הזמנה' }} />
       </Tabs>
       <BottomNav

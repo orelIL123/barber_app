@@ -1,5 +1,4 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { RecaptchaVerifier } from 'firebase/auth';
 import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
@@ -56,7 +55,6 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate, onBack }) => 
   const [verificationId, setVerificationId] = useState('');
   const [verificationCode, setVerificationCode] = useState('');
   const [confirmationResult, setConfirmationResult] = useState<any>(null);
-  const [recaptchaVerifier, setRecaptchaVerifier] = useState<RecaptchaVerifier | null>(null);
   
   // Form states
   const [email, setEmail] = useState('');
@@ -94,8 +92,73 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate, onBack }) => 
     return unsubscribe;
   }, []);
 
-  // Utility: validate phone format (simple, Israeli +972-5X...)
-  const isValidPhone = (phone: string) => /^\+972-5\d{1}-\d{3}-\d{4}$/.test(phone.trim());
+  // Utility: validate phone format (ALL Israeli mobile numbers)
+  const isValidPhone = (phone: string) => {
+    if (!phone || phone.trim() === '') return false;
+    
+    // Extract only digits from the input
+    const digits = phone.replace(/\D/g, '');
+    
+    console.log('🔍 Phone validation:');
+    console.log('Original:', phone);
+    console.log('Digits only:', digits);
+    console.log('Length:', digits.length);
+    
+    // Israeli mobile number patterns:
+    // 10 digits starting with 05: 0501234567
+    // 9 digits starting with 5: 501234567 
+    // 12 digits starting with 972 and then 5: 972501234567
+    
+    let isValid = false;
+    
+    if (digits.length === 10 && digits.startsWith('05')) {
+      // 0501234567 format
+      const prefix = digits.substring(1, 3); // get "50"
+      isValid = ['50', '52', '53', '54', '55', '57', '58'].includes(prefix);
+    } else if (digits.length === 9 && digits.startsWith('5')) {
+      // 501234567 format
+      const prefix = digits.substring(0, 2); // get "50"
+      isValid = ['50', '52', '53', '54', '55', '57', '58'].includes(prefix);
+    } else if (digits.length === 12 && digits.startsWith('972')) {
+      // 972501234567 format
+      const afterCountryCode = digits.substring(3); // remove "972"
+      if (afterCountryCode.length === 9 && afterCountryCode.startsWith('5')) {
+        const prefix = afterCountryCode.substring(0, 2); // get "50"
+        isValid = ['50', '52', '53', '54', '55', '57', '58'].includes(prefix);
+      }
+    }
+    
+    console.log('Valid:', isValid);
+    return isValid;
+  };
+
+  // Format phone number to clean display format
+  const formatPhoneForDisplay = (phone: string) => {
+    if (!phone) return '';
+    
+    // Extract only digits
+    const digits = phone.replace(/\D/g, '');
+    
+    // Convert to standard 10-digit format (05XXXXXXXX)
+    let cleanNumber = '';
+    
+    if (digits.length === 10 && digits.startsWith('05')) {
+      cleanNumber = digits; // Already in correct format
+    } else if (digits.length === 9 && digits.startsWith('5')) {
+      cleanNumber = '0' + digits; // Add leading 0
+    } else if (digits.length === 12 && digits.startsWith('972')) {
+      cleanNumber = '0' + digits.substring(3); // Remove 972, add 0
+    } else {
+      return phone; // Return original if can't format
+    }
+    
+    // Format as 050-XXX-XXXX
+    if (cleanNumber.length === 10) {
+      return cleanNumber.substring(0, 3) + '-' + cleanNumber.substring(3, 6) + '-' + cleanNumber.substring(6);
+    }
+    
+    return cleanNumber;
+  };
   
   // Check if phone user exists and has password
   const checkPhoneUser = async (phoneNumber: string) => {
@@ -126,17 +189,27 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate, onBack }) => 
       return;
     }
     if (!isValidPhone(phone)) {
-      Alert.alert('שגיאה', 'נא להזין מספר טלפון בפורמט +972-5X-XXX-XXXX');
+      Alert.alert('שגיאה', 'נא להזין מספר בפורמט: 050-123-4567 או +972-50-123-4567');
       return;
     }
     
     setLoading(true);
     try {
-      // For React Native, we need to handle reCAPTCHA differently
-      const confirmationResult = await sendSMSVerification(phone, null as any);
+      const confirmationResult = await sendSMSVerification(phone);
       setConfirmationResult(confirmationResult);
-      setStep('otp');
-      Alert.alert('הצלחה', 'קוד אימות נשלח לטלפון שלך');
+      
+      // הצג הודעת הצלחה
+      const formattedPhone = formatPhoneForDisplay(phone);
+      Alert.alert(
+        '✅ קוד נשלח!', 
+        `קוד אימות נשלח ל-${formattedPhone}`, 
+        [
+          { 
+            text: 'המשך', 
+            onPress: () => setStep('otp') 
+          }
+        ]
+      );
     } catch (error: any) {
       console.error('Error sending SMS:', error);
       Alert.alert('שגיאה', 'לא ניתן לשלוח קוד אימות. ודא שהמספר תקין ונסה שוב.');
@@ -160,12 +233,14 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate, onBack }) => 
         setPhone('');
       } else {
         // Register new user
-        await registerUserWithPhone(phone, displayName, verificationId, verificationCode);
+        await verifySMSCode(confirmationResult, verificationCode);
+        await setPasswordForPhoneUser(password);
         setStep('input');
         setVerificationCode('');
         setPhone('');
         setDisplayName('');
-        Alert.alert('הצלחה', 'המשתמש נרשם בהצלחה!');
+        setPassword('');
+        Alert.alert('✅ נרשמת בהצלחה!', 'כעת תוכל להתחבר עם מספר הטלפון והסיסמה שלך.');
       }
     } catch (error: any) {
       console.error('Error verifying code:', error);
@@ -179,15 +254,18 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate, onBack }) => 
     if (authMethod === 'phone') {
       // Validate phone format first
       if (!isValidPhone(phone)) {
-        Alert.alert('שגיאה', 'מספר הטלפון אינו תקין');
+        Alert.alert('שגיאה', 'נא להזין מספר תקין (דוגמה: 0501234567)');
         return;
       }
 
       // Always check if user exists before login attempt
       await checkPhoneUser(phone);
 
-      // If user exists and has password, REQUIRE password (no SMS option)
-      if (phoneUserExists && phoneUserHasPassword) {
+      console.log('🔍 Login check - User exists:', phoneUserExists, 'Has password:', phoneUserHasPassword);
+
+      // If user exists (with or without password), REQUIRE password for login (NO SMS)
+      if (phoneUserExists) {
+        console.log('✅ User exists - requiring password login (no SMS)');
         if (!password.trim()) {
           Alert.alert('שגיאה', 'משתמש רשום - נא להזין סיסמה');
           return;
@@ -206,9 +284,13 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate, onBack }) => 
         return;
       }
       
-      // Only use SMS if user doesn't exist or has no password (first time)
-      handleSendSMSVerification();
-      return;
+      // If user doesn't exist, this is not login - redirect to registration
+      if (!phoneUserExists) {
+        console.log('❌ User does not exist - cannot login. Please register first.');
+        Alert.alert('שגיאה', 'משתמש לא נמצא. אנא הירשם תחילה');
+        setTab('register'); // Switch to registration tab
+        return;
+      }
     }
     
     if (!email.trim()) {
@@ -253,7 +335,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate, onBack }) => 
         return;
       }
       if (!isValidPhone(phone)) {
-        Alert.alert('שגיאה', 'נא להזין מספר טלפון בפורמט +972-5X-XXX-XXXX');
+        Alert.alert('שגיאה', 'נא להזין מספר תקין (דוגמה: 0501234567)');
         return;
       }
       handleSendSMSVerification();
@@ -262,6 +344,14 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate, onBack }) => 
     
     if (!email.trim()) {
       Alert.alert('שגיאה', 'נא להזין כתובת מייל');
+      return;
+    }
+    if (!phone.trim()) {
+      Alert.alert('שגיאה', 'נא להזין מספר טלפון');
+      return;
+    }
+    if (!isValidPhone(phone)) {
+      Alert.alert('שגיאה', 'נא להזין מספר בפורמט: 050-123-4567 או +972-50-123-4567');
       return;
     }
     if (!password.trim()) {
@@ -401,9 +491,15 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate, onBack }) => 
             </TouchableOpacity>
           </View>
           {/* White half-sheet for form */}
-          <View style={styles.sheet}>
+          <ScrollView style={styles.sheet} showsVerticalScrollIndicator={false}>
             {tab === 'login' ? (
               <View style={styles.form}>
+                {/* Login Title */}
+                <View style={styles.formHeader}>
+                  <Text style={styles.formTitle}>התחבר לחשבון שלך</Text>
+                  <Text style={styles.formSubtitle}>בחר את שיטת ההתחברות המועדפת עליך</Text>
+                </View>
+                
                 {/* Auth Method Selection */}
                 <View style={styles.authMethodContainer}>
                   <TouchableOpacity
@@ -438,31 +534,33 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate, onBack }) => 
                           <Text style={styles.inputLabel}>מספר טלפון</Text>
                           <TextInput 
                             style={styles.input} 
-                            placeholder="+972-50-123-4567" 
+                            placeholder="0501234567"
                             value={phone} 
                             onChangeText={(text) => {
                               setPhone(text);
                               if (text.length > 10) checkPhoneUser(text);
                             }}
-                            keyboardType="phone-pad" 
+                            keyboardType="phone-pad"
+                            placeholderTextColor="#999"
                           />
                           {phoneUserExists && (
                             <Text style={styles.helperText}>
-                              {phoneUserHasPassword ? '✅ משתמש קיים - הזן סיסמה' : 'ℹ️ משתמש קיים - יישלח SMS'}
+                              ✅ משתמש קיים - הזן סיסמה
                             </Text>
                           )}
                         </View>
                         
                         {/* Show password field if user exists and has password */}
-                        {phoneUserExists && phoneUserHasPassword && (
+                        {phoneUserExists && (
                           <View style={styles.inputContainer}>
                             <Text style={styles.inputLabel}>סיסמה</Text>
                             <TextInput 
                               style={styles.input} 
-                              placeholder="הזן סיסמה" 
+                              placeholder="הזן סיסמה"
                               value={password} 
                               onChangeText={setPassword} 
-                              secureTextEntry 
+                              secureTextEntry
+                              placeholderTextColor="#999"
                             />
                           </View>
                         )}
@@ -473,27 +571,29 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate, onBack }) => 
                           <Text style={styles.inputLabel}>כתובת אימייל</Text>
                           <TextInput 
                             style={styles.input} 
-                            placeholder="example@email.com" 
+                            placeholder="הזן כתובת אימייל"
                             value={email} 
                             onChangeText={setEmail} 
                             autoCapitalize="none" 
-                            keyboardType="email-address" 
+                            keyboardType="email-address"
+                            placeholderTextColor="#999"
                           />
                         </View>
                         <View style={styles.inputContainer}>
                           <Text style={styles.inputLabel}>סיסמה</Text>
                           <TextInput 
                             style={styles.input} 
-                            placeholder="הזן סיסמה" 
+                            placeholder="הזן סיסמה"
                             value={password} 
                             onChangeText={setPassword} 
-                            secureTextEntry 
+                            secureTextEntry
+                            placeholderTextColor="#999"
                           />
                         </View>
                       </>
                     )}
                     <NeonButton 
-                      title={authMethod === 'phone' ? 'שלח קוד אימות' : 'התחברות'} 
+                      title="התחברות" 
                       onPress={handleLogin} 
                       disabled={loading} 
                       {...(loading ? { textStyle: { opacity: 0.5 }, children: <ActivityIndicator color="#fff" /> } : {})}
@@ -505,11 +605,12 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate, onBack }) => 
                       <Text style={styles.inputLabel}>קוד אימות (נשלח לטלפון)</Text>
                       <TextInput 
                         style={styles.input} 
-                        placeholder="הזן קוד בן 6 ספרות" 
+                        placeholder="הזן קוד בן 6 ספרות"
                         value={verificationCode} 
                         onChangeText={setVerificationCode} 
                         keyboardType="number-pad" 
                         maxLength={6}
+                        placeholderTextColor="#999"
                       />
                     </View>
                     <NeonButton 
@@ -529,6 +630,12 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate, onBack }) => 
               </View>
             ) : (
               <View style={styles.form}>
+                {/* Register Title */}
+                <View style={styles.formHeader}>
+                  <Text style={styles.formTitle}>צור חשבון חדש</Text>
+                  <Text style={styles.formSubtitle}>בחר את שיטת ההרשמה המועדפת עליך</Text>
+                </View>
+                
                 {/* Auth Method Selection */}
                 <View style={styles.authMethodContainer}>
                   <TouchableOpacity
@@ -561,54 +668,72 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate, onBack }) => 
                       <Text style={styles.inputLabel}>שם מלא</Text>
                       <TextInput 
                         style={styles.input} 
-                        placeholder="הזן שם מלא" 
+                        placeholder="הזן שם מלא"
                         value={displayName} 
-                        onChangeText={setDisplayName} 
+                        onChangeText={setDisplayName}
+                        placeholderTextColor="#999"
                       />
                     </View>
                     
                     {authMethod === 'phone' ? (
-                      <View style={styles.inputContainer}>
-                        <Text style={styles.inputLabel}>מספר טלפון</Text>
-                        <TextInput 
-                          style={styles.input} 
-                          placeholder="+972-50-123-4567" 
-                          value={phone} 
-                          onChangeText={setPhone} 
-                          keyboardType="phone-pad" 
-                        />
-                      </View>
-                    ) : (
                       <>
                         <View style={styles.inputContainer}>
-                          <Text style={styles.inputLabel}>כתובת אימייל</Text>
+                          <Text style={styles.inputLabel}>מספר טלפון</Text>
                           <TextInput 
                             style={styles.input} 
-                            placeholder="example@email.com" 
-                            value={email} 
-                            onChangeText={setEmail} 
-                            autoCapitalize="none" 
-                            keyboardType="email-address" 
-                          />
-                        </View>
-                        <View style={styles.inputContainer}>
-                          <Text style={styles.inputLabel}>מספר טלפון (אופציונלי)</Text>
-                          <TextInput 
-                            style={styles.input} 
-                            placeholder="+972-50-123-4567" 
+                            placeholder="+972-50-123-4567"
                             value={phone} 
                             onChangeText={setPhone} 
-                            keyboardType="phone-pad" 
+                            keyboardType="phone-pad"
+                            placeholderTextColor="#999"
                           />
                         </View>
                         <View style={styles.inputContainer}>
                           <Text style={styles.inputLabel}>סיסמה</Text>
                           <TextInput 
                             style={styles.input} 
-                            placeholder="הזן סיסמה (לפחות 6 תווים)" 
+                            placeholder="הזן סיסמה (לפחות 6 תווים)"
                             value={password} 
                             onChangeText={setPassword} 
-                            secureTextEntry 
+                            secureTextEntry
+                            placeholderTextColor="#999"
+                          />
+                        </View>
+                      </>
+                    ) : (
+                      <>
+                        <View style={styles.inputContainer}>
+                          <Text style={styles.inputLabel}>כתובת אימייל</Text>
+                          <TextInput 
+                            style={styles.input} 
+                            placeholder="example@email.com"
+                            value={email} 
+                            onChangeText={setEmail} 
+                            autoCapitalize="none" 
+                            keyboardType="email-address"
+                            placeholderTextColor="#999"
+                          />
+                        </View>
+                        <View style={styles.inputContainer}>
+                          <Text style={styles.inputLabel}>מספר טלפון</Text>
+                          <TextInput 
+                            style={styles.input} 
+                            placeholder="0501234567"
+                            value={phone} 
+                            onChangeText={setPhone} 
+                            keyboardType="phone-pad"
+                            placeholderTextColor="#999"
+                          />
+                        </View>
+                        <View style={styles.inputContainer}>
+                          <Text style={styles.inputLabel}>סיסמה</Text>
+                          <TextInput 
+                            style={styles.input} 
+                            placeholder="הזן סיסמה (לפחות 6 תווים)"
+                            value={password} 
+                            onChangeText={setPassword} 
+                            secureTextEntry
+                            placeholderTextColor="#999"
                           />
                         </View>
                       </>
@@ -626,11 +751,12 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate, onBack }) => 
                       <Text style={styles.inputLabel}>קוד אימות (נשלח לטלפון)</Text>
                       <TextInput 
                         style={styles.input} 
-                        placeholder="הזן קוד בן 6 ספרות" 
+                        placeholder="הזן קוד בן 6 ספרות"
                         value={verificationCode} 
                         onChangeText={setVerificationCode} 
                         keyboardType="number-pad" 
                         maxLength={6}
+                        placeholderTextColor="#999"
                       />
                     </View>
                     <NeonButton 
@@ -649,7 +775,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate, onBack }) => 
                 )}
               </View>
             )}
-          </View>
+          </ScrollView>
         </View>
       </SafeAreaView>
     );
@@ -832,17 +958,49 @@ const styles = StyleSheet.create({
   tabGradient: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, borderRadius: 16, zIndex: -1 },
   tabText: { fontSize: 18, color: '#888', fontWeight: '600', zIndex: 1 },
   activeTabText: { color: '#fff', fontWeight: 'bold' },
-  sheet: { flex: 1, backgroundColor: '#fff', borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 24, marginTop: 0, shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 8 },
-  form: { marginTop: 16 },
-  inputContainer: { marginBottom: 16 },
-  inputLabel: { 
-    fontSize: 16, 
-    fontWeight: 'bold', 
-    color: '#333', 
-    marginBottom: 8, 
-    textAlign: 'right' 
+  sheet: { 
+    flex: 1, 
+    backgroundColor: '#fff', 
+    borderTopLeftRadius: 32, 
+    borderTopRightRadius: 32, 
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    paddingBottom: 50, // מרווח נוסף למטה
+    marginTop: 0, 
+    shadowColor: '#000', 
+    shadowOffset: { width: 0, height: -4 }, 
+    shadowOpacity: 0.15, 
+    shadowRadius: 16, 
+    elevation: 12 
   },
-  input: { backgroundColor: '#f3f3f3', borderRadius: 12, padding: 16, fontSize: 16, borderWidth: 1, borderColor: '#eee' },
+  form: { marginTop: 16 },
+  inputContainer: { 
+    marginBottom: 24,
+    position: 'relative',
+  },
+  inputLabel: { 
+    fontSize: 17, 
+    fontWeight: '700', 
+    color: '#2c3e50', 
+    marginBottom: 12, 
+    textAlign: 'right',
+    letterSpacing: 0.5,
+  },
+  input: { 
+    backgroundColor: '#f8f9fa', 
+    borderRadius: 16, 
+    padding: 18, 
+    fontSize: 16, 
+    borderWidth: 2, 
+    borderColor: '#e9ecef',
+    textAlign: 'right',
+    minHeight: 56,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
   orText: { textAlign: 'center', color: '#aaa', marginBottom: 8, marginTop: 8 },
   errorText: { color: '#f00', textAlign: 'center', marginTop: 8 },
   successText: { color: '#0a0', textAlign: 'center', marginTop: 8 },
@@ -1236,34 +1394,48 @@ const styles = StyleSheet.create({
   },
   authMethodContainer: {
     flexDirection: 'row',
-    marginBottom: 20,
-    borderRadius: 12,
-    backgroundColor: '#f0f0f0',
-    padding: 4,
+    marginBottom: 28,
+    borderRadius: 16,
+    backgroundColor: '#f1f3f4',
+    padding: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
   },
   authMethodButton: {
     flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderRadius: 12,
     alignItems: 'center',
-    marginHorizontal: 2,
+    marginHorizontal: 3,
+    shadowColor: '#007bff',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
+    transition: 'all 0.2s ease',
   },
   activeAuthMethod: {
     backgroundColor: '#007bff',
     shadowColor: '#007bff',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 6,
+    transform: [{ scale: 1.02 }],
   },
   authMethodText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#666',
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#6c757d',
+    letterSpacing: 0.5,
   },
   activeAuthMethodText: {
     color: '#fff',
+    fontWeight: '800',
   },
   helperText: {
     fontSize: 12,
@@ -1284,6 +1456,43 @@ const styles = StyleSheet.create({
     color: '#666',
     fontSize: 16,
     fontWeight: '500',
+  },
+  formHeader: {
+    marginBottom: 28,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e9ecef',
+    alignItems: 'center',
+    backgroundColor: 'rgba(52, 152, 219, 0.02)',
+    marginHorizontal: -4,
+    paddingHorizontal: 4,
+    borderRadius: 12,
+  },
+  formTitle: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#2c3e50',
+    marginBottom: 10,
+    textAlign: 'center',
+    letterSpacing: 0.5,
+  },
+  formSubtitle: {
+    fontSize: 17,
+    color: '#7f8c8d',
+    textAlign: 'center',
+    lineHeight: 24,
+    fontWeight: '500',
+    letterSpacing: 0.3,
+  },
+  placeholderText: {
+    position: 'absolute',
+    right: 18,
+    top: 47,
+    fontSize: 16,
+    color: '#adb5bd',
+    textAlign: 'right',
+    fontWeight: '400',
+    letterSpacing: 0.3,
   },
 });
 

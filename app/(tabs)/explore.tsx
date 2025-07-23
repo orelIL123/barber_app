@@ -36,7 +36,7 @@ export default function ExploreTab() {
   };
 
   if (isAdmin) {
-    return <AdminGalleryScreen initialTab="shop" />;
+    return <AdminGalleryScreen initialTab="shop" onNavigate={handleNavigate} onBack={handleBack} />;
   }
   return <ShopScreen onNavigate={handleNavigate} onBack={handleBack} />;
 }
