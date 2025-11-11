@@ -36,4 +36,7 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
+# Fastlane
+fastlane/service_account.json
+
 app-example
