@@ -25,6 +25,9 @@ export default function HomeTab() {
       case 'settings':
         router.replace('/settings');
         break;
+      case 'my-appointments':
+        router.push('/my-appointments');
+        break;
       case 'admin-home':
         router.replace('/admin-home');
         break;

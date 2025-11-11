@@ -52,3 +52,6 @@ async function checkUser(phone) {
 const phoneToSearch = process.argv[2] || '0523985505';
 checkUser(phoneToSearch);
 
+
+
+

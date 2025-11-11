@@ -73,7 +73,7 @@ const SideMenu: React.FC<SideMenuProps> = ({ visible, onClose, onNavigate, onNot
   const menuItems = [
     { id: 'language', title: t('settings.language'), icon: 'language', screen: null },
     { id: 'notifications', title: t('settings.notifications'), icon: 'notifications', screen: null },
-    { id: 'appointments', title: t('profile.my_appointments'), icon: 'calendar-today', screen: 'profile' },
+    { id: 'appointments', title: t('profile.my_appointments'), icon: 'calendar-today', screen: 'my-appointments' },
     { id: 'settings', title: t('nav.settings'), icon: 'settings', screen: 'settings' },
     ...(isAdmin ? [{ id: 'admin', title: t('nav.admin'), icon: 'admin-panel-settings', screen: 'admin-home' }] : []),
     { id: 'about', title: t('nav.about') || 'אודות', icon: 'info', screen: null },

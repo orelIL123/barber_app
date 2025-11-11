@@ -661,25 +661,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate, onBack }) => 
             <Text style={styles.sectionTitle}>התורים שלי</Text>
             <TouchableOpacity
               style={styles.viewAllButton}
-              onPress={() => {
-                if (appointments.length > 0) {
-                  const upcomingAppointments = appointments
-                    .filter(apt => apt.status === 'confirmed' || apt.status === 'pending')
-                    .slice(0, 3);
-                  
-                  const appointmentList = upcomingAppointments.map(apt => 
-                    `• ${formatDate(apt.date)} - ${getStatusText(apt.status)}`
-                  ).join('\n');
-                  
-                  Alert.alert(
-                    'התורים הקרובים שלי',
-                    appointmentList || 'אין תורים קרובים',
-                    [{ text: 'סגור', style: 'default' }]
-                  );
-                } else {
-                  Alert.alert('התורים שלי', 'אין לך תורים קיימים');
-                }
-              }}
+              onPress={() => onNavigate('my-appointments')}
             >
               <Text style={styles.viewAllText}>הצג הכל</Text>
             </TouchableOpacity>

@@ -22,6 +22,9 @@ export default function ProfileTab() {
       case 'auth-choice':
         router.replace('/auth-choice');
         break;
+      case 'my-appointments':
+        router.push('/my-appointments');
+        break;
       default:
         router.replace('/');
     }
