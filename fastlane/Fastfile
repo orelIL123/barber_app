@@ -1,0 +1,17 @@
+default_platform(:android)
+
+platform :android do
+  desc "העלאה אוטומטית לגוגל פליי - Ron Turgeman"
+  lane :release do
+    gradle(task: "bundle", build_type: "Release")
+    upload_to_play_store(
+      track: 'production',
+      json_key: 'fastlane/service_account.json',
+      aab: 'android/app/build/outputs/bundle/release/app-release.aab',
+      skip_upload_images: false,
+      skip_upload_screenshots: false,
+      skip_upload_metadata: false,
+      skip_upload_changelogs: false
+    )
+  end
+end
