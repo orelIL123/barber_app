@@ -22,7 +22,7 @@ import {
     getBarberAppointmentsForDay,
     getBarberAvailableSlots,
     getBarbers,
-    getCurrentMonthAppointments,
+    getAllAppointments,
     getTreatments,
     Treatment,
     updateAppointment,
@@ -103,7 +103,7 @@ const AdminAppointmentsScreen: React.FC<AdminAppointmentsScreenProps> = ({ onNav
     try {
       setLoading(true);
       const [appointmentsData, barbersData, usersData, treatmentsData] = await Promise.all([
-        getCurrentMonthAppointments(), // Only load current month for better performance
+        getAllAppointments(), // Load all appointments
         getBarbers(),
         getAllUsers(),
         getTreatments()
@@ -127,9 +127,9 @@ const AdminAppointmentsScreen: React.FC<AdminAppointmentsScreenProps> = ({ onNav
             console.error(`❌ Failed to auto-complete appointment ${appointment.id}:`, error);
           }
         }
-        
+
         // Reload appointments after auto-completion
-        const updatedAppointments = await getCurrentMonthAppointments();
+        const updatedAppointments = await getAllAppointments();
         setAppointments(updatedAppointments);
       } else {
         setAppointments(appointmentsData);
