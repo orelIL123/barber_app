@@ -774,6 +774,58 @@ export const findUserByPhoneNumber = async (phoneNumber: string): Promise<UserPr
   }
 };
 
+// Check for duplicate users with same phone number
+export const checkDuplicateUsersByPhone = async (phoneNumber: string): Promise<Array<{ uid: string; displayName?: string; phone?: string; email?: string; createdAt?: Timestamp }>> => {
+  try {
+    console.log(`🔍 Checking for duplicate users with phone: ${phoneNumber}`);
+    
+    const cleanPhone = phoneNumber.replace(/[^0-9]/g, '');
+    const possiblePhones = [
+      phoneNumber,
+      `+972${cleanPhone.startsWith('0') ? cleanPhone.substring(1) : cleanPhone}`,
+      `972${cleanPhone.startsWith('0') ? cleanPhone.substring(1) : cleanPhone}`,
+      `0${cleanPhone.startsWith('972') ? cleanPhone.substring(3) : cleanPhone}`,
+      cleanPhone
+    ];
+    
+    const usersRef = collection(db, 'users');
+    const foundUsers: Array<{ uid: string; displayName?: string; phone?: string; email?: string; createdAt?: Timestamp }> = [];
+    const foundUIDs = new Set<string>();
+    
+    for (const phoneFormat of possiblePhones) {
+      try {
+        const q = query(usersRef, where('phone', '==', phoneFormat));
+        const querySnapshot = await getDocs(q);
+        
+        querySnapshot.forEach((doc) => {
+          const userData = doc.data();
+          if (!foundUIDs.has(doc.id)) {
+            foundUIDs.add(doc.id);
+            foundUsers.push({
+              uid: doc.id,
+              displayName: userData.displayName,
+              phone: userData.phone,
+              email: userData.email,
+              createdAt: userData.createdAt
+            });
+          }
+        });
+      } catch (error) {
+        console.log(`⚠️ Error searching for phone format ${phoneFormat}:`, error);
+      }
+    }
+    
+    if (foundUsers.length > 1) {
+      console.warn(`⚠️ Found ${foundUsers.length} duplicate users with phone ${phoneNumber}`);
+    }
+    
+    return foundUsers;
+  } catch (error) {
+    console.error('Error checking duplicate users:', error);
+    return [];
+  }
+};
+
 // New function to check if phone user exists and has password
 export const checkPhoneUserExists = async (phoneNumber: string): Promise<{ exists: boolean; hasPassword: boolean; uid?: string; isAdmin?: boolean; email?: string }> => {
   try {
@@ -1363,6 +1415,31 @@ export const getTreatments = async (useCache: boolean = true): Promise<Treatment
 // Appointments functions
 export const createAppointment = async (appointmentData: Omit<Appointment, 'id' | 'createdAt'>) => {
   try {
+    console.log('🔍 createAppointment called with:', {
+      userId: appointmentData.userId,
+      barberId: appointmentData.barberId,
+      treatmentId: appointmentData.treatmentId,
+      date: appointmentData.date,
+      duration: appointmentData.duration,
+      status: appointmentData.status
+    });
+
+    // Validate userId exists in Firestore
+    try {
+      const userDoc = await getDoc(doc(db, 'users', appointmentData.userId));
+      if (!userDoc.exists()) {
+        console.error(`❌ User ${appointmentData.userId} does not exist in Firestore!`);
+        throw new Error(`User ${appointmentData.userId} does not exist. Please contact support.`);
+      }
+      const userData = userDoc.data();
+      console.log(`✅ User found: ${userData.displayName} (${userData.phone || 'no phone'})`);
+    } catch (userCheckError: any) {
+      if (userCheckError.message.includes('does not exist')) {
+        throw userCheckError;
+      }
+      console.error('⚠️ Error checking user:', userCheckError);
+    }
+
     // Validate duration is a multiple of 25 minutes
     if (appointmentData.duration && !isValidDuration(appointmentData.duration)) {
       throw new Error(`Duration must be a multiple of ${SLOT_SIZE_MINUTES} minutes. Got: ${appointmentData.duration} minutes`);
@@ -1373,8 +1450,9 @@ export const createAppointment = async (appointmentData: Omit<Appointment, 'id' 
       createdAt: Timestamp.now()
     };
     
+    console.log('📝 Attempting to create appointment in Firestore...');
     const docRef = await addDoc(collection(db, 'appointments'), appointment);
-    console.log('Appointment created with ID:', docRef.id);
+    console.log('✅ Appointment created with ID:', docRef.id);
     
     // Send notification to user about new appointment
     try {
@@ -1417,7 +1495,14 @@ export const createAppointment = async (appointmentData: Omit<Appointment, 'id' 
     // Schedule LOCAL notification reminders ONLY (removed Firestore-based reminders to avoid duplicates)
     try {
       console.log('📱 Scheduling LOCAL appointment reminders...');
-      const appointmentDate = appointmentData.date.toDate();
+      let appointmentDate: Date;
+      if (typeof appointmentData.date.toDate === 'function') {
+        appointmentDate = appointmentData.date.toDate();
+      } else if (appointmentData.date instanceof Date) {
+        appointmentDate = appointmentData.date;
+      } else {
+        appointmentDate = new Date(appointmentData.date);
+      }
       await scheduleLocalAppointmentReminders({
         id: docRef.id,
         startsAt: appointmentDate.toISOString(),
@@ -1425,11 +1510,19 @@ export const createAppointment = async (appointmentData: Omit<Appointment, 'id' 
       console.log('✅ LOCAL appointment reminders scheduled successfully');
     } catch (localScheduleError) {
       console.log('❌ Failed to schedule LOCAL appointment reminders:', localScheduleError);
+      // Don't fail the appointment creation if reminder scheduling fails
     }
 
     return docRef.id;
-  } catch (error) {
-    throw error;
+  } catch (error: any) {
+    console.error('❌ Error in createAppointment:', error);
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      stack: error.stack
+    });
+    // Re-throw with more context
+    throw new Error(error.message || 'Failed to create appointment. Please try again.');
   }
 };
 

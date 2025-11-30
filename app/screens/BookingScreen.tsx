@@ -740,6 +740,34 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
 
       console.log('📅 Creating appointment with userId:', user.uid);
       
+      // Verify user exists in Firestore before creating appointment
+      try {
+        const { getUserProfile } = await import('../../services/firebase');
+        const userProfile = await getUserProfile(user.uid);
+        if (!userProfile) {
+          console.error(`❌ User ${user.uid} does not exist in Firestore!`);
+          Alert.alert(
+            t('common.error'),
+            'שגיאה: המשתמש לא נמצא במערכת. נא להתחבר מחדש או ליצור קשר עם התמיכה.',
+            [{ text: t('common.confirm'), onPress: () => onNavigate('profile') }]
+          );
+          setBooking(false);
+          setShowConfirmModal(false);
+          return;
+        }
+        console.log('✅ User profile verified:', userProfile.displayName);
+      } catch (userCheckError: any) {
+        console.error('❌ Error verifying user:', userCheckError);
+        Alert.alert(
+          t('common.error'),
+          'שגיאה בבדיקת המשתמש. נא לנסות שוב.',
+          [{ text: t('common.confirm') }]
+        );
+        setBooking(false);
+        setShowConfirmModal(false);
+        return;
+      }
+      
       await createAppointment({
         userId: user.uid,
         barberId: selectedBarber.id,
@@ -765,9 +793,23 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
         await scheduleAppointmentReminders(appointmentDate, selectedTreatment.name);
       }
 
-    } catch (error) {
-      console.error('Error creating appointment:', error);
-      Alert.alert(t('common.error'), t('booking.booking_error'));
+    } catch (error: any) {
+      console.error('❌ Error creating appointment:', error);
+      console.error('Error details:', {
+        message: error.message,
+        code: error.code,
+        stack: error.stack
+      });
+      
+      // Show more specific error message
+      let errorMessage = t('booking.booking_error');
+      if (error.message && error.message.includes('does not exist')) {
+        errorMessage = 'שגיאה: המשתמש לא נמצא במערכת. נא להתחבר מחדש או ליצור קשר עם התמיכה.';
+      } else if (error.message) {
+        errorMessage = `שגיאה: ${error.message}`;
+      }
+      
+      Alert.alert(t('common.error'), errorMessage);
     } finally {
       setBooking(false);
     }
