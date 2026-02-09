@@ -18,6 +18,7 @@ import {
     getWaitlistEntriesForWeek,
     WaitlistEntry
 } from '../../services/firebase';
+import { ScissorsLoader } from '../components/ScissorsLoader';
 import TopNav from '../components/TopNav';
 import { colors } from '../constants/colors';
 
@@ -202,7 +203,7 @@ const AdminWaitlistScreen: React.FC<AdminWaitlistScreenProps> = ({
           onBackPress={onBack}
         />
         <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>טוען...</Text>
+          <ScissorsLoader size={60} color="#007bff" accessibilityLabel="טוען" />
         </View>
       </SafeAreaView>
     );

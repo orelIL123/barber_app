@@ -19,7 +19,8 @@ import {
   View
 } from 'react-native';
 import { authManager } from '../../services/authManager';
-import { loginUser, loginWithPhoneAndPassword, registerForPushNotifications } from '../../services/firebase';
+import { callUpdateEmailAndSendReset, checkUserExistsForPasswordReset, loginUser, loginWithPhoneAndPassword, registerForPushNotifications, sendResetEmail } from '../../services/firebase';
+import { sendSms } from '../services/messaging/instance';
 import { colors } from '../constants/colors';
 import { CONTACT_INFO } from '../constants/contactInfo';
 
@@ -32,6 +33,16 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+
+  // Forgot password states
+  const [resettingPassword, setResettingPassword] = useState(false);
+  const [showSmsVerification, setShowSmsVerification] = useState(false);
+  const [showEmailInput, setShowEmailInput] = useState(false);
+  const [smsCode, setSmsCode] = useState('');
+  const [expectedCode, setExpectedCode] = useState('');
+  const [foundUserId, setFoundUserId] = useState('');
+  const [foundUserPhone, setFoundUserPhone] = useState('');
+  const [resetEmail, setResetEmail] = useState('');
 
   // Load saved credentials on component mount
   useEffect(() => {
@@ -193,29 +204,121 @@ export default function LoginScreen() {
     }
   };
 
-  const handleForgotPassword = () => {
-    Alert.alert(
-      'שכחת סיסמה?',
-      'לאיפוס סיסמה, אנא פנה לרון בוואטסאפ',
-      [
-        {
-          text: 'פתח וואטסאפ',
-          onPress: () => {
-            const phoneNumber = '972542280222'; // מספר הטלפון של רון
-            const message = 'היי רון, שכחתי את הסיסמה שלי לאפליקציה. תוכל לעזור?';
-            const whatsappUrl = `whatsapp://send?phone=${phoneNumber}&text=${encodeURIComponent(message)}`;
-            Linking.openURL(whatsappUrl).catch(() => {
-              Alert.alert('שגיאה', 'לא ניתן לפתוח את וואטסאפ. אנא וודא שהאפליקציה מותקנת.');
-            });
-          }
-        },
-        {
-          text: 'ביטול',
-          style: 'cancel'
-        }
-      ]
-    );
+  const generateVerificationCode = () => {
+    return Math.floor(100000 + Math.random() * 900000).toString();
   };
+
+  const handleForgotPassword = async () => {
+    if (!emailOrPhone.trim()) {
+      Alert.alert('שכחת סיסמה?', 'אנא הזן את מספר הטלפון שלך בשדה למעלה ואז לחץ על "שכחתי סיסמה".');
+      return;
+    }
+
+    // Check if the input is a phone number
+    const isEmail = emailOrPhone.includes('@');
+    if (isEmail) {
+      Alert.alert('איפוס סיסמה', 'אנא הזן את מספר הטלפון שלך לצורך אימות ב-SMS.');
+      return;
+    }
+
+    setResettingPassword(true);
+    try {
+      const userExists = await checkUserExistsForPasswordReset(emailOrPhone);
+      if (!userExists.exists) {
+        Alert.alert(
+          'משתמש לא נמצא',
+          'לא נמצא משתמש עם מספר הטלפון הזה. אנא בדוק את המספר או הירשם מחדש.',
+          [{ text: 'אישור', onPress: () => {} }]
+        );
+        setResettingPassword(false);
+        return;
+      }
+
+      // User exists - generate and send SMS verification code
+      const code = generateVerificationCode();
+      setExpectedCode(code);
+      setFoundUserId(userExists.userId || '');
+
+      // Format phone number for SMS
+      let phoneToSend = emailOrPhone.trim();
+      const cleanPhone = phoneToSend.replace(/[^0-9]/g, '');
+      if (cleanPhone.startsWith('0')) {
+        phoneToSend = '+972' + cleanPhone.substring(1);
+      } else if (!phoneToSend.startsWith('+')) {
+        phoneToSend = '+972' + cleanPhone;
+      } else {
+        phoneToSend = '+' + cleanPhone;
+      }
+      
+      setFoundUserPhone(phoneToSend);
+
+      // Send SMS with verification code
+      const smsResult = await sendSms(phoneToSend, `קוד אימות לאיפוס סיסמה למספרת רון תורגמן: ${code}`);
+      
+      if (smsResult.success) {
+        setShowSmsVerification(true);
+      } else {
+        Alert.alert('שגיאה', 'לא הצלחנו לשלוח קוד אימות ב-SMS. אנא נסה שוב או פנה לתמיכה.');
+      }
+    } catch (error: any) {
+      console.error('❌ Forgot password error:', error);
+      Alert.alert('שגיאה', error?.message || 'אירעה שגיאה. אנא נסה שוב מאוחר יותר.');
+    } finally {
+      setResettingPassword(false);
+    }
+  };
+
+  const handleVerifySmsCode = () => {
+    if (!smsCode.trim()) {
+      Alert.alert('שגיאה', 'אנא הזן את קוד האימות');
+      return;
+    }
+
+    if (smsCode.trim() !== expectedCode) {
+      Alert.alert('שגיאה', 'קוד האימות שגוי. אנא נסה שוב.');
+      return;
+    }
+
+    setShowSmsVerification(false);
+    setShowEmailInput(true);
+    setSmsCode('');
+  };
+
+  const handleSendResetEmail = async () => {
+    if (!resetEmail.trim() || !resetEmail.includes('@')) {
+      Alert.alert('שגיאה', 'אנא הזן כתובת אימייל תקינה');
+      return;
+    }
+
+    setResettingPassword(true);
+    try {
+      // Step 1: Call Cloud Function to update user email
+      console.log(`🔄 Calling Cloud Function to update email for user ${foundUserId} to ${resetEmail}`);
+      await callUpdateEmailAndSendReset(foundUserId, resetEmail.trim().toLowerCase());
+      
+      // Step 2: Send password reset email from client
+      console.log(`📧 Sending password reset email to ${resetEmail}`);
+      await sendResetEmail(resetEmail.trim().toLowerCase());
+
+      Alert.alert(
+        'הודעת איפוס בדרך 📧',
+        `קישור לאיפוס סיסמה נשלח לכתובת ${resetEmail}. אנא בדוק את תיבת הדואר הנכנס שלך (גם בתיקיית הספאם).`,
+        [{ 
+          text: 'אישור', 
+          onPress: () => {
+            setShowEmailInput(false);
+            setResetEmail('');
+          } 
+        }]
+      );
+    } catch (error: any) {
+      console.error('❌ Reset email error:', error);
+      Alert.alert('שגיאה', 'לא הצלחנו לשלוח את לינק האיפוס. אנא וודא שהאימייל תקין ונסה שוב.');
+    } finally {
+      setResettingPassword(false);
+    }
+  };
+
 
   const handleBack = () => {
     // Navigate to auth choice screen instead of using router.back()
@@ -304,7 +407,11 @@ export default function LoginScreen() {
               </TouchableOpacity>
 
               <TouchableOpacity onPress={handleForgotPassword} style={{ marginBottom: 10 }}>
-                <Text style={styles.forgotPasswordText}>שכחתי סיסמה?</Text>
+                {resettingPassword ? (
+                  <ActivityIndicator color={colors.primary} />
+                ) : (
+                  <Text style={styles.forgotPasswordText}>שכחתי סיסמה?</Text>
+                )}
               </TouchableOpacity>
 
               <TouchableOpacity onPress={() => router.push('/register')}>
@@ -321,6 +428,77 @@ export default function LoginScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* SMS Verification Modal */}
+      <Modal visible={showSmsVerification} transparent={true} animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>אימות ב-SMS</Text>
+            <Text style={styles.modalText}>
+              שלחנו קוד אימות לנייד המסתיים ב-*{foundUserPhone.slice(-4)}. אנא הזן אותו למטה:
+            </Text>
+            <TextInput
+              style={styles.input}
+              placeholder="6 ספרות"
+              value={smsCode}
+              onChangeText={setSmsCode}
+              keyboardType="number-pad"
+              maxLength={6}
+              textAlign="center"
+            />
+            <TouchableOpacity 
+              style={styles.loginButton} 
+              onPress={handleVerifySmsCode}
+            >
+              <Text style={styles.loginButtonText}>אמת קוד</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              onPress={() => setShowSmsVerification(false)}
+              style={{ marginTop: 10 }}
+            >
+              <Text style={[styles.linkText, { color: '#666' }]}>ביטול</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Email Input Modal */}
+      <Modal visible={showEmailInput} transparent={true} animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>איפוס סיסמה</Text>
+            <Text style={styles.modalText}>
+              הקוד אומת בהצלחה!{'\n'}כעת, הזן את כתובת האימייל שלך לקבלת לינק לאיפוס סיסמה:
+            </Text>
+            <TextInput
+              style={styles.input}
+              placeholder="your@email.com"
+              value={resetEmail}
+              onChangeText={setResetEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              textAlign="right"
+            />
+            <TouchableOpacity 
+              style={[styles.loginButton, resettingPassword && styles.buttonDisabled]} 
+              onPress={handleSendResetEmail}
+              disabled={resettingPassword}
+            >
+              {resettingPassword ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.loginButtonText}>שלח לינק לאיפוס</Text>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity 
+              onPress={() => setShowEmailInput(false)}
+              style={{ marginTop: 10 }}
+            >
+              <Text style={[styles.linkText, { color: '#666' }]}>ביטול</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* Terms Modal */}
       <Modal visible={showTerms} transparent={true} animationType="fade" onRequestClose={() => setShowTerms(false)}>

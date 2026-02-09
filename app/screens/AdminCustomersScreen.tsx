@@ -13,6 +13,7 @@ import {
     View,
 } from 'react-native';
 import { checkIsAdmin, deleteCustomer, getAllUsers, sendNotificationToUser } from '../../services/firebase';
+import { ScissorsLoader } from '../components/ScissorsLoader';
 import TopNav from '../components/TopNav';
 import { colors } from '../constants/colors';
 
@@ -244,7 +245,7 @@ const AdminCustomersScreen: React.FC<AdminCustomersScreenProps> = ({
           }
         />
         <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>טוען לקוחות...</Text>
+          <ScissorsLoader size={60} color="#007bff" accessibilityLabel="טוען לקוחות" />
         </View>
       </SafeAreaView>
     );
@@ -292,7 +293,10 @@ const AdminCustomersScreen: React.FC<AdminCustomersScreenProps> = ({
         }
       />
       
-      <ScrollView style={styles.content}>
+      <ScrollView 
+        style={styles.content}
+        contentContainerStyle={styles.scrollContent}
+      >
         <View style={styles.header}>
           <Text style={styles.headerTitle}>לקוחות ({customers.length})</Text>
         </View>
@@ -401,7 +405,10 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+  },
+  scrollContent: {
     padding: 20,
+    paddingTop: 110, // TopNav height (90) + extra padding (20)
   },
   header: {
     flexDirection: 'row',

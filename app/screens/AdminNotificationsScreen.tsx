@@ -21,6 +21,7 @@ import {
     getAllUsers,
     onAuthStateChange
 } from '../../services/firebase';
+import { ScissorsLoader } from '../components/ScissorsLoader';
 import TopNav from '../components/TopNav';
 
 const { width } = Dimensions.get('window');
@@ -139,7 +140,7 @@ const AdminNotificationsScreen: React.FC<AdminNotificationsScreenProps> = ({ onN
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>טוען...</Text>
+          <ScissorsLoader size={60} color="#007bff" accessibilityLabel="טוען" />
         </View>
       </SafeAreaView>
     );

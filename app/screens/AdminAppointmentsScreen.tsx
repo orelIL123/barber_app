@@ -16,18 +16,20 @@ import {
 import {
     Appointment,
     Barber,
+    batchUpdateAppointmentsStatus,
     createAppointment,
     deleteAppointment,
     getAllUsers,
     getBarberAppointmentsForDay,
     getBarberAvailableSlots,
     getBarbers,
-    getAllAppointments,
+    getRecentAppointments,
     getTreatments,
     Treatment,
     updateAppointment,
     UserProfile
 } from '../../services/firebase';
+import { ScissorsLoader } from '../components/ScissorsLoader';
 import ToastMessage from '../components/ToastMessage';
 import TopNav from '../components/TopNav';
 import { isOnGrid, isValidDuration, SLOT_SIZE_MINUTES, slotFitsInDay, toYMD } from '../constants/scheduling';
@@ -103,33 +105,32 @@ const AdminAppointmentsScreen: React.FC<AdminAppointmentsScreenProps> = ({ onNav
     try {
       setLoading(true);
       const [appointmentsData, barbersData, usersData, treatmentsData] = await Promise.all([
-        getAllAppointments(), // Load all appointments
+        getRecentAppointments(), // Optimized: loads only last 14 days + future
         getBarbers(),
         getAllUsers(),
         getTreatments()
       ]);
       
-      // Auto-complete past appointments
+      // Auto-complete past appointments using batch update (much faster!)
       const now = new Date();
-      const pastAppointments = appointmentsData.filter(apt => {
-        const aptTime = apt.date.toMillis ? apt.date.toMillis() : apt.date.toDate().getTime();
-        return aptTime < now.getTime() && apt.status === 'confirmed';
-      });
+      const pastAppointmentIds = appointmentsData
+        .filter(apt => {
+          const aptTime = apt.date.toMillis ? apt.date.toMillis() : apt.date.toDate().getTime();
+          return aptTime < now.getTime() && apt.status === 'confirmed';
+        })
+        .map(apt => apt.id);
       
-      // Update past appointments to completed status
-      if (pastAppointments.length > 0) {
-        console.log(`🔄 Auto-completing ${pastAppointments.length} past appointments`);
-        for (const appointment of pastAppointments) {
-          try {
-            await updateAppointment(appointment.id, { status: 'completed' });
-            console.log(`✅ Auto-completed appointment ${appointment.id}`);
-          } catch (error) {
-            console.error(`❌ Failed to auto-complete appointment ${appointment.id}:`, error);
-          }
-        }
-
-        // Reload appointments after auto-completion
-        const updatedAppointments = await getAllAppointments();
+      // Batch update + local state update (no reload needed!)
+      if (pastAppointmentIds.length > 0) {
+        console.log(`🔄 Auto-completing ${pastAppointmentIds.length} past appointments (batch)`);
+        await batchUpdateAppointmentsStatus(pastAppointmentIds, 'completed');
+        
+        // Update state locally instead of reloading from server
+        const updatedAppointments = appointmentsData.map(apt => 
+          pastAppointmentIds.includes(apt.id) 
+            ? { ...apt, status: 'completed' as const }
+            : apt
+        );
         setAppointments(updatedAppointments);
       } else {
         setAppointments(appointmentsData);
@@ -627,7 +628,7 @@ const AdminAppointmentsScreen: React.FC<AdminAppointmentsScreenProps> = ({ onNav
         {/* Appointments List */}
         {loading ? (
           <View style={styles.loadingContainer}>
-            <Text style={styles.loadingText}>טוען תורים...</Text>
+            <ScissorsLoader size={60} color="#007bff" accessibilityLabel="טוען תורים" />
           </View>
         ) : (
           <ScrollView style={styles.appointmentsList}>

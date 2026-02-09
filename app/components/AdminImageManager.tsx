@@ -3,7 +3,6 @@ import * as ImagePicker from 'expo-image-picker';
 import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-    ActivityIndicator,
     Alert,
     Dimensions,
     Image,
@@ -13,6 +12,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { CacheUtils } from '../../services/cache';
 import {
     addAppGalleryImage,
     AppImages,
@@ -23,6 +23,7 @@ import {
     updateAtmosphereImage
 } from '../../services/firebase';
 import ConfirmationModal from './ConfirmationModal';
+import { ScissorsLoader } from './ScissorsLoader';
 
 const { width } = Dimensions.get('window');
 
@@ -117,6 +118,8 @@ const AdminImageManager: React.FC<AdminImageManagerProps> = ({ onClose }) => {
       setUploading(true);
       console.log('📤 Uploading atmosphere image...');
       await updateAtmosphereImage(imageUri);
+      // Invalidate cache so users see updated data immediately
+      await CacheUtils.clearHomeData();
       await loadImages();
       setSuccessMessage(t('admin.atmosphere_updated'));
       setShowSuccessModal(true);
@@ -137,6 +140,8 @@ const AdminImageManager: React.FC<AdminImageManagerProps> = ({ onClose }) => {
       setUploading(true);
       console.log('📤 Uploading about us image...');
       await updateAboutUsImage(imageUri);
+      // Invalidate cache so users see updated data immediately
+      await CacheUtils.clearHomeData();
       await loadImages();
       setSuccessMessage(t('admin.about_us_updated'));
       setShowSuccessModal(true);
@@ -157,6 +162,8 @@ const AdminImageManager: React.FC<AdminImageManagerProps> = ({ onClose }) => {
       setUploading(true);
       console.log('📤 Adding gallery image...');
       await addAppGalleryImage(imageUri);
+      // Invalidate cache so users see updated data immediately
+      await CacheUtils.clearHomeData();
       await loadImages();
       setSuccessMessage(t('admin.gallery_image_added'));
       setShowSuccessModal(true);
@@ -175,6 +182,8 @@ const AdminImageManager: React.FC<AdminImageManagerProps> = ({ onClose }) => {
       try {
         setUploading(true);
         await removeAppGalleryImage(imageUrl);
+        // Invalidate cache so users see updated data immediately
+        await CacheUtils.clearHomeData();
         await loadImages();
         setSuccessMessage(t('admin.gallery_image_removed'));
         setShowSuccessModal(true);
@@ -196,6 +205,8 @@ const AdminImageManager: React.FC<AdminImageManagerProps> = ({ onClose }) => {
       setUploading(true);
       console.log('📤 Replacing gallery image...');
       await replaceAppGalleryImage(oldImageUrl, imageUri);
+      // Invalidate cache so users see updated data immediately
+      await CacheUtils.clearHomeData();
       await loadImages();
       setSuccessMessage(t('admin.gallery_image_replaced'));
       setShowSuccessModal(true);
@@ -211,8 +222,7 @@ const AdminImageManager: React.FC<AdminImageManagerProps> = ({ onClose }) => {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007bff" />
-        <Text style={styles.loadingText}>{t('common.loading')}</Text>
+        <ScissorsLoader size={60} color="#007bff" accessibilityLabel={t('common.loading')} />
       </View>
     );
   }

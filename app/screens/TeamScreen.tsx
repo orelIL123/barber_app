@@ -1,4 +1,4 @@
-import React, { useEffect, useState, memo } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     Alert,
     Dimensions,
@@ -12,6 +12,7 @@ import {
     View
 } from 'react-native';
 import { Barber, getBarbers } from '../../services/firebase';
+import { ScissorsLoader } from '../components/ScissorsLoader';
 import TopNav from '../components/TopNav';
 
 const { width, height } = Dimensions.get('window');
@@ -80,7 +81,7 @@ const TeamScreen: React.FC<TeamScreenProps> = ({ onNavigate, onBack }) => {
           onBackPress={onBack || (() => onNavigate('home'))}
         />
         <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>טוען...</Text>
+          <ScissorsLoader size={60} color="#007bff" accessibilityLabel="טוען" />
         </View>
       </SafeAreaView>
     );

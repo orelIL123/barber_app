@@ -2,6 +2,7 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native
 import { useFonts } from 'expo-font';
 import * as Notifications from 'expo-notifications';
 import { Stack, useRouter } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import * as Updates from 'expo-updates';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -18,6 +19,9 @@ import AppAuthGate from './components/AppAuthGate';
 import i18n from './i18n';
 
 import { useColorScheme } from '../hooks/useColorScheme';
+
+// Hide splash screen immediately to prevent flicker
+SplashScreen.hideAsync();
 
 // Configure notification behavior
 Notifications.setNotificationHandler({
@@ -163,7 +167,7 @@ export default function RootLayout() {
       <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
         <AppAuthGate>
           <Stack>
-            <Stack.Screen name="splash" options={{ headerShown: false }} />
+            <Stack.Screen name="index" options={{ headerShown: false }} />
             <Stack.Screen name="auth-choice" options={{ headerShown: false }} />
             <Stack.Screen name="login" options={{ headerShown: false }} />
             <Stack.Screen name="register" options={{ headerShown: false }} />
@@ -171,6 +175,7 @@ export default function RootLayout() {
             <Stack.Screen name="booking" options={{ headerShown: false }} />
             <Stack.Screen name="admin-home" options={{ headerShown: false }} />
             <Stack.Screen name="admin-appointments" options={{ headerShown: false }} />
+            <Stack.Screen name="admin-calendar" options={{ headerShown: false }} />
             <Stack.Screen name="admin-availability" options={{ headerShown: false }} />
             <Stack.Screen name="admin-gallery" options={{ headerShown: false }} />
             <Stack.Screen name="admin-notification-settings" options={{ headerShown: false }} />

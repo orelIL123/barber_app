@@ -113,6 +113,9 @@ export const CACHE_KEYS = {
   GALLERY_IMAGES: 'cache_gallery_images',
   SETTINGS_IMAGES: 'cache_settings_images',
   USER_PROFILE: 'cache_user_profile',
+  // Home screen data
+  HOME_IMAGES: 'cache_home_images',
+  HOME_CONTENT: 'cache_home_content',
   // Auth-related cache keys
   AUTH_DATA: 'cache_auth_data',
   LOGIN_CREDENTIALS: 'cache_login_credentials',
@@ -177,6 +180,50 @@ export const CacheUtils = {
     return cache.clear(CACHE_KEYS.SETTINGS_IMAGES);
   },
 
+  // Home screen data utilities
+  async getHomeImages() {
+    return cache.get<{
+      atmosphere: string;
+      aboutUs: string;
+      gallery: string[];
+    }>(CACHE_KEYS.HOME_IMAGES);
+  },
+
+  async setHomeImages(images: {
+    atmosphere: string;
+    aboutUs: string;
+    gallery: string[];
+  }, ttlMinutes: number = 30) {
+    return cache.set(CACHE_KEYS.HOME_IMAGES, images, ttlMinutes);
+  },
+
+  async getHomeContent() {
+    return cache.get<{
+      welcomeMessage: string;
+      subtitleMessage: string;
+      aboutUsMessage: string;
+      popupMessage?: string;
+      showPopup?: boolean;
+    }>(CACHE_KEYS.HOME_CONTENT);
+  },
+
+  async setHomeContent(content: {
+    welcomeMessage: string;
+    subtitleMessage: string;
+    aboutUsMessage: string;
+    popupMessage?: string;
+    showPopup?: boolean;
+  }, ttlMinutes: number = 30) {
+    return cache.set(CACHE_KEYS.HOME_CONTENT, content, ttlMinutes);
+  },
+
+  async clearHomeData() {
+    await Promise.all([
+      cache.clear(CACHE_KEYS.HOME_IMAGES),
+      cache.clear(CACHE_KEYS.HOME_CONTENT),
+    ]);
+  },
+
   // Auth data utilities
   async getAuthData() {
     return cache.get(CACHE_KEYS.AUTH_DATA);
@@ -233,6 +280,8 @@ export const CacheUtils = {
       cache.clear(CACHE_KEYS.TREATMENTS),
       cache.clear(CACHE_KEYS.GALLERY_IMAGES),
       cache.clear(CACHE_KEYS.SETTINGS_IMAGES),
+      cache.clear(CACHE_KEYS.HOME_IMAGES),
+      cache.clear(CACHE_KEYS.HOME_CONTENT),
     ]);
   }
 };

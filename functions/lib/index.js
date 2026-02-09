@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteUserAuth = void 0;
+exports.updateEmailAndSendReset = exports.deleteUserAuth = void 0;
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 admin.initializeApp();
@@ -32,6 +32,38 @@ exports.deleteUserAuth = functions.https.onCall(async (data, context) => {
             return { success: true, message: 'User already deleted' };
         }
         throw new functions.https.HttpsError('internal', `Failed: ${error.message}`);
+    }
+});
+exports.updateEmailAndSendReset = functions.https.onCall(async (data, context) => {
+    const { firestoreUserId, newEmail } = data;
+    if (!firestoreUserId || !newEmail) {
+        throw new functions.https.HttpsError('invalid-argument', 'firestoreUserId and newEmail are required');
+    }
+    try {
+        const userDoc = await admin.firestore().collection('users').doc(firestoreUserId).get();
+        if (!userDoc.exists) {
+            throw new functions.https.HttpsError('not-found', 'User not found in database');
+        }
+        const userData = userDoc.data();
+        // Use the stored authUid or the doc ID if not present
+        const authUid = (userData === null || userData === void 0 ? void 0 : userData.authUid) || firestoreUserId;
+        console.log(`🔄 Updating email for user ${authUid} to ${newEmail}`);
+        // Update Firebase Auth
+        await admin.auth().updateUser(authUid, {
+            email: newEmail.toLowerCase(),
+            emailVerified: false
+        });
+        // Update Firestore user document
+        await admin.firestore().collection('users').doc(firestoreUserId).update({
+            email: newEmail.toLowerCase(),
+            emailUpdatedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+        console.log(`✅ User ${authUid} updated successfully with new email`);
+        return { success: true, email: newEmail.toLowerCase() };
+    }
+    catch (error) {
+        console.error('❌ Error in updateEmailAndSendReset:', error);
+        throw new functions.https.HttpsError('internal', error.message || 'Failed to update user email');
     }
 });
 //# sourceMappingURL=index.js.map

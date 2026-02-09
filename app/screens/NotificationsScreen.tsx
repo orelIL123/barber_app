@@ -18,6 +18,7 @@ import {
     getUserNotifications,
     markNotificationAsRead
 } from '../../services/firebase';
+import { ScissorsLoader } from '../components/ScissorsLoader';
 import TopNav from '../components/TopNav';
 
 interface NotificationsScreenProps {
@@ -199,8 +200,7 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ onNavigate, o
           {/* Notifications List */}
           {loading ? (
             <View style={styles.emptyState}>
-              <Ionicons name="hourglass" size={64} color="#ccc" />
-              <Text style={styles.emptyStateText}>טוען הודעות...</Text>
+              <ScissorsLoader size={60} color="#007bff" accessibilityLabel="טוען הודעות" />
             </View>
           ) : notifications.length === 0 ? (
             <View style={styles.emptyState}>

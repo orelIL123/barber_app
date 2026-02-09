@@ -9,7 +9,26 @@
       "client_info": {
         "mobilesdk_app_id": "1:246646930767:android:00325447393d15bdf2193a",
         "android_client_info": {
-          "package_name": "com.orelaharon.rontugemanbarber"
+          "package_name": "com.barberapp.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBh3LrIWAsy6ZgzWVir2rr2L0cktqoMvwc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:246646930767:android:f7ad55f2aca9b08cf2193a",
+        "android_client_info": {
+          "package_name": "com.orelaharon.rontugemanbarber.app"
         }
       },
       "oauth_client": [],
@@ -26,4 +45,4 @@
     }
   ],
   "configuration_version": "1"
-} 
+}

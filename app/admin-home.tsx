@@ -13,6 +13,9 @@ export default function AdminHomeTab() {
       case 'admin-appointments':
         router.replace('/admin-appointments');
         break;
+      case 'admin-calendar':
+        router.replace('/admin-calendar');
+        break;
       case 'admin-treatments':
         router.replace('/admin-treatments');
         break;

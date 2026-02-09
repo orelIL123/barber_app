@@ -22,6 +22,7 @@ import {
     getTreatments,
     updateTreatment
 } from '../../services/firebase';
+import { ScissorsLoader } from '../components/ScissorsLoader';
 import ToastMessage from '../components/ToastMessage';
 import TopNav from '../components/TopNav';
 import { SLOT_SIZE_MINUTES, isValidDuration } from '../constants/scheduling';
@@ -284,7 +285,7 @@ const AdminTreatmentsScreen: React.FC<AdminTreatmentsScreenProps> = ({ onNavigat
         {/* Treatments List */}
         {loading ? (
           <View style={styles.loadingContainer}>
-            <Text style={styles.loadingText}>טוען טיפולים...</Text>
+            <ScissorsLoader size={60} color="#007bff" accessibilityLabel="טוען טיפולים" />
           </View>
         ) : (
           <ScrollView style={styles.treatmentsList}>

@@ -10,7 +10,6 @@ import {
     Dimensions,
     Image,
     ImageBackground,
-    InteractionManager,
     Linking,
     Modal,
     SafeAreaView,
@@ -20,7 +19,9 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { CacheUtils } from '../../services/cache';
 import NotificationPanel from '../components/NotificationPanel';
+import { ScissorsLoader } from '../components/ScissorsLoader';
 import SideMenu from '../components/SideMenu';
 import TermsModal from '../components/TermsModal';
 import TopNav from '../components/TopNav';
@@ -94,7 +95,10 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
   
   // 3D Carousel refs
   const carousel3DRef = useRef<ScrollView>(null);
-  const cardWidth = 160;
+  // Card sizing for 3D gallery carousel
+  // Keep these values in sync with `styles.carousel3DCard` and `styles.carousel3DContainer`
+  // so the infinite-scroll math and the visuals match.
+  const cardWidth = 285; // Increased by 1.5x (was 190)
   const cardSpacing = 8;
   const scrollX = useRef(new Animated.Value(0)).current;
   
@@ -143,10 +147,51 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
   }, [originalLength, itemWidth]);
 
   useEffect(() => {
-    // Simulate loading (splash) for 3 seconds
-    setTimeout(() => {
-      setLoading(false);
-    }, 3000);
+    // Load data from cache first, then fallback to loading if needed
+    const loadDataFromCache = async () => {
+      try {
+        // Try to load from cache
+        const [cachedImages, cachedContent] = await Promise.all([
+          CacheUtils.getHomeImages(),
+          CacheUtils.getHomeContent(),
+        ]);
+
+        if (cachedImages && cachedContent) {
+          // Data found in cache - use it immediately
+          console.log('✅ Loading home data from cache');
+          setSettingsImages(cachedImages);
+          setWelcomeMessage(cachedContent.welcomeMessage);
+          setSubtitleMessage(cachedContent.subtitleMessage);
+          setAboutUsMessage(cachedContent.aboutUsMessage);
+          if (cachedContent.showPopup && cachedContent.popupMessage) {
+            setPopupMessage(cachedContent.popupMessage);
+            setShowPopup(true);
+          }
+          setLoading(false);
+        } else {
+          // Cache miss - load from Firebase (fallback)
+          console.log('⚠️ Cache miss - loading from Firebase');
+          await Promise.all([
+            fetchImages(),
+            fetchDynamicContent(),
+          ]);
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error('Error loading from cache:', error);
+        // Fallback to loading from Firebase
+        await Promise.all([
+          fetchImages(),
+          fetchDynamicContent(),
+        ]);
+        setLoading(false);
+      }
+    };
+
+    loadDataFromCache();
+    
+    // Run cleanup in background (doesn't block screen display)
+    cleanupOldWaitlistData();
   }, []);
 
   useEffect(() => {
@@ -184,15 +229,6 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
     }
   }, [loading]);
 
-  useEffect(() => {
-    // Fetch images and dynamic content after interactions are complete
-    InteractionManager.runAfterInteractions(() => {
-      fetchImages();
-      fetchDynamicContent();
-      cleanupOldWaitlistData();
-    });
-  }, []);
-
   // Cleanup old waitlist entries (runs automatically on app start)
   const cleanupOldWaitlistData = async () => {
     try {
@@ -211,39 +247,65 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
       
       // Load welcome messages
       const welcomeDoc = await getDoc(doc(db, 'settings', 'homeMessages'));
+      let welcomeMessage = t('home.welcome');
+      let subtitleMessage = t('home.subtitle');
+      
       if (welcomeDoc.exists()) {
         const data = welcomeDoc.data();
-        setWelcomeMessage(data.welcome || t('home.welcome'));
-        setSubtitleMessage(data.subtitle || t('home.subtitle'));
-      } else {
-        setWelcomeMessage(t('home.welcome'));
-        setSubtitleMessage(t('home.subtitle'));
+        welcomeMessage = data.welcome || welcomeMessage;
+        subtitleMessage = data.subtitle || subtitleMessage;
       }
+      
+      setWelcomeMessage(welcomeMessage);
+      setSubtitleMessage(subtitleMessage);
 
       // Load about us text
+      const defaultAboutUs = 'ברוכים הבאים למספרה של רון תורג׳מן! כאן תיהנו מחוויה אישית, מקצועית ומפנקת, עם יחס חם לכל לקוח. רון, בעל ניסיון של שנים בתחום, מזמין אתכם להתרווח, להתחדש ולהרגיש בבית.';
       const aboutDoc = await getDoc(doc(db, 'settings', 'aboutUsText'));
+      let aboutUsMessage = defaultAboutUs;
+      
       if (aboutDoc.exists()) {
         const data = aboutDoc.data();
-        setAboutUsMessage(data.text || 'ברוכים הבאים למספרה של רון תורג׳מן! כאן תיהנו מחוויה אישית, מקצועית ומפנקת, עם יחס חם לכל לקוח. רון, בעל ניסיון של שנים בתחום, מזמין אתכם להתרווח, להתחדש ולהרגיש בבית.');
-      } else {
-        setAboutUsMessage('ברוכים הבאים למספרה של רון תורג׳מן! כאן תיהנו מחוויה אישית, מקצועית ומפנקת, עם יחס חם לכל לקוח. רון, בעל ניסיון של שנים בתחום, מזמין אתכם להתרווח, להתחדש ולהרגיש בבית.');
+        aboutUsMessage = data.text || defaultAboutUs;
       }
+      
+      setAboutUsMessage(aboutUsMessage);
 
       // Check for popup message
+      let popupMessage: string | undefined;
+      let showPopupValue = false;
       const popupDoc = await getDoc(doc(db, 'settings', 'popupMessage'));
       if (popupDoc.exists()) {
         const data = popupDoc.data();
         if (data.isActive && data.message && data.expiresAt && data.expiresAt.toDate() > new Date()) {
-          setPopupMessage(data.message);
+          popupMessage = data.message;
+          showPopupValue = true;
+          setPopupMessage(popupMessage);
           setShowPopup(true);
         }
+      }
+
+      // Update cache for next time
+      try {
+        await CacheUtils.setHomeContent({
+          welcomeMessage,
+          subtitleMessage,
+          aboutUsMessage,
+          popupMessage,
+          showPopup: showPopupValue,
+        }, 30);
+      } catch (cacheError) {
+        console.warn('Failed to update content cache:', cacheError);
       }
     } catch (error) {
       console.warn('Failed to fetch dynamic content:', error);
       // Fallback to translation values
-      setWelcomeMessage(t('home.welcome'));
-      setSubtitleMessage(t('home.subtitle'));
-      setAboutUsMessage('ברוכים הבאים למספרה של רון תורג׳מן! כאן תיהנו מחוויה אישית, מקצועית ומפנקת, עם יחס חם לכל לקוח. רון, בעל ניסיון של שנים בתחום, מזמין אתכם להתרווח, להתחדש ולהרגיש בבית.');
+      const fallbackWelcome = t('home.welcome');
+      const fallbackSubtitle = t('home.subtitle');
+      const fallbackAboutUs = 'ברוכים הבאים למספרה של רון תורג׳מן! כאן תיהנו מחוויה אישית, מקצועית ומפנקת, עם יחס חם לכל לקוח. רון, בעל ניסיון של שנים בתחום, מזמין אתכם להתרווח, להתחדש ולהרגיש בבית.';
+      setWelcomeMessage(fallbackWelcome);
+      setSubtitleMessage(fallbackSubtitle);
+      setAboutUsMessage(fallbackAboutUs);
     }
   };
 
@@ -305,11 +367,20 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
           });
         }
         
-        setSettingsImages({
+        const imagesData = {
           atmosphere: atmosphereImage,
           aboutUs: aboutUsImage,
           gallery: galleryImages,
-        });
+        };
+        
+        setSettingsImages(imagesData);
+        
+        // Update cache for next time
+        try {
+          await CacheUtils.setHomeImages(imagesData, 30);
+        } catch (cacheError) {
+          console.warn('Failed to update images cache:', cacheError);
+        }
         
         console.log('✅ Loaded Firebase images:', {
           atmosphere: atmosphereImage ? '✅ Found' : '❌ Not found',
@@ -359,10 +430,17 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
             });
             
             if (refreshedGalleryImages.length > 0) {
-              setSettingsImages(prev => ({
-                ...prev,
-                gallery: refreshedGalleryImages,
-              }));
+              setSettingsImages(prev => {
+                const updated = {
+                  ...prev,
+                  gallery: refreshedGalleryImages,
+                };
+                // Update cache
+                CacheUtils.setHomeImages(updated, 30).catch(err => 
+                  console.warn('Failed to update images cache after init:', err)
+                );
+                return updated;
+              });
               console.log('✅ Gallery initialized with', refreshedGalleryImages.length, 'images');
             }
           } catch (initError) {
@@ -389,10 +467,17 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
             });
             
             if (refreshedGalleryImages.length > 0) {
-              setSettingsImages(prev => ({
-                ...prev,
-                gallery: refreshedGalleryImages,
-              }));
+              setSettingsImages(prev => {
+                const updated = {
+                  ...prev,
+                  gallery: refreshedGalleryImages,
+                };
+                // Update cache
+                CacheUtils.setHomeImages(updated, 30).catch(err => 
+                  console.warn('Failed to update images cache after replacement:', err)
+                );
+                return updated;
+              });
               console.log('✅ Gallery placeholders replaced with', refreshedGalleryImages.length, 'real images');
             }
           } catch (replaceError) {
@@ -513,7 +598,7 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>{t('common.loading')}</Text>
+          <ScissorsLoader size={60} color="#007bff" accessibilityLabel={t('common.loading')} />
         </View>
       </SafeAreaView>
     );
@@ -647,7 +732,20 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
               
               <TouchableOpacity 
                 style={styles.quickActionCard}
-                onPress={() => onNavigate('profile')}
+                onPress={() => {
+                  if (isGuestMode) {
+                    Alert.alert(
+                      'התחברות נדרשת',
+                      'חייב להתחבר כדי לראות את התורים שלך. האם תרצה להתחבר עכשיו?',
+                      [
+                        { text: 'ביטול', style: 'cancel' },
+                        { text: 'התחבר', onPress: () => router.push('/auth-choice') }
+                      ]
+                    );
+                  } else {
+                    onNavigate('my-appointments');
+                  }
+                }}
               >
                 <Ionicons name="list" size={32} color="#007bff" />
                 <Text style={styles.quickActionTitle}>{t('home.my_appointments')}</Text>
@@ -735,12 +833,6 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
                   
 ✂️ AI: "המספרה שלנו היא לא רק מקום להסתפר, אלא מקום להרגיש בו טוב, להירגע ולצאת עם חיוך. כל תספורת היא יצירת אמנות!"`}
                 </Text>
-                <TouchableOpacity 
-                  style={styles.wazeButton} 
-                  onPress={handleWaze}
-                >
-                  <Text style={styles.wazeButtonText}>{t('home.navigate_waze')}</Text>
-                </TouchableOpacity>
               </View>
             </View>
           </Animated.View>
@@ -774,10 +866,7 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
 
           {/* Footer */}
           <View style={styles.footerCard}>
-            <Text style={styles.footerText}>מושב יושיביה 1</Text>
-            <TouchableOpacity onPress={handleWaze}>
-              <Text style={styles.footerWaze}>{t('home.navigate_waze')}</Text>
-            </TouchableOpacity>
+            <Text style={styles.footerText}>מושב יושייביה</Text>
             <Text style={styles.footerCredit}>{t('home.powered_by')}</Text>
             <TouchableOpacity onPress={() => setShowTerms(true)}>
               <Text style={styles.footerTerms}>{t('home.terms')}</Text>
@@ -1116,7 +1205,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   carousel3DContainer: {
-    height: 280,
+    height: 480, // Increased to accommodate larger cards (was 320)
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1124,8 +1213,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   carousel3DCard: {
-    width: 160,
-    height: 240,
+    width: 285, // Increased by 1.5x (was 190)
+    height: 420, // Increased by 1.5x (was 280)
     borderRadius: 20,
     marginRight: 8,
     backgroundColor: '#eee',

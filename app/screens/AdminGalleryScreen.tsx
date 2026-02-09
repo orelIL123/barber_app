@@ -3,31 +3,33 @@ import * as ImagePicker from 'expo-image-picker';
 import { doc, getDoc, getFirestore, setDoc } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
 import {
-  Alert,
-  Dimensions,
-  Image,
-  Modal,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    Alert,
+    Dimensions,
+    Image,
+    Modal,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
+import { CacheUtils } from '../../services/cache';
 import {
-  addGalleryImage,
-  addShopItem,
-  deleteGalleryImage,
-  deleteShopItem,
-  GalleryImage,
-  getAllStorageImages,
-  getGalleryImages,
-  getShopItems,
-  ShopItem,
-  updateShopItem,
-  uploadImageToStorage
+    addGalleryImage,
+    addShopItem,
+    deleteGalleryImage,
+    deleteShopItem,
+    GalleryImage,
+    getAllStorageImages,
+    getGalleryImages,
+    getShopItems,
+    ShopItem,
+    updateShopItem,
+    uploadImageToStorage
 } from '../../services/firebase';
+import { ScissorsLoader } from '../components/ScissorsLoader';
 import ToastMessage from '../components/ToastMessage';
 import TopNav from '../components/TopNav';
 
@@ -121,6 +123,8 @@ const AdminGalleryScreen: React.FC<AdminGalleryScreenProps> = ({ onNavigate, onB
     try {
       const db = getFirestore();
       await setDoc(doc(db, 'settings', 'aboutUsText'), { text: aboutUsText });
+      // Invalidate cache so users see updated data immediately
+      await CacheUtils.clearHomeData();
       setEditingAboutUs(false);
       showToast('הטקסט עודכן!');
     } catch (e) {
@@ -287,6 +291,11 @@ const AdminGalleryScreen: React.FC<AdminGalleryScreenProps> = ({ onNavigate, onB
             : img
         ));
         
+        // Invalidate cache if this affects home screen (gallery, background, aboutus)
+        if (imageData.type === 'gallery' || imageData.type === 'background' || imageData.type === 'aboutus') {
+          await CacheUtils.clearHomeData();
+        }
+        
         showToast('התמונה עודכנה בהצלחה');
         console.log('✅ Image updated successfully');
       } else {
@@ -312,6 +321,12 @@ const AdminGalleryScreen: React.FC<AdminGalleryScreenProps> = ({ onNavigate, onB
         console.log('✅ Image saved with ID:', newImageId);
         
         setImages(prev => [...prev, { id: newImageId, ...imageData, createdAt: new Date() as any }]);
+        
+        // Invalidate cache if this affects home screen (gallery, background, aboutus)
+        if (imageData.type === 'gallery' || imageData.type === 'background' || imageData.type === 'aboutus') {
+          await CacheUtils.clearHomeData();
+        }
+        
         showToast('התמונה נוספה בהצלחה');
       }
       
@@ -327,6 +342,11 @@ const AdminGalleryScreen: React.FC<AdminGalleryScreenProps> = ({ onNavigate, onB
   };
 
   const handleDelete = async (imageId: string) => {
+    // Find the image to check its type
+    const imageToDelete = images.find(img => img.id === imageId);
+    const affectsHomeScreen = imageToDelete && 
+      (imageToDelete.type === 'gallery' || imageToDelete.type === 'background' || imageToDelete.type === 'aboutus');
+    
     Alert.alert(
       'מחיקת תמונה',
       'האם אתה בטוח שברצונך למחוק תמונה זו?',
@@ -339,6 +359,12 @@ const AdminGalleryScreen: React.FC<AdminGalleryScreenProps> = ({ onNavigate, onB
             try {
               await deleteGalleryImage(imageId);
               setImages(prev => prev.filter(img => img.id !== imageId));
+              
+              // Invalidate cache if this affects home screen
+              if (affectsHomeScreen) {
+                await CacheUtils.clearHomeData();
+              }
+              
               showToast('התמונה נמחקה בהצלחה');
             } catch (error) {
               console.error('Error deleting image:', error);
@@ -694,7 +720,7 @@ const AdminGalleryScreen: React.FC<AdminGalleryScreenProps> = ({ onNavigate, onB
         {/* Images Grid */}
         {loading ? (
           <View style={styles.loadingContainer}>
-            <Text style={styles.loadingText}>טוען תמונות...</Text>
+            <ScissorsLoader size={60} color="#007bff" accessibilityLabel="טוען תמונות" />
           </View>
         ) : (
           <ScrollView style={styles.imagesList}>

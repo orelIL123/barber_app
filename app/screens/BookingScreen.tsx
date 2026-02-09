@@ -4,31 +4,32 @@ import { collection, getDocs, getFirestore, onSnapshot, query, QuerySnapshot, Ti
 import React, { memo, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  Alert,
-  Dimensions,
-  Image,
-  Modal,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
+    Alert,
+    Dimensions,
+    Image,
+    Modal,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import {
-  Barber,
-  createAppointment,
-  createWaitlistEntry,
-  getBarberAppointmentsForDay,
-  getBarberAvailableSlots,
-  getBarbers,
-  getCurrentUser,
-  getTreatments,
-  getUserProfile,
-  subscribeToTreatmentsChanges,
-  Treatment
+    Barber,
+    createAppointment,
+    createWaitlistEntry,
+    getBarberAppointmentsForDay,
+    getBarberAvailableSlots,
+    getBarbers,
+    getCurrentUser,
+    getTreatments,
+    getUserProfile,
+    subscribeToTreatmentsChanges,
+    Treatment
 } from '../../services/firebase';
 import ConfirmationModal from '../components/ConfirmationModal';
+import { ScissorsLoader } from '../components/ScissorsLoader';
 import TopNav from '../components/TopNav';
 import { generateTimeSlots, getSlotsNeeded, SLOT_SIZE_MINUTES, toMin, toYMD } from '../constants/scheduling';
 
@@ -63,7 +64,7 @@ const OptimizedImage = memo(({ source, style, resizeMode = 'cover' }: {
           justifyContent: 'center', 
           alignItems: 'center' 
         }]}>
-          <Text style={{ color: '#999', fontSize: 12 }}>טוען...</Text>
+          <ScissorsLoader size={14} color="#007bff" accessibilityLabel="טוען תמונה" />
         </View>
       )}
       <Image
@@ -105,6 +106,19 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
   const [waitlistTimeEnd, setWaitlistTimeEnd] = useState('18:00');
 
   const preSelectedBarberId = route?.params?.barberId;
+
+  // Locale-independent time helpers.
+  // We must NOT use toLocaleTimeString() for slot strings because some devices emit "2:00 PM",
+  // which breaks parsing (minutes -> NaN) and can lead to "date value out of bounds" when creating Firestore Timestamps.
+  const toHHMM = (d: Date) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  const parseHHMM = (time: string) => {
+    const [hhStr, mmStr] = String(time || '').split(':');
+    const hours = Number(hhStr);
+    const minutes = Number(mmStr);
+    if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return null;
+    if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
+    return { hours, minutes };
+  };
 
   const loadData = useCallback(async () => {
     try {
@@ -271,7 +285,7 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
       // If we have a selected date and treatment, update available times
       if (selectedDate && selectedTreatment) {
         const slots = await generateAvailableSlots(selectedBarber.id, selectedDate, selectedTreatment.duration);
-        const timeStrings = slots.map(slot => slot.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+        const timeStrings = slots.map(toHHMM);
         setAvailableTimes(timeStrings);
       }
       
@@ -335,7 +349,7 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
         if (selectedDate && selectedTreatment) {
           console.log('🔄 Real-time: Regenerating available times for selected date');
           generateAvailableSlots(selectedBarber.id, selectedDate, selectedTreatment.duration).then(slots => {
-            const timeStrings = slots.map(slot => slot.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+            const timeStrings = slots.map(toHHMM);
             console.log('🔄 Real-time: Updated available times:', timeStrings.length, 'slots');
             setAvailableTimes(timeStrings);
           });
@@ -591,7 +605,7 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
     // If we already have a selected date, generate times now
     if (selectedDate && selectedBarber) {
       generateAvailableSlots(selectedBarber.id, selectedDate, treatment.duration).then(slots => {
-        const timeStrings = slots.map(slot => slot.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+        const timeStrings = slots.map(toHHMM);
         setAvailableTimes(timeStrings);
       });
     }
@@ -609,7 +623,7 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
     if (selectedBarber && selectedTreatment) {
       try {
         const slots = await generateAvailableSlots(selectedBarber.id, date, selectedTreatment.duration);
-        const timeStrings = slots.map(slot => slot.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+        const timeStrings = slots.map(toHHMM);
         console.log('🎯 DATE SELECTED: Final timeStrings generated:', timeStrings);
         
         // If no slots available, check if barber has availability for this day
@@ -708,8 +722,11 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
     setBooking(true);
     try {
       const appointmentDateTime = new Date(selectedDate);
-      const [hours, minutes] = selectedTime.split(':').map(Number);
-      appointmentDateTime.setHours(hours, minutes, 0, 0);
+      const parsed = parseHHMM(selectedTime);
+      if (!parsed) {
+        throw new Error(`Invalid time value: ${selectedTime}`);
+      }
+      appointmentDateTime.setHours(parsed.hours, parsed.minutes, 0, 0);
 
       console.log('Creating appointment:', {
         barberId: selectedBarber.id,
@@ -732,7 +749,7 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
         // Refresh available times
         if (selectedBarber && selectedTreatment) {
           const slots = await generateAvailableSlots(selectedBarber.id, selectedDate, selectedTreatment.duration);
-          const timeStrings = slots.map(slot => slot.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+          const timeStrings = slots.map(toHHMM);
           setAvailableTimes(timeStrings);
         }
         return;
@@ -787,10 +804,14 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
 
       // אחרי יצירת התור בהצלחה:
       if (selectedDate && selectedTime && selectedTreatment) {
-        const [hours, minutes] = selectedTime.split(":").map(Number);
-        const appointmentDate = new Date(selectedDate);
-        appointmentDate.setHours(hours, minutes, 0, 0);
-        await scheduleAppointmentReminders(appointmentDate, selectedTreatment.name);
+        const parsed = parseHHMM(selectedTime);
+        if (parsed) {
+          const appointmentDate = new Date(selectedDate);
+          appointmentDate.setHours(parsed.hours, parsed.minutes, 0, 0);
+          await scheduleAppointmentReminders(appointmentDate, selectedTreatment.name);
+        } else {
+          console.warn('⚠️ Skipping reminder scheduling due to invalid selectedTime:', selectedTime);
+        }
       }
 
     } catch (error: any) {
@@ -853,6 +874,11 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
     ];
     
     return `יום ${days[date.getDay()]} ${date.getDate()} ${months[date.getMonth()]}`;
+  };
+
+  const formatDateDayOnly = (date: Date) => {
+    const days = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
+    return days[date.getDay()];
   };
 
   const getStepTitle = () => {
@@ -946,7 +972,7 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
           onClosePress={onClose}
         />
         <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>{t('common.loading')}</Text>
+          <ScissorsLoader size={60} color="#007bff" accessibilityLabel={t('common.loading')} />
         </View>
       </SafeAreaView>
     );
@@ -1016,7 +1042,7 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
                     </View>
                     <Text style={styles.barberName}>{barber.name}</Text>
                     <Text style={styles.barberExperience}>{barber.experience}</Text>
-                    <TouchableOpacity style={styles.detailsButton} onPress={() => setDetailsBarber(barber)}>
+                    <TouchableOpacity style={styles.detailsButton} onPress={() => handleBarberSelect(barber)}>
                       <Text style={styles.detailsButtonText}>{t('booking.details')}</Text>
                     </TouchableOpacity>
                   </LinearGradient>
@@ -1066,77 +1092,84 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
         {/* Step 3: Select Date */}
         {currentStep === 3 && (
           <View style={styles.stepContent}>
-            {/* Refresh Button */}
-            <View style={styles.refreshContainer}>
-              <TouchableOpacity
-                style={[styles.refreshButton, refreshing && styles.refreshButtonDisabled]}
-                onPress={refreshAvailability}
-                disabled={refreshing || !selectedBarber}
-              >
-                <Text style={styles.refreshButtonText}>
-                  {refreshing ? 'מעדכן...' : '🔄 רענן זמינות'}
-                </Text>
-              </TouchableOpacity>
+            <View style={styles.selectionSummary}>
+              <Text style={styles.selectionSummaryText}>
+                בחרת את {selectedBarber?.name} ל{selectedTreatment?.name} ב
+              </Text>
             </View>
-            
-            <View style={styles.datesContainer}>
-              {availableDates.length > 0 ? availableDates.map((dateObj, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={[
-                    styles.dateCard,
-                    selectedDate?.getTime() === dateObj.date.getTime() && styles.selectedCard,
-                    !dateObj.isAvailable && styles.unavailableCard
-                  ]}
-                  onPress={() => dateObj.isAvailable ? handleDateSelect(dateObj.date) : null}
-                  disabled={!dateObj.isAvailable}
-                >
-                  <LinearGradient
-                    colors={dateObj.isAvailable ? ['#1a1a1a', '#000000', '#1a1a1a'] : ['#ff4444', '#cc0000', '#ff4444']}
-                    style={styles.dateGradient}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
+
+            <View style={styles.datesListContainer}>
+              {(availableDates.length > 0 ? availableDates : generateAvailableDates()).map((dateObj, index) => {
+                const isToday = index === 0;
+                const isTomorrow = index === 1;
+                const dateLabel = isToday ? 'היום' : isTomorrow ? 'מחר' : formatDateDayOnly(dateObj.date);
+                const dateNum = `${dateObj.date.getDate()}.${dateObj.date.getMonth() + 1}`;
+                
+                return (
+                  <TouchableOpacity
+                    key={index}
+                    style={[
+                      styles.dateListItem,
+                      selectedDate?.getTime() === dateObj.date.getTime() && styles.selectedDateListItem,
+                    ]}
+                    onPress={() => dateObj.isAvailable ? handleDateSelect(dateObj.date) : null}
                   >
-                    <Text style={[styles.dateText, !dateObj.isAvailable && styles.unavailableText]}>
-                      {formatDate(dateObj.date)}
-                    </Text>
-                    <Text style={[styles.dateNumber, !dateObj.isAvailable && styles.unavailableText]}>
-                      {dateObj.date.getDate()}
-                    </Text>
-                    {!dateObj.isAvailable && (
-                      <Text style={styles.unavailableLabel}>לא זמין</Text>
-                    )}
-                  </LinearGradient>
-                </TouchableOpacity>
-              )) : generateAvailableDates().map((dateObj, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={[
-                    styles.dateCard,
-                    selectedDate?.getTime() === dateObj.date.getTime() && styles.selectedCard,
-                    !dateObj.isAvailable && styles.unavailableCard
-                  ]}
-                  onPress={() => dateObj.isAvailable ? handleDateSelect(dateObj.date) : null}
-                  disabled={!dateObj.isAvailable}
+                    <LinearGradient
+                      colors={selectedDate?.getTime() === dateObj.date.getTime() 
+                        ? ['#3b82f6', '#1d4ed8'] 
+                        : ['#e0e0e0', '#ffffff']} // More noticeable gradient at the top
+                      style={styles.dateListItemGradient}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 0, y: 1 }}
+                    >
+                      <Text style={[
+                        styles.dateListItemText,
+                        selectedDate?.getTime() === dateObj.date.getTime() && { color: '#fff' },
+                        !dateObj.isAvailable && styles.dateListItemTextUnavailable
+                      ]}>
+                        {dateLabel}, {dateNum}
+                      </Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <View style={styles.legendContainer}>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: '#333' }]} />
+                <Text style={styles.legendText}>יש תורים</Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: '#FF6B6B' }]} />
+                <Text style={styles.legendText}>אין תורים</Text>
+              </View>
+            </View>
+
+            <View style={styles.bottomActionsContainer}>
+              <View style={styles.actionColumn}>
+                <Text style={styles.actionLabel}>חייב תור דחוף?</Text>
+                <TouchableOpacity 
+                  style={[styles.actionButton, styles.urgentButton]}
+                  onPress={() => {
+                    // Find first available date and select it
+                    const firstAvail = availableDates.find(d => d.isAvailable);
+                    if (firstAvail) handleDateSelect(firstAvail.date);
+                  }}
                 >
-                  <LinearGradient
-                    colors={dateObj.isAvailable ? ['#1a1a1a', '#000000', '#1a1a1a'] : ['#ff4444', '#cc0000', '#ff4444']}
-                    style={styles.dateGradient}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                  >
-                    <Text style={[styles.dateText, !dateObj.isAvailable && styles.unavailableText]}>
-                      {formatDate(dateObj.date)}
-                    </Text>
-                    <Text style={[styles.dateNumber, !dateObj.isAvailable && styles.unavailableText]}>
-                      {dateObj.date.getDate()}
-                    </Text>
-                    {!dateObj.isAvailable && (
-                      <Text style={styles.unavailableLabel}>לא זמין</Text>
-                    )}
-                  </LinearGradient>
+                  <Text style={styles.actionButtonText}>התורים הקרובים ביותר</Text>
                 </TouchableOpacity>
-              ))}
+              </View>
+
+              <View style={styles.actionColumn}>
+                <Text style={styles.actionLabel}>לא מצאת תור לזמן שלך?</Text>
+                <TouchableOpacity 
+                  style={[styles.actionButton, styles.waitlistButton]}
+                  onPress={() => setShowWaitlistModal(true)}
+                >
+                  <Text style={styles.actionButtonText}>כניסה לרשימת המתנה</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         )}
@@ -1144,17 +1177,13 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
         {/* Step 4: Select Time */}
         {currentStep === 4 && (
           <View style={styles.stepContent}>
-            {/* Refresh Button */}
-            <View style={styles.refreshContainer}>
-              <TouchableOpacity
-                style={[styles.refreshButton, refreshing && styles.refreshButtonDisabled]}
-                onPress={refreshAvailability}
-                disabled={refreshing || !selectedBarber}
-              >
-                <Text style={styles.refreshButtonText}>
-                  {refreshing ? 'מעדכן...' : '🔄 רענן זמינות'}
-                </Text>
-              </TouchableOpacity>
+            <View style={styles.selectionSummary}>
+              <Text style={styles.selectionSummaryText}>
+                בחרת את {selectedBarber?.name} ל{selectedTreatment?.name}
+              </Text>
+              <Text style={styles.selectionSummarySubtext}>
+                בתאריך: {selectedDate && formatDateDayOnly(selectedDate)}, {selectedDate && `${selectedDate.getDate()}.${selectedDate.getMonth() + 1}`}
+              </Text>
             </View>
             
             {availableTimes.length === 0 ? (
@@ -1165,23 +1194,30 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
                 <Text style={styles.noSlotsHint}>נסה לבחור תאריך אחר</Text>
               </View>
             ) : (
-              <View style={styles.timesContainer}>
+              <View style={styles.datesListContainer}>
                 {availableTimes.map((time, index) => (
                   <TouchableOpacity
                     key={index}
                     style={[
-                      styles.timeCard,
-                      selectedTime === time && styles.selectedCard
+                      styles.dateListItem,
+                      selectedTime === time && styles.selectedDateListItem
                     ]}
                     onPress={() => handleTimeSelect(time)}
                   >
                     <LinearGradient
-                      colors={['#1a1a1a', '#000000', '#1a1a1a']}
-                      style={styles.timeGradient}
+                      colors={selectedTime === time 
+                        ? ['#3b82f6', '#1d4ed8'] 
+                        : ['#e0e0e0', '#ffffff']} // Same style as dates
+                      style={styles.dateListItemGradient}
                       start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
+                      end={{ x: 0, y: 1 }}
                     >
-                      <Text style={styles.timeText}>{time}</Text>
+                      <Text style={[
+                        styles.dateListItemText,
+                        selectedTime === time && { color: '#fff' }
+                      ]}>
+                        {time}
+                      </Text>
                     </LinearGradient>
                   </TouchableOpacity>
                 ))}
@@ -1455,6 +1491,118 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
 };
 
 const styles = StyleSheet.create({
+  selectionSummary: {
+    paddingVertical: 20,
+    alignItems: 'center',
+  },
+  selectionSummaryText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    textAlign: 'center',
+  },
+  datesListContainer: {
+    paddingHorizontal: 60, // Narrower cards as requested
+    gap: 12,
+  },
+  dateListItem: {
+    borderRadius: 25,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  dateListItemGradient: {
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  selectedDateListItem: {
+    borderWidth: 2,
+    borderColor: '#3b82f6',
+    transform: [{ scale: 1.02 }],
+  },
+  dateListItemText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#333', // Black text for white background
+  },
+  dateListItemTextUnavailable: {
+    color: '#FF6B6B',
+  },
+  selectionSummarySubtext: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  legendContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 20,
+    marginTop: 24,
+    marginBottom: 32,
+  },
+  legendItem: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 8,
+  },
+  legendDot: {
+    width: 12,
+    height: 2,
+    borderRadius: 1,
+  },
+  legendText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  bottomActionsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    marginTop: 20,
+    marginBottom: 40,
+    gap: 12,
+  },
+  actionColumn: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  actionLabel: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  actionButton: {
+    width: '100%',
+    paddingVertical: 12, // Shrunk from 14
+    borderRadius: 20, // More modern look
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1, // Softer shadow
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  urgentButton: {
+    backgroundColor: '#C1A386', // Gold/Brown color from image
+  },
+  waitlistButton: {
+    backgroundColor: '#000',
+  },
+  actionButtonText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
   container: {
     flex: 1,
     backgroundColor: '#f8f9fa',

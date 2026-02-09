@@ -20,6 +20,7 @@ import {
     onAuthStateChange,
     updateAppointment
 } from '../../services/firebase';
+import { ScissorsLoader } from '../components/ScissorsLoader';
 import TopNav from '../components/TopNav';
 
 const { width } = Dimensions.get('window');
@@ -307,7 +308,7 @@ const AdminStatisticsScreen: React.FC<AdminStatisticsScreenProps> = ({ onNavigat
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>טוען סטטיסטיקות...</Text>
+          <ScissorsLoader size={60} color="#007bff" accessibilityLabel="טוען סטטיסטיקות" />
         </View>
       </SafeAreaView>
     );

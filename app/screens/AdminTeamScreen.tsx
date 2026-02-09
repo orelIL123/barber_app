@@ -27,6 +27,7 @@ import {
     updateBarberProfile,
     uploadImageToStorage
 } from '../../services/firebase';
+import { ScissorsLoader } from '../components/ScissorsLoader';
 import ToastMessage from '../components/ToastMessage';
 import TopNav from '../components/TopNav';
 
@@ -53,7 +54,7 @@ const OptimizedImage = memo(({ source, style, resizeMode = 'cover' }: {
           justifyContent: 'center', 
           alignItems: 'center' 
         }]}>
-          <Text style={{ color: '#999', fontSize: 12 }}>טוען...</Text>
+          <ScissorsLoader size={14} color="#007bff" accessibilityLabel="טוען תמונה" />
         </View>
       )}
       <Image
@@ -401,7 +402,7 @@ const AdminTeamScreen: React.FC<AdminTeamScreenProps> = ({ onNavigate, onBack })
         {/* Barbers List */}
         {loading ? (
           <View style={styles.loadingContainer}>
-            <Text style={styles.loadingText}>טוען ספרים...</Text>
+            <ScissorsLoader size={60} color="#007bff" accessibilityLabel="טוען ספרים" />
           </View>
         ) : (
           <ScrollView style={styles.barbersList}>

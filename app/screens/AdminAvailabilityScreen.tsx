@@ -1,39 +1,40 @@
 import { Ionicons } from '@expo/vector-icons';
 import {
-  collection,
-  deleteDoc,
-  doc,
-  getDocs,
-  getFirestore,
-  query,
-  setDoc,
-  where
+    collection,
+    deleteDoc,
+    doc,
+    getDocs,
+    getFirestore,
+    query,
+    setDoc,
+    where
 } from 'firebase/firestore';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  Alert,
-  Modal,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Alert,
+    Modal,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import {
-  Barber,
-  getBarbers,
-  updateBarberProfile
+    Barber,
+    getBarbers,
+    updateBarberProfile
 } from '../../services/firebase';
+import { ScissorsLoader } from '../components/ScissorsLoader';
 import ToastMessage from '../components/ToastMessage';
 import TopNav from '../components/TopNav';
 import {
-  SLOT_SIZE_MINUTES,
-  generateTimeSlots,
-  getDayOfWeekFromYMD,
-  isOnGrid,
-  toMin,
-  toYMD
+    SLOT_SIZE_MINUTES,
+    generateTimeSlots,
+    getDayOfWeekFromYMD,
+    isOnGrid,
+    toMin,
+    toYMD
 } from '../constants/scheduling';
 
 interface AdminAvailabilityScreenProps {
@@ -754,7 +755,7 @@ const AdminAvailabilityScreen: React.FC<AdminAvailabilityScreenProps> = ({ onNav
       <View style={styles.content}>
         {loading ? (
           <View style={styles.loadingContainer}>
-            <Text style={styles.loadingText}>טוען ספרים...</Text>
+            <ScissorsLoader size={60} color="#007bff" accessibilityLabel="טוען ספרים" />
           </View>
         ) : (
           <ScrollView style={styles.barbersList}>

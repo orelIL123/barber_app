@@ -6,6 +6,7 @@ import {
   linkWithCredential,
   onAuthStateChanged,
   PhoneAuthProvider,
+  sendPasswordResetEmail,
   signInWithCredential,
   signInWithEmailAndPassword,
   signOut,
@@ -921,6 +922,33 @@ export const checkPhoneUserExists = async (phoneNumber: string): Promise<{ exist
   }
 };
 
+// Function specifically for password reset flow
+export const checkUserExistsForPasswordReset = async (phoneNumber: string): Promise<{ exists: boolean; userId?: string; email?: string }> => {
+  try {
+    const userCheck = await checkPhoneUserExists(phoneNumber.trim());
+    return {
+      exists: userCheck.exists,
+      userId: userCheck.uid,
+      email: userCheck.email
+    };
+  } catch (error) {
+    console.error('Error checking user for password reset:', error);
+    return { exists: false };
+  }
+};
+
+// Export the auth password reset function
+export const sendResetEmail = async (email: string) => {
+  return sendPasswordResetEmail(auth, email);
+};
+
+export const callUpdateEmailAndSendReset = async (firestoreUserId: string, newEmail: string) => {
+  const updateEmailAndSendReset = httpsCallable(functions, 'updateEmailAndSendReset');
+  return updateEmailAndSendReset({ firestoreUserId, newEmail });
+};
+
+
+
 // New function to set password for existing SMS users
 export const setPasswordForSMSUser = async (phoneNumber: string, password: string) => {
   try {
@@ -1424,20 +1452,24 @@ export const createAppointment = async (appointmentData: Omit<Appointment, 'id' 
       status: appointmentData.status
     });
 
-    // Validate userId exists in Firestore
-    try {
-      const userDoc = await getDoc(doc(db, 'users', appointmentData.userId));
-      if (!userDoc.exists()) {
-        console.error(`❌ User ${appointmentData.userId} does not exist in Firestore!`);
-        throw new Error(`User ${appointmentData.userId} does not exist. Please contact support.`);
+    // Validate userId exists in Firestore (skip for manual-client)
+    if (appointmentData.userId !== 'manual-client') {
+      try {
+        const userDoc = await getDoc(doc(db, 'users', appointmentData.userId));
+        if (!userDoc.exists()) {
+          console.error(`❌ User ${appointmentData.userId} does not exist in Firestore!`);
+          throw new Error(`User ${appointmentData.userId} does not exist. Please contact support.`);
+        }
+        const userData = userDoc.data();
+        console.log(`✅ User found: ${userData.displayName} (${userData.phone || 'no phone'})`);
+      } catch (userCheckError: any) {
+        if (userCheckError.message.includes('does not exist')) {
+          throw userCheckError;
+        }
+        console.error('⚠️ Error checking user:', userCheckError);
       }
-      const userData = userDoc.data();
-      console.log(`✅ User found: ${userData.displayName} (${userData.phone || 'no phone'})`);
-    } catch (userCheckError: any) {
-      if (userCheckError.message.includes('does not exist')) {
-        throw userCheckError;
-      }
-      console.error('⚠️ Error checking user:', userCheckError);
+    } else {
+      console.log('✅ Manual client - skipping user validation');
     }
 
     // Validate duration is a multiple of 25 minutes
@@ -1454,14 +1486,18 @@ export const createAppointment = async (appointmentData: Omit<Appointment, 'id' 
     const docRef = await addDoc(collection(db, 'appointments'), appointment);
     console.log('✅ Appointment created with ID:', docRef.id);
     
-    // Send notification to user about new appointment
-    try {
-      const dateVal: any = appointmentData.date as any;
-      const asDate = typeof dateVal?.toDate === 'function' ? dateVal.toDate() : new Date(dateVal);
-      const dateStr = asDate.toLocaleDateString('he-IL');
-      await sendNotificationToUser(appointmentData.userId, 'תור חדש נוצר! 📅', `התור שלך נוצר בהצלחה. תאריך: ${dateStr}`, { appointmentId: docRef.id });
-    } catch (notificationError) {
-      console.log('Failed to send appointment notification:', notificationError);
+    // Send notification to user about new appointment (skip for manual-client)
+    if (appointmentData.userId !== 'manual-client') {
+      try {
+        const dateVal: any = appointmentData.date as any;
+        const asDate = typeof dateVal?.toDate === 'function' ? dateVal.toDate() : new Date(dateVal);
+        const dateStr = asDate.toLocaleDateString('he-IL');
+        await sendNotificationToUser(appointmentData.userId, 'תור חדש נוצר! 📅', `התור שלך נוצר בהצלחה. תאריך: ${dateStr}`, { appointmentId: docRef.id });
+      } catch (notificationError) {
+        console.log('Failed to send appointment notification:', notificationError);
+      }
+    } else {
+      console.log('⏭️ Skipping user notification for manual client');
     }
     
     // Send notification to admin about new appointment
@@ -1473,13 +1509,18 @@ export const createAppointment = async (appointmentData: Omit<Appointment, 'id' 
       
       // Get customer name for better admin notification
       let customerName = 'לקוח';
-      try {
-        const customerDoc = await getDoc(doc(db, 'users', appointmentData.userId));
-        if (customerDoc.exists()) {
-          customerName = customerDoc.data().displayName || 'לקוח';
+      if (appointmentData.userId === 'manual-client' && (appointmentData as any).clientName) {
+        // Use manual client name if available
+        customerName = (appointmentData as any).clientName;
+      } else if (appointmentData.userId !== 'manual-client') {
+        try {
+          const customerDoc = await getDoc(doc(db, 'users', appointmentData.userId));
+          if (customerDoc.exists()) {
+            customerName = customerDoc.data().displayName || 'לקוח';
+          }
+        } catch (e) {
+          console.log('Could not fetch customer name');
         }
-      } catch (e) {
-        console.log('Could not fetch customer name');
       }
       
       await sendNotificationToAdmin(
@@ -1493,24 +1534,29 @@ export const createAppointment = async (appointmentData: Omit<Appointment, 'id' 
     }
     
     // Schedule LOCAL notification reminders ONLY (removed Firestore-based reminders to avoid duplicates)
-    try {
-      console.log('📱 Scheduling LOCAL appointment reminders...');
-      let appointmentDate: Date;
-      if (typeof appointmentData.date.toDate === 'function') {
-        appointmentDate = appointmentData.date.toDate();
-      } else if (appointmentData.date instanceof Date) {
-        appointmentDate = appointmentData.date;
-      } else {
-        appointmentDate = new Date(appointmentData.date);
+    // Skip for manual clients - no user to send reminders to
+    if (appointmentData.userId !== 'manual-client') {
+      try {
+        console.log('📱 Scheduling LOCAL appointment reminders...');
+        let appointmentDate: Date;
+        if (typeof appointmentData.date.toDate === 'function') {
+          appointmentDate = appointmentData.date.toDate();
+        } else if (appointmentData.date instanceof Date) {
+          appointmentDate = appointmentData.date;
+        } else {
+          appointmentDate = new Date(appointmentData.date);
+        }
+        await scheduleLocalAppointmentReminders({
+          id: docRef.id,
+          startsAt: appointmentDate.toISOString(),
+        });
+        console.log('✅ LOCAL appointment reminders scheduled successfully');
+      } catch (localScheduleError) {
+        console.log('❌ Failed to schedule LOCAL appointment reminders:', localScheduleError);
+        // Don't fail the appointment creation if reminder scheduling fails
       }
-      await scheduleLocalAppointmentReminders({
-        id: docRef.id,
-        startsAt: appointmentDate.toISOString(),
-      });
-      console.log('✅ LOCAL appointment reminders scheduled successfully');
-    } catch (localScheduleError) {
-      console.log('❌ Failed to schedule LOCAL appointment reminders:', localScheduleError);
-      // Don't fail the appointment creation if reminder scheduling fails
+    } else {
+      console.log('⏭️ Skipping local reminders for manual client');
     }
 
     return docRef.id;
@@ -1901,11 +1947,59 @@ export const getCurrentMonthAppointments = async (): Promise<Appointment[]> => {
   return getAppointmentsByDateRange(startOfMonth, endOfMonth);
 };
 
-export const getRecentAppointments = async (days: number = 30): Promise<Appointment[]> => {
-  const now = new Date();
-  const startDate = new Date(now.getTime() - (days * 24 * 60 * 60 * 1000));
+// Optimized version for Admin - loads only recent appointments (last 14 days + all future)
+export const getRecentAppointments = async (): Promise<Appointment[]> => {
+  try {
+    // Get appointments from 14 days ago onwards (includes all future)
+    const fourteenDaysAgo = new Date();
+    fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+    fourteenDaysAgo.setHours(0, 0, 0, 0);
+    
+    const q = query(
+      collection(db, 'appointments'),
+      where('date', '>=', Timestamp.fromDate(fourteenDaysAgo)),
+      orderBy('date', 'desc')
+    );
+    
+    const querySnapshot = await getDocs(q);
+    const appointments: Appointment[] = [];
+    
+    querySnapshot.forEach((doc) => {
+      appointments.push({
+        id: doc.id,
+        ...doc.data()
+      } as Appointment);
+    });
+    
+    console.log(`📅 Loaded ${appointments.length} recent appointments (14 days + future)`);
+    return appointments;
+  } catch (error) {
+    console.error('Error getting recent appointments:', error);
+    throw error;
+  }
+};
+
+// Batch update appointments status (for auto-complete)
+export const batchUpdateAppointmentsStatus = async (
+  appointmentIds: string[], 
+  newStatus: 'confirmed' | 'completed' | 'cancelled'
+): Promise<void> => {
+  if (appointmentIds.length === 0) return;
   
-  return getAppointmentsByDateRange(startDate, now);
+  try {
+    const batch = writeBatch(db);
+    
+    for (const id of appointmentIds) {
+      const appointmentRef = doc(db, 'appointments', id);
+      batch.update(appointmentRef, { status: newStatus });
+    }
+    
+    await batch.commit();
+    console.log(`✅ Batch updated ${appointmentIds.length} appointments to ${newStatus}`);
+  } catch (error) {
+    console.error('Error batch updating appointments:', error);
+    throw error;
+  }
 };
 
 export const getUpcomingAppointments = async (days: number = 30): Promise<Appointment[]> => {

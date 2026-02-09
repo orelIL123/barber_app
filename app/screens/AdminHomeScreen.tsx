@@ -12,6 +12,7 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
+import { CacheUtils } from '../../services/cache';
 import { checkIsAdmin, initializeCollections, initializeGalleryImages, listAllStorageImages, makeCurrentUserAdmin, onAuthStateChange, replaceGalleryPlaceholders, resetGalleryWithRealImages, restoreGalleryFromStorage } from '../../services/firebase';
 import ToastMessage from '../components/ToastMessage';
 import TopNav from '../components/TopNav';
@@ -142,6 +143,8 @@ const AdminHomeScreen: React.FC<AdminHomeScreenProps> = ({ onNavigate, onBack })
     try {
       const db = getFirestore();
       await setDoc(doc(db, 'settings', 'aboutus'), { text: aboutUsText });
+      // Invalidate cache so users see updated data immediately
+      await CacheUtils.clearHomeData();
       showToast('הטקסט נשמר בהצלחה!');
     } catch (e) {
       showToast('שגיאה בשמירת הטקסט', 'error');
@@ -157,6 +160,13 @@ const AdminHomeScreen: React.FC<AdminHomeScreenProps> = ({ onNavigate, onBack })
       icon: 'calendar',
       screen: 'admin-appointments',
       color: '#007bff'
+    },
+    {
+      title: 'יומן חודשי',
+      subtitle: 'תצוגת לוח שנה חודשי עם כל התורים',
+      icon: 'calendar-outline',
+      screen: 'admin-calendar',
+      color: '#5a67d8'
     },
     {
       title: 'ניהול טיפולים ומחירים',

@@ -11,7 +11,8 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { db, cleanupOldAppointments } from '../../services/firebase';
+import { CacheUtils } from '../../services/cache';
+import { cleanupOldAppointments, db } from '../../services/firebase';
 import ToastMessage from '../components/ToastMessage';
 import TopNav from '../components/TopNav';
 
@@ -127,6 +128,8 @@ const AdminSettingsScreen: React.FC<AdminSettingsScreenProps> = ({ onNavigate, o
         subtitle: subtitleMessage,
         updatedAt: new Date()
       });
+      // Invalidate cache so users see updated data immediately
+      await CacheUtils.clearHomeData();
       showToast('הודעות הברכה עודכנו בהצלחה!');
     } catch (error) {
       console.error('Error saving welcome messages:', error);
@@ -143,6 +146,8 @@ const AdminSettingsScreen: React.FC<AdminSettingsScreenProps> = ({ onNavigate, o
         text: aboutUsText,
         updatedAt: new Date()
       });
+      // Invalidate cache so users see updated data immediately
+      await CacheUtils.clearHomeData();
       showToast('טקסט אודותינו עודכן בהצלחה!');
     } catch (error) {
       console.error('Error saving about us text:', error);
@@ -166,6 +171,8 @@ const AdminSettingsScreen: React.FC<AdminSettingsScreenProps> = ({ onNavigate, o
         createdAt: new Date(),
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
       });
+      // Invalidate cache so users see updated data immediately
+      await CacheUtils.clearHomeData();
       setPopupMessage('');
       showToast('ההודעה נשלחה לכל המשתמשים!');
     } catch (error) {
@@ -184,6 +191,8 @@ const AdminSettingsScreen: React.FC<AdminSettingsScreenProps> = ({ onNavigate, o
         isActive: false,
         clearedAt: new Date()
       });
+      // Invalidate cache so users see updated data immediately
+      await CacheUtils.clearHomeData();
       showToast('ההודעה הוסרה מכל המשתמשים');
     } catch (error) {
       console.error('Error clearing popup message:', error);

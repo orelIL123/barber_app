@@ -17,6 +17,7 @@ import {
     View,
 } from 'react-native';
 import { addShopItem, deleteShopItem, getActiveShopItems, getAllStorageImages, ShopItem, updateShopItem, uploadImageToStorage } from '../../services/firebase';
+import { ScissorsLoader } from '../components/ScissorsLoader';
 import TopNav from '../components/TopNav';
 
 const { width } = Dimensions.get('window');
@@ -371,7 +372,7 @@ const ShopScreen: React.FC<ShopScreenProps> = ({ onNavigate, onBack, isAdmin = f
 
         {loading ? (
           <View style={styles.loadingContainer}>
-            <Text style={styles.loadingText}>טוען מוצרים...</Text>
+            <ScissorsLoader size={60} color="#007bff" accessibilityLabel="טוען מוצרים" />
           </View>
         ) : (
           <ScrollView style={styles.itemsContainer}>

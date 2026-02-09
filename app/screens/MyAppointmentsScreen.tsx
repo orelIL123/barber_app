@@ -3,26 +3,27 @@ import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  Alert,
-  Dimensions,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
+    Alert,
+    Dimensions,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import {
-  Appointment,
-  Barber,
-  cancelAppointment,
-  deleteAppointment,
-  getBarbers,
-  getCurrentUser,
-  getTreatments,
-  getUserAppointments,
-  Treatment
+    Appointment,
+    Barber,
+    cancelAppointment,
+    deleteAppointment,
+    getBarbers,
+    getCurrentUser,
+    getTreatments,
+    getUserAppointments,
+    Treatment
 } from '../../services/firebase';
+import { ScissorsLoader } from '../components/ScissorsLoader';
 import ToastMessage from '../components/ToastMessage';
 import TopNav from '../components/TopNav';
 
@@ -256,7 +257,7 @@ const MyAppointmentsScreen: React.FC<MyAppointmentsScreenProps> = ({ onNavigate,
           onPress={() => setFilter('upcoming')}
         >
           <LinearGradient
-            colors={filter === 'upcoming' ? ['#4CAF50', '#45a049'] : ['#f8f9fa', '#e9ecef']}
+            colors={filter === 'upcoming' ? ['#3b82f6', '#1d4ed8'] : ['#f8f9fa', '#e9ecef']}
             style={styles.filterGradient}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
@@ -333,7 +334,7 @@ const MyAppointmentsScreen: React.FC<MyAppointmentsScreenProps> = ({ onNavigate,
       <ScrollView style={styles.appointmentsList}>
         {loading ? (
           <View style={styles.loadingContainer}>
-            <Text style={styles.loadingText}>טוען תורים...</Text>
+            <ScissorsLoader size={60} color="#007bff" accessibilityLabel="טוען תורים" />
           </View>
         ) : filteredAppointments.length === 0 ? (
           <View style={styles.emptyState}>
@@ -356,7 +357,7 @@ const MyAppointmentsScreen: React.FC<MyAppointmentsScreenProps> = ({ onNavigate,
                 onPress={() => onNavigate('booking')}
               >
                 <LinearGradient
-                  colors={['#4CAF50', '#45a049']}
+                  colors={['#3b82f6', '#1d4ed8']}
                   style={styles.bookNewGradient}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
@@ -397,7 +398,7 @@ const MyAppointmentsScreen: React.FC<MyAppointmentsScreenProps> = ({ onNavigate,
 
                   {/* Treatment Name */}
                   <View style={styles.treatmentContainer}>
-                    <Ionicons name="cut-outline" size={24} color="#4CAF50" />
+                    <Ionicons name="cut-outline" size={24} color="#3b82f6" />
                     <Text style={styles.treatmentName}>
                       {getTreatmentName(appointment.treatmentId)}
                     </Text>
@@ -465,7 +466,7 @@ const MyAppointmentsScreen: React.FC<MyAppointmentsScreenProps> = ({ onNavigate,
           onPress={() => onNavigate('booking')}
         >
           <LinearGradient
-            colors={['#4CAF50', '#45a049']}
+            colors={['#3b82f6', '#1d4ed8']}
             style={styles.fabGradient}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
@@ -509,7 +510,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   activeFilterButtonUpcoming: {
-    shadowColor: '#4CAF50',
+    shadowColor: '#3b82f6',
     shadowOpacity: 0.3,
   },
   activeFilterButtonPast: {
@@ -733,7 +734,7 @@ const styles = StyleSheet.create({
     height: 56,
     borderRadius: 28,
     overflow: 'hidden',
-    shadowColor: '#4CAF50',
+    shadowColor: '#3b82f6',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,
     shadowRadius: 12,
