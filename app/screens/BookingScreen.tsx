@@ -302,6 +302,79 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
     loadData();
   }, [loadData]);
 
+  // Load availability immediately when barber is selected (so step 3 shows real data; listener keeps it real-time)
+  const loadInitialAvailability = useCallback(async (barber: Barber) => {
+    try {
+      const db = getFirestore();
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const dateSpecificSlots: {[date: string]: string[] | null} = {};
+
+      for (let i = 0; i <= 14; i++) {
+        const checkDate = new Date(today);
+        checkDate.setDate(today.getDate() + i);
+        const dateStr = toYMD(checkDate);
+        const dailyQuery = query(
+          collection(db, 'dailyAvailability'),
+          where('barberId', '==', barber.id),
+          where('date', '==', dateStr)
+        );
+        const dailySnapshot = await getDocs(dailyQuery);
+        dailySnapshot.docs.forEach(doc => {
+          const data = doc.data();
+          if (data.isAvailable === false) {
+            dateSpecificSlots[dateStr] = null;
+          } else if (data.isAvailable && data.availableSlots && Array.isArray(data.availableSlots)) {
+            dateSpecificSlots[dateStr] = data.availableSlots;
+          }
+        });
+      }
+
+      const finalWeeklySlots: {[key: number]: string[]} = {};
+      for (let i = 0; i <= 14; i++) {
+        const checkDate = new Date(today);
+        checkDate.setDate(today.getDate() + i);
+        const dateStr = toYMD(checkDate);
+        const dayOfWeek = checkDate.getDay();
+        if (dateStr in dateSpecificSlots) {
+          const dateSlots = dateSpecificSlots[dateStr];
+          if (dateSlots !== null && dateSlots.length > 0) {
+            finalWeeklySlots[dayOfWeek] = dateSlots;
+          }
+        }
+      }
+      Object.keys(finalWeeklySlots).forEach(day => {
+        finalWeeklySlots[parseInt(day)] = [...new Set(finalWeeklySlots[parseInt(day)])].sort();
+      });
+
+      setWeeklyAvailability(finalWeeklySlots);
+      setDateSpecificAvailability(dateSpecificSlots);
+
+      // Build available dates from the fetched slots (state not updated yet)
+      const todayObj = new Date();
+      todayObj.setHours(0, 0, 0, 0);
+      const dates: { date: Date; isAvailable: boolean; dayOfWeek: number }[] = [];
+      for (let i = 0; i <= 14; i++) {
+        const date = new Date(todayObj);
+        date.setDate(todayObj.getDate() + i);
+        const dateStr = toYMD(date);
+        const dayOfWeek = date.getDay();
+        const dateSlots = dateSpecificSlots[dateStr];
+        const isAvailable = dateSlots !== null && Array.isArray(dateSlots) && dateSlots.length > 0;
+        dates.push({ date, isAvailable, dayOfWeek });
+      }
+      setAvailableDates(dates);
+    } catch (e) {
+      console.error('Error loading initial availability:', e);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (selectedBarber) {
+      loadInitialAvailability(selectedBarber);
+    }
+  }, [selectedBarber?.id, loadInitialAvailability]);
+
   // Listen to availability changes in real-time (DAILY AVAILABILITY)
   useEffect(() => {
     if (selectedBarber) {
@@ -340,8 +413,19 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
         console.log('📊 Real-time: Updated dateSpecificAvailability with', Object.keys(dateSpecificSlots).length, 'dates');
         setDateSpecificAvailability(dateSpecificSlots);
 
-        // Update available dates
-        const dates = generateAvailableDates();
+        // Build available dates from new slots (state not updated yet)
+        const todayObj = new Date();
+        todayObj.setHours(0, 0, 0, 0);
+        const dates: { date: Date; isAvailable: boolean; dayOfWeek: number }[] = [];
+        for (let i = 0; i <= 14; i++) {
+          const date = new Date(todayObj);
+          date.setDate(todayObj.getDate() + i);
+          const dateStr = toYMD(date);
+          const dayOfWeek = date.getDay();
+          const dateSlots = dateSpecificSlots[dateStr];
+          const isAvailable = dateSlots !== null && Array.isArray(dateSlots) && dateSlots.length > 0;
+          dates.push({ date, isAvailable, dayOfWeek });
+        }
         console.log('📅 Real-time: Regenerated available dates');
         setAvailableDates(dates);
 

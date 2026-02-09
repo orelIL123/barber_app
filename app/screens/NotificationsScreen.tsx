@@ -3,6 +3,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useState } from 'react';
 import {
     Alert,
+    Modal,
+    Pressable,
     SafeAreaView,
     ScrollView,
     StyleSheet,
@@ -13,7 +15,6 @@ import {
 } from 'react-native';
 import {
     clearAllUserNotifications,
-    createTestNotification,
     getCurrentUser,
     getUserNotifications,
     markNotificationAsRead
@@ -40,6 +41,7 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ onNavigate, o
   const [appointmentNotifications, setAppointmentNotifications] = useState(true);
   const [generalNotifications, setGeneralNotifications] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [detailNotification, setDetailNotification] = useState<Notification | null>(null);
 
   useEffect(() => {
     loadNotifications();
@@ -52,17 +54,6 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ onNavigate, o
       if (user) {
         const userNotifications = await getUserNotifications(user.uid);
         setNotifications(userNotifications);
-        
-        // If no notifications, create some test ones
-        if (userNotifications.length === 0) {
-          await createTestNotification(user.uid, 'general', 'ברוכים הבאים! 🎉', 'תודה שהצטרפתם לאפליקציה של רון תורגמן');
-          await createTestNotification(user.uid, 'appointment', 'תזכורת לתור', 'התור שלך מתחיל בעוד 10 דקות');
-          await createTestNotification(user.uid, 'general', 'הודעה מהספר', 'זמנים מיוחדים לחגים - אנא בדקו שעות פתיחה');
-          
-          // Reload notifications
-          const updatedNotifications = await getUserNotifications(user.uid);
-          setNotifications(updatedNotifications);
-        }
       }
     } catch (error) {
       console.error('Error loading notifications:', error);
@@ -108,6 +99,11 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ onNavigate, o
     } catch (error) {
       console.error('Error marking notification as read:', error);
     }
+  };
+
+  const handleNotificationPress = async (notification: Notification) => {
+    setDetailNotification(notification);
+    if (!notification.isRead) await markAsRead(notification.id);
   };
 
   const clearAllNotifications = () => {
@@ -211,23 +207,24 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ onNavigate, o
           ) : (
             <View style={styles.notificationsList}>
               {notifications.map((notification) => (
-                <TouchableOpacity
+                <Pressable
                   key={notification.id}
-                  style={[
+                  style={({ pressed }) => [
                     styles.notificationCard,
-                    !notification.isRead && styles.unreadNotification
+                    !notification.isRead && styles.unreadNotification,
+                    pressed && styles.notificationCardPressed,
                   ]}
-                  onPress={() => markAsRead(notification.id)}
+                  onPress={() => handleNotificationPress(notification)}
                 >
                   <View style={styles.notificationContent}>
                     <View style={styles.notificationHeader}>
                       <View style={styles.notificationLeft}>
                         <Ionicons 
                           name={getNotificationIcon(notification.type)} 
-                          size={20} 
+                          size={22} 
                           color={getNotificationColor(notification.type)} 
                         />
-                        <Text style={styles.notificationTitle}>
+                        <Text style={styles.notificationTitle} numberOfLines={1}>
                           {notification.title}
                         </Text>
                       </View>
@@ -236,7 +233,7 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ onNavigate, o
                       </Text>
                     </View>
                     
-                    <Text style={styles.notificationMessage}>
+                    <Text style={styles.notificationMessage} numberOfLines={2}>
                       {notification.message}
                     </Text>
                     
@@ -244,10 +241,46 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ onNavigate, o
                       <View style={styles.unreadIndicator} />
                     )}
                   </View>
-                </TouchableOpacity>
+                </Pressable>
               ))}
             </View>
           )}
+
+          {/* Detail modal when tapping a notification */}
+          <Modal
+            animationType="fade"
+            transparent
+            visible={!!detailNotification}
+            onRequestClose={() => setDetailNotification(null)}
+          >
+            <Pressable style={styles.detailOverlay} onPress={() => setDetailNotification(null)}>
+              <Pressable style={styles.detailCard} onPress={e => e.stopPropagation()}>
+                {detailNotification && (
+                  <>
+                    <View style={styles.detailHeader}>
+                      <View style={styles.detailIconWrap}>
+                        <Ionicons
+                          name={getNotificationIcon(detailNotification.type)}
+                          size={28}
+                          color={getNotificationColor(detailNotification.type)}
+                        />
+                      </View>
+                      <Text style={styles.detailTitle}>{detailNotification.title}</Text>
+                      <Text style={styles.detailTime}>{detailNotification.time}</Text>
+                    </View>
+                    <Text style={styles.detailMessage}>{detailNotification.message}</Text>
+                    <TouchableOpacity
+                      style={styles.detailCloseButton}
+                      onPress={() => setDetailNotification(null)}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.detailCloseText}>סגור</Text>
+                    </TouchableOpacity>
+                  </>
+                )}
+              </Pressable>
+            </Pressable>
+          </Modal>
 
           {/* Notification Schedule Info */}
           <View style={styles.infoSection}>
@@ -374,6 +407,10 @@ const styles = StyleSheet.create({
     borderLeftWidth: 4,
     borderLeftColor: '#007bff',
   },
+  notificationCardPressed: {
+    opacity: 0.92,
+    backgroundColor: '#f5f7fa',
+  },
   notificationContent: {
     position: 'relative',
   },
@@ -435,6 +472,64 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 20,
     opacity: 0.9,
+  },
+  detailOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  detailCard: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 24,
+    width: '100%',
+    maxWidth: 400,
+  },
+  detailHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    flexWrap: 'wrap',
+  },
+  detailIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#f0f4ff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 12,
+  },
+  detailTitle: {
+    flex: 1,
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#222',
+    textAlign: 'right',
+  },
+  detailTime: {
+    fontSize: 13,
+    color: '#888',
+  },
+  detailMessage: {
+    fontSize: 16,
+    color: '#444',
+    lineHeight: 24,
+    textAlign: 'right',
+    marginBottom: 20,
+  },
+  detailCloseButton: {
+    backgroundColor: '#007bff',
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  detailCloseText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 

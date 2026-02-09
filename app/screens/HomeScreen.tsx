@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { collection, doc, getDoc, getDocs, getFirestore, query, where } from 'firebase/firestore';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
     Alert,
@@ -68,7 +69,7 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
   const [notificationPanelVisible, setNotificationPanelVisible] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
   const [showImageModal, setShowImageModal] = useState(false);
-  const [selectedImage, setSelectedImage] = useState<string>('');
+  const [selectedImage, setSelectedImage] = useState<string | number>('');
   const [settingsImages, setSettingsImages] = useState<{
     atmosphere: string;
     aboutUs: string;
@@ -103,11 +104,13 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
   const scrollX = useRef(new Animated.Value(0)).current;
   
   // Get original images array
+  // Fallback: real gallery images when Firebase/admin hasn't set any yet (JPG for Android AAPT compatibility)
   const originalImages = settingsImages.gallery.length > 0 ? settingsImages.gallery : [
     require('../../assets/images/gallery/1.jpg'),
     require('../../assets/images/gallery/2.jpg'),
     require('../../assets/images/gallery/3.jpg'),
     require('../../assets/images/gallery/4.jpg'),
+    require('../../assets/images/gallery/5.jpg'),
   ];
   
   // Create infinite scroll data by duplicating images
@@ -146,53 +149,59 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
     }, 100);
   }, [originalLength, itemWidth]);
 
-  useEffect(() => {
-    // Load data from cache first, then fallback to loading if needed
-    const loadDataFromCache = async () => {
-      try {
-        // Try to load from cache
-        const [cachedImages, cachedContent] = await Promise.all([
-          CacheUtils.getHomeImages(),
-          CacheUtils.getHomeContent(),
-        ]);
+  // Reload home data whenever the screen gains focus (e.g. returning from admin)
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
 
-        if (cachedImages && cachedContent) {
-          // Data found in cache - use it immediately
-          console.log('✅ Loading home data from cache');
-          setSettingsImages(cachedImages);
-          setWelcomeMessage(cachedContent.welcomeMessage);
-          setSubtitleMessage(cachedContent.subtitleMessage);
-          setAboutUsMessage(cachedContent.aboutUsMessage);
-          if (cachedContent.showPopup && cachedContent.popupMessage) {
-            setPopupMessage(cachedContent.popupMessage);
-            setShowPopup(true);
-          }
-          setLoading(false);
-        } else {
-          // Cache miss - load from Firebase (fallback)
-          console.log('⚠️ Cache miss - loading from Firebase');
-          await Promise.all([
-            fetchImages(),
-            fetchDynamicContent(),
+      const loadDataFromCache = async () => {
+        try {
+          setLoading(true);
+          const [cachedImages, cachedContent] = await Promise.all([
+            CacheUtils.getHomeImages(),
+            CacheUtils.getHomeContent(),
           ]);
-          setLoading(false);
-        }
-      } catch (error) {
-        console.error('Error loading from cache:', error);
-        // Fallback to loading from Firebase
-        await Promise.all([
-          fetchImages(),
-          fetchDynamicContent(),
-        ]);
-        setLoading(false);
-      }
-    };
 
-    loadDataFromCache();
-    
-    // Run cleanup in background (doesn't block screen display)
-    cleanupOldWaitlistData();
-  }, []);
+          if (cancelled) return;
+
+          if (cachedImages && cachedContent) {
+            console.log('✅ Loading home data from cache');
+            setSettingsImages(cachedImages);
+            setWelcomeMessage(cachedContent.welcomeMessage);
+            setSubtitleMessage(cachedContent.subtitleMessage);
+            setAboutUsMessage(cachedContent.aboutUsMessage);
+            if (cachedContent.showPopup && cachedContent.popupMessage) {
+              setPopupMessage(cachedContent.popupMessage);
+              setShowPopup(true);
+            }
+          } else {
+            console.log('⚠️ Cache miss - loading from Firebase');
+            await Promise.all([
+              fetchImages(),
+              fetchDynamicContent(),
+            ]);
+          }
+        } catch (error) {
+          if (!cancelled) {
+            console.error('Error loading from cache:', error);
+            await Promise.all([
+              fetchImages(),
+              fetchDynamicContent(),
+            ]);
+          }
+        } finally {
+          if (!cancelled) setLoading(false);
+        }
+      };
+
+      loadDataFromCache();
+      cleanupOldWaitlistData();
+
+      return () => {
+        cancelled = true;
+      };
+    }, [])
+  );
 
   useEffect(() => {
     if (!loading) {
@@ -496,6 +505,7 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
   //     require('../../assets/images/gallery/2.jpg'),
   //     require('../../assets/images/gallery/3.jpg'),
   //     require('../../assets/images/gallery/4.jpg'),
+  //     require('../../assets/images/gallery/5.jpg'),
   //   ];
 
   //   const interval = setInterval(() => {
@@ -784,8 +794,8 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
                   <TouchableOpacity
                     key={index}
                     onPress={() => {
-                      const imageUrl = typeof img === 'string' ? img : img.uri;
-                      setSelectedImage(imageUrl);
+                      const imageSource = typeof img === 'string' ? img : img;
+                      setSelectedImage(imageSource);
                       setShowImageModal(true);
                     }}
                     activeOpacity={0.9}
@@ -931,7 +941,7 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
           >
             <View style={styles.imageModalContent}>
               <Image
-                source={{ uri: selectedImage }}
+                source={typeof selectedImage === 'string' ? { uri: selectedImage } : selectedImage}
                 style={styles.fullScreenImage}
                 resizeMode="contain"
               />

@@ -1539,12 +1539,14 @@ export const createAppointment = async (appointmentData: Omit<Appointment, 'id' 
       try {
         console.log('📱 Scheduling LOCAL appointment reminders...');
         let appointmentDate: Date;
-        if (typeof appointmentData.date.toDate === 'function') {
-          appointmentDate = appointmentData.date.toDate();
+        if (typeof (appointmentData.date as any)?.toDate === 'function') {
+          appointmentDate = (appointmentData.date as any).toDate();
         } else if (appointmentData.date instanceof Date) {
           appointmentDate = appointmentData.date;
         } else {
-          appointmentDate = new Date(appointmentData.date);
+          appointmentDate = appointmentData.date instanceof Timestamp
+            ? appointmentData.date.toDate()
+            : new Date(appointmentData.date as string | number);
         }
         await scheduleLocalAppointmentReminders({
           id: docRef.id,
@@ -3391,6 +3393,22 @@ export const sendPushNotification = async (pushToken: string, title: string, bod
   }
 };
 
+const saveNotificationToInbox = async (userId: string, title: string, message: string, type: 'appointment' | 'general' | 'reminder' = 'general') => {
+  try {
+    const notificationsRef = collection(db, 'notifications');
+    await addDoc(notificationsRef, {
+      userId,
+      type,
+      title,
+      message,
+      isRead: false,
+      createdAt: serverTimestamp()
+    });
+  } catch (e) {
+    console.error('Error saving notification to inbox:', e);
+  }
+};
+
 export const sendNotificationToUser = async (userId: string, title: string, body: string, data?: any) => {
   try {
     const userProfile = await getUserProfile(userId);
@@ -3400,6 +3418,7 @@ export const sendNotificationToUser = async (userId: string, title: string, body
     }
 
     await sendPushNotification(userProfile.pushToken, title, body, data);
+    await saveNotificationToInbox(userId, title, body);
     return true;
   } catch (error) {
     console.error('Error sending notification to user:', error);
@@ -3451,15 +3470,15 @@ export const sendSMSReminder = async (phoneNumber: string, message: string) => {
 export const sendNotificationToAllUsers = async (title: string, body: string, data?: any) => {
   try {
     const users = await getAllUsers();
-    // Filter out admin users to avoid sending to admins
     const nonAdminUsers = users.filter(user => !user.isAdmin && user.pushToken);
     
     console.log(`📱 Sending notification to ${nonAdminUsers.length} non-admin users`);
     
     const results = await Promise.allSettled(
-      nonAdminUsers.map(user => 
-        sendPushNotification(user.pushToken!, title, body, data)
-      )
+      nonAdminUsers.map(async (user) => {
+        await sendPushNotification(user.pushToken!, title, body, data);
+        await saveNotificationToInbox(user.uid, title, body);
+      })
     );
     
     const successful = results.filter(result => result.status === 'fulfilled').length;
@@ -4397,7 +4416,21 @@ export const sendAppointmentCancellationToAdmin = async (appointmentId: string) 
   }
 };
 
-// Get user notifications
+const getRelativeTime = (createdAt: Date): string => {
+  const now = new Date();
+  const diffMs = now.getTime() - createdAt.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+  if (diffMins < 1) return 'עכשיו';
+  if (diffMins < 60) return `לפני ${diffMins} דקות`;
+  if (diffHours < 24) return `לפני ${diffHours} שעות`;
+  if (diffDays === 1) return 'אתמול';
+  if (diffDays < 7) return `לפני ${diffDays} ימים`;
+  return createdAt.toLocaleDateString('he-IL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+};
+
+// Get user notifications (only last 24h; older ones are auto-deleted)
 export const getUserNotifications = async (userId: string): Promise<{
   id: string;
   type: 'appointment' | 'general' | 'reminder';
@@ -4412,26 +4445,38 @@ export const getUserNotifications = async (userId: string): Promise<{
       notificationsRef,
       where('userId', '==', userId),
       orderBy('createdAt', 'desc'),
-      limit(50)
+      limit(100)
     );
     
     const querySnapshot = await getDocs(q);
-    const notifications = querySnapshot.docs.map(doc => {
-      const data = doc.data();
-      return {
-        id: doc.id,
-        type: data.type || 'general',
-        title: data.title || 'הודעה',
-        message: data.message || '',
-        time: data.createdAt?.toDate?.()?.toLocaleTimeString('he-IL', { 
-          hour: '2-digit', 
-          minute: '2-digit' 
-        }) || 'עכשיו',
-        isRead: data.isRead || false
-      };
+    const now = new Date();
+    const cutoff = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const batch = writeBatch(db);
+    const recent: { doc: any; data: any; createdAt: Date }[] = [];
+    let hasDeletes = false;
+    
+    querySnapshot.docs.forEach((d) => {
+      const data = d.data();
+      const createdAt = data.createdAt?.toDate?.() as Date | undefined;
+      if (!createdAt) return;
+      if (createdAt < cutoff) {
+        batch.delete(d.ref);
+        hasDeletes = true;
+      } else {
+        recent.push({ doc: d, data, createdAt });
+      }
     });
     
-    return notifications;
+    if (hasDeletes) await batch.commit();
+    
+    return recent.map(({ doc: d, data, createdAt }) => ({
+      id: d.id,
+      type: (data.type || 'general') as 'appointment' | 'general' | 'reminder',
+      title: data.title || 'הודעה',
+      message: data.message || '',
+      time: getRelativeTime(createdAt),
+      isRead: data.isRead || false
+    }));
   } catch (error) {
     console.error('Error getting user notifications:', error);
     return [];

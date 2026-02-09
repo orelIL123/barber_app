@@ -157,45 +157,34 @@ export default function Index() {
 
   useEffect(() => {
     let authStateChecked = false;
+    const SPLASH_MIN_MS = 5000; // 5 seconds minimum so everything has time to load
 
-    const checkAuthState = async () => {
+    const checkAuthState = async (): Promise<'/(tabs)' | '/auth-choice'> => {
       try {
-        // Wait for AuthManager to initialize
         await authManager.waitForInitialization();
-
-        if (authStateChecked) return;
+        if (authStateChecked) return '/(tabs)';
         authStateChecked = true;
 
-        // Preload home data before navigation
         await preloadHomeData();
 
-        // Check if already authenticated
         const isAuthenticated = await authManager.isAuthenticated();
+        if (isAuthenticated) return '/(tabs)';
 
-        if (isAuthenticated) {
-          router.replace('/(tabs)');
-          return;
-        }
-
-        // Try auto-login
         const autoLoginSuccess = await authManager.attemptAutoLogin();
-        
-        if (autoLoginSuccess) {
-          router.replace('/(tabs)');
-        } else {
-          router.replace('/auth-choice');
-        }
+        return autoLoginSuccess ? '/(tabs)' : '/auth-choice';
       } catch (error) {
         console.error('Error in auth check:', error);
-        router.replace('/auth-choice');
+        return '/auth-choice';
       }
     };
 
-    // Start loading immediately (no fixed timeout)
-    checkAuthState();
+    Promise.all([
+      checkAuthState(),
+      new Promise<void>(r => setTimeout(r, SPLASH_MIN_MS)),
+    ]).then(([route]) => router.replace(route as string));
   }, [router]);
 
-  // Show TURGI.png for 2 seconds
+  // Show splash until loaded (minimum 5 seconds)
   return (
     <View style={styles.container}>
       <Image
