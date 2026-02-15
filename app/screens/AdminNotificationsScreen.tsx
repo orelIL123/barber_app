@@ -36,8 +36,11 @@ interface UserProfile {
   displayName: string;
   phone: string;
   pushToken?: string;
+  expoPushToken?: string;
   isAdmin?: boolean;
 }
+
+const getPushToken = (user: UserProfile) => user.pushToken ?? user.expoPushToken;
 
 const AdminNotificationsScreen: React.FC<AdminNotificationsScreenProps> = ({ onNavigate, onBack }) => {
   const [isAdmin, setIsAdmin] = useState(false);
@@ -129,11 +132,11 @@ const AdminNotificationsScreen: React.FC<AdminNotificationsScreenProps> = ({ onN
   };
 
   const getUsersWithTokens = () => {
-    return users.filter(user => user.pushToken);
+    return users.filter(user => getPushToken(user));
   };
 
   const getUsersWithoutTokens = () => {
-    return users.filter(user => !user.pushToken);
+    return users.filter(user => !getPushToken(user));
   };
 
   if (loading) {
@@ -224,7 +227,7 @@ const AdminNotificationsScreen: React.FC<AdminNotificationsScreenProps> = ({ onN
                       <Text style={styles.userPhone}>{user.phone}</Text>
                     </View>
                     <View style={styles.userStatus}>
-                      {user.pushToken ? (
+                      {getPushToken(user) ? (
                         <Ionicons name="notifications" size={20} color="#28a745" />
                       ) : (
                         <Ionicons name="notifications-off" size={20} color="#dc3545" />

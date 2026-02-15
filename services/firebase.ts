@@ -91,11 +91,11 @@ export const checkCurrentUserAdminStatus = async () => {
     
     console.log(`👤 Current user: ${profile.displayName}`);
     console.log(`👨‍💼 Is admin: ${profile.isAdmin || false}`);
-    console.log(`📱 Has push token: ${!!profile.pushToken}`);
+    console.log(`📱 Has push token: ${!!getPushToken(profile)}`);
     
     return {
       isAdmin: profile.isAdmin || false,
-      hasPushToken: !!profile.pushToken,
+      hasPushToken: !!getPushToken(profile),
       profile: profile
     };
   } catch (error) {
@@ -3329,6 +3329,12 @@ export const replaceAppGalleryImage = async (oldImageUrl: string, newImageUri: s
 };
 
 // Push Notification functions
+/** Returns pushToken or expoPushToken so both registration paths are supported (EAS update safe). */
+function getPushToken(user: UserProfile | null): string | undefined {
+  if (!user) return undefined;
+  return user.pushToken ?? (user as UserProfile & { expoPushToken?: string }).expoPushToken;
+}
+
 export const registerForPushNotifications = async (userId: string) => {
   try {
     // Check if device supports notifications
@@ -3368,6 +3374,15 @@ export const registerForPushNotifications = async (userId: string) => {
 
 export const sendPushNotification = async (pushToken: string, title: string, body: string, data?: any) => {
   try {
+    if (!pushToken || typeof pushToken !== 'string') {
+      console.warn('📱 Push send skipped: no token');
+      throw new Error('No push token');
+    }
+    if (!pushToken.startsWith('ExponentPushToken[')) {
+      console.warn('📱 Push send skipped: invalid token format (expected ExponentPushToken[...])', pushToken.slice(0, 40) + '…');
+      throw new Error('Invalid Expo push token format');
+    }
+
     const message = {
       to: pushToken,
       sound: 'default',
@@ -3376,7 +3391,7 @@ export const sendPushNotification = async (pushToken: string, title: string, bod
       data: data || {},
     };
 
-    await fetch('https://exp.host/--/api/v2/push/send', {
+    const response = await fetch('https://exp.host/--/api/v2/push/send', {
       method: 'POST',
       headers: {
         Accept: 'application/json',
@@ -3386,7 +3401,20 @@ export const sendPushNotification = async (pushToken: string, title: string, bod
       body: JSON.stringify(message),
     });
 
-    console.log('✅ Push notification sent successfully');
+    const json = await response.json().catch(() => ({}));
+    const ticket = Array.isArray(json.data) ? json.data[0] : json.data;
+
+    if (!response.ok) {
+      console.error('📱 Push API error', response.status, json?.errors || json);
+      throw new Error(json?.errors?.[0]?.message || `Push API ${response.status}`);
+    }
+    if (ticket?.status === 'error') {
+      console.error('📱 Push ticket error:', ticket.message, ticket.details);
+      throw new Error(ticket.message || 'Push delivery error');
+    }
+    if (ticket?.status === 'ok') {
+      console.log('✅ Push notification sent successfully', ticket.id ? `(id: ${ticket.id})` : '');
+    }
   } catch (error) {
     console.error('Error sending push notification:', error);
     throw error;
@@ -3412,12 +3440,13 @@ const saveNotificationToInbox = async (userId: string, title: string, message: s
 export const sendNotificationToUser = async (userId: string, title: string, body: string, data?: any) => {
   try {
     const userProfile = await getUserProfile(userId);
-    if (!userProfile || !userProfile.pushToken) {
+    const token = getPushToken(userProfile);
+    if (!userProfile || !token) {
       console.log('❌ User not found or no push token');
       return false;
     }
 
-    await sendPushNotification(userProfile.pushToken, title, body, data);
+    await sendPushNotification(token, title, body, data);
     await saveNotificationToInbox(userId, title, body);
     return true;
   } catch (error) {
@@ -3470,13 +3499,13 @@ export const sendSMSReminder = async (phoneNumber: string, message: string) => {
 export const sendNotificationToAllUsers = async (title: string, body: string, data?: any) => {
   try {
     const users = await getAllUsers();
-    const nonAdminUsers = users.filter(user => !user.isAdmin && user.pushToken);
+    const nonAdminUsers = users.filter(user => !user.isAdmin && getPushToken(user));
     
     console.log(`📱 Sending notification to ${nonAdminUsers.length} non-admin users`);
     
     const results = await Promise.allSettled(
       nonAdminUsers.map(async (user) => {
-        await sendPushNotification(user.pushToken!, title, body, data);
+        await sendPushNotification(getPushToken(user)!, title, body, data);
         await saveNotificationToInbox(user.uid, title, body);
       })
     );
@@ -3914,7 +3943,7 @@ export const sendNotificationToAdmin = async (title: string, body: string, data?
     
     if (currentUser) {
       const currentUserProfile = await getUserProfile(currentUser.uid);
-      if (currentUserProfile?.isAdmin && currentUserProfile?.pushToken) {
+      if (currentUserProfile?.isAdmin && getPushToken(currentUserProfile)) {
         adminUsers.push(currentUserProfile);
         console.log(`👨‍💼 Current user is admin with push token: ${currentUserProfile.displayName}`);
       }
@@ -3924,7 +3953,7 @@ export const sendNotificationToAdmin = async (title: string, body: string, data?
     try {
       const users = await getAllUsers();
       console.log(`👥 Total users found: ${users.length}`);
-      const allAdminUsers = users.filter(user => user.isAdmin && user.pushToken);
+      const allAdminUsers = users.filter(user => user.isAdmin && getPushToken(user));
       // Merge without duplicates
       allAdminUsers.forEach(user => {
         if (!adminUsers.find(existing => existing.uid === user.uid)) {
@@ -3949,7 +3978,7 @@ export const sendNotificationToAdmin = async (title: string, body: string, data?
       adminUsers.map(async (user) => {
         try {
           console.log(`📱 Sending to admin: ${user.displayName} (${user.uid})`);
-          return await sendPushNotification(user.pushToken!, title, body, data);
+          return await sendPushNotification(getPushToken(user)!, title, body, data);
         } catch (error) {
           console.error(`❌ Failed to send to admin ${user.displayName}:`, error);
           throw error;
@@ -4146,13 +4175,13 @@ export const sendWelcomeNotification = async (userId: string) => {
 export const sendPromotionalNotification = async (title: string, body: string, data?: any) => {
   try {
     const users = await getAllUsers();
-    const usersWithTokens = users.filter(user => user.pushToken && !user.isAdmin); // Don't send to admins
+    const usersWithTokens = users.filter(user => getPushToken(user) && !user.isAdmin); // Don't send to admins
     
     console.log(`📱 Sending promotional notification to ${usersWithTokens.length} users`);
     
     const results = await Promise.allSettled(
       usersWithTokens.map(user => 
-        sendPushNotification(user.pushToken!, title, body, data)
+        sendPushNotification(getPushToken(user)!, title, body, data)
       )
     );
     

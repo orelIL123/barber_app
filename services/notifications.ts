@@ -8,11 +8,11 @@
  * - Notification channel setup (Android)
  */
 
-import * as Notifications from 'expo-notifications';
-import { Platform } from 'react-native';
-import { updateDoc, doc, deleteField } from 'firebase/firestore';
-import { db } from '../config/firebase';
 import * as Device from 'expo-device';
+import * as Notifications from 'expo-notifications';
+import { deleteField, doc, updateDoc } from 'firebase/firestore';
+import { Platform } from 'react-native';
+import { db } from '../config/firebase';
 
 // ============================================================================
 // TYPES
@@ -157,10 +157,11 @@ export async function registerPushTokenForUser(uid: string): Promise<void> {
 
     console.log('📱 Push token obtained:', token);
 
-    // Save to Firestore
+    // Save to Firestore (both fields so send path works without rebuild - EAS update safe)
     const userRef = doc(db, 'users', uid);
     await updateDoc(userRef, {
       expoPushToken: token,
+      pushToken: token,
       pushTokenUpdatedAt: new Date().toISOString(),
     });
 
@@ -183,6 +184,7 @@ export async function revokePushTokenForUser(uid: string): Promise<void> {
     const userRef = doc(db, 'users', uid);
     await updateDoc(userRef, {
       expoPushToken: deleteField(),
+      pushToken: deleteField(),
       pushTokenUpdatedAt: deleteField(),
     });
 
