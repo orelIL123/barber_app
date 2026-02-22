@@ -86,6 +86,8 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
   const [aboutUsMessage, setAboutUsMessage] = useState('');
   const [showPopup, setShowPopup] = useState(false);
   const [popupMessage, setPopupMessage] = useState('');
+  const [atmosphereLoadFailed, setAtmosphereLoadFailed] = useState(false);
+  const [aboutImageLoadFailed, setAboutImageLoadFailed] = useState(false);
 
   // Animation refs
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -238,6 +240,14 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
     }
   }, [loading]);
 
+  useEffect(() => {
+    setAtmosphereLoadFailed(false);
+  }, [settingsImages.atmosphere]);
+
+  useEffect(() => {
+    setAboutImageLoadFailed(false);
+  }, [settingsImages.aboutUs]);
+
   // Cleanup old waitlist entries (runs automatically on app start)
   const cleanupOldWaitlistData = async () => {
     try {
@@ -289,7 +299,7 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
         if (data.isActive && data.message && data.expiresAt && data.expiresAt.toDate() > new Date()) {
           popupMessage = data.message;
           showPopupValue = true;
-          setPopupMessage(popupMessage);
+          setPopupMessage(popupMessage || '');
           setShowPopup(true);
         }
       }
@@ -623,9 +633,14 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
       />
       <View style={styles.backgroundWrapper}>
         <ImageBackground
-          source={settingsImages.atmosphere ? { uri: settingsImages.atmosphere } : require('../../assets/images/atmosphere/atmosphere.png')}
+          source={
+            settingsImages.atmosphere && !atmosphereLoadFailed
+              ? { uri: settingsImages.atmosphere }
+              : require('../../assets/images/atmosphere/atmosphere.png')
+          }
           style={styles.atmosphereImage}
           resizeMode="cover"
+          onError={() => setAtmosphereLoadFailed(true)}
         >
           <View style={styles.overlay} />
           <LinearGradient
@@ -833,9 +848,14 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
             <Text style={styles.sectionTitle}>{t('home.about')}</Text>
             <View style={styles.aboutCard}>
               <Image
-                source={settingsImages.aboutUs ? { uri: settingsImages.aboutUs } : require('../../assets/images/ABOUT US/aboutus.png')}
+                source={
+                  settingsImages.aboutUs && !aboutImageLoadFailed
+                    ? { uri: settingsImages.aboutUs }
+                    : require('../../assets/images/ABOUT US/aboutus.png')
+                }
                 style={styles.aboutImageWide}
                 resizeMode="cover"
+                onError={() => setAboutImageLoadFailed(true)}
               />
               <View style={styles.aboutContent}>
                 <Text style={styles.aboutText}>
