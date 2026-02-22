@@ -734,7 +734,7 @@ const AdminGalleryScreen: React.FC<AdminGalleryScreenProps> = ({ onNavigate, onB
               )}
 
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>תמונות Firestore</Text>
+                <Text style={styles.sectionTitle}>תמונות פעילות</Text>
                 {filteredImages.length === 0 ? (
                   <Text style={styles.emptyText}>לא נמצאו תמונות לשונית זו.</Text>
                 ) : (

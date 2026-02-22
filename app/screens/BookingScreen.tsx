@@ -5,6 +5,7 @@ import React, { memo, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
     Alert,
+    Animated,
     Dimensions,
     Image,
     Modal,
@@ -15,6 +16,7 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
+import { CacheUtils } from '../../services/cache';
 import {
     Barber,
     createAppointment,
@@ -34,6 +36,8 @@ import TopNav from '../components/TopNav';
 import { generateTimeSlots, getSlotsNeeded, SLOT_SIZE_MINUTES, toMin, toYMD } from '../constants/scheduling';
 
 const { width } = Dimensions.get('window');
+
+let bookingDataMemory: { barbers: Barber[]; treatments: Treatment[] } | null = null;
 
 interface BookingScreenProps {
   onNavigate: (screen: string) => void;
@@ -88,13 +92,13 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   
-  const [barbers, setBarbers] = useState<Barber[]>([]);
-  const [treatments, setTreatments] = useState<Treatment[]>([]);
+  const [barbers, setBarbers] = useState<Barber[]>(() => bookingDataMemory?.barbers || []);
+  const [treatments, setTreatments] = useState<Treatment[]>(() => bookingDataMemory?.treatments || []);
   const [availableTimes, setAvailableTimes] = useState<string[]>([]);
   const [weeklyAvailability, setWeeklyAvailability] = useState<{[key: number]: string[]}>({});
   const [dateSpecificAvailability, setDateSpecificAvailability] = useState<{[date: string]: string[] | null}>({});
   const [availableDates, setAvailableDates] = useState<{date: Date, isAvailable: boolean, dayOfWeek: number}[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !bookingDataMemory);
   const [refreshing, setRefreshing] = useState(false);
   const [booking, setBooking] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -104,6 +108,7 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
   const [showWaitlistModal, setShowWaitlistModal] = useState(false);
   const [waitlistTimeStart, setWaitlistTimeStart] = useState('09:00');
   const [waitlistTimeEnd, setWaitlistTimeEnd] = useState('18:00');
+  const barberFadeAnims = React.useRef<Animated.Value[]>([]);
 
   const preSelectedBarberId = route?.params?.barberId;
 
@@ -122,6 +127,27 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
 
   const loadData = useCallback(async () => {
     try {
+      if (!bookingDataMemory) {
+        const [cachedBarbers, cachedTreatments] = await Promise.all([
+          CacheUtils.getBarbers(),
+          CacheUtils.getTreatments(),
+        ]);
+        if (
+          Array.isArray(cachedBarbers) &&
+          cachedBarbers.length > 0 &&
+          Array.isArray(cachedTreatments) &&
+          cachedTreatments.length > 0
+        ) {
+          setBarbers(cachedBarbers as Barber[]);
+          setTreatments(cachedTreatments as Treatment[]);
+          bookingDataMemory = {
+            barbers: cachedBarbers as Barber[],
+            treatments: cachedTreatments as Treatment[],
+          };
+          setLoading(false);
+        }
+      }
+
       const [barbersData, treatmentsData] = await Promise.all([
         getBarbers(),
         getTreatments()
@@ -129,6 +155,9 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
       
       setBarbers(barbersData);
       setTreatments(treatmentsData);
+      bookingDataMemory = { barbers: barbersData, treatments: treatmentsData };
+      CacheUtils.setBarbers(barbersData, 30).catch(() => undefined);
+      CacheUtils.setTreatments(treatmentsData, 60).catch(() => undefined);
       
       // If barber is pre-selected, set it and skip to next step
       if (preSelectedBarberId) {
@@ -301,6 +330,26 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    if (currentStep !== 1 || barbers.length === 0) return;
+
+    barberFadeAnims.current = barbers.map(
+      (_, index) => barberFadeAnims.current[index] || new Animated.Value(0)
+    );
+    barberFadeAnims.current.forEach((anim) => anim.setValue(0));
+
+    Animated.stagger(
+      70,
+      barberFadeAnims.current.map((anim) =>
+        Animated.timing(anim, {
+          toValue: 1,
+          duration: 380,
+          useNativeDriver: true,
+        })
+      )
+    ).start();
+  }, [barbers, currentStep]);
 
   // Load availability immediately when barber is selected (so step 3 shows real data; listener keeps it real-time)
   const loadInitialAvailability = useCallback(async (barber: Barber) => {
@@ -1084,7 +1133,14 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
 
       {/* Step Header */}
       <View style={styles.stepHeader}>
-        <Text style={styles.stepTitle}>{getStepTitle()}</Text>
+        <Text
+          style={[
+            styles.stepTitle,
+            currentStep === 1 && styles.stepTitleBookingRtlLeft,
+          ]}
+        >
+          {getStepTitle()}
+        </Text>
         {currentStep > 1 && (
           <TouchableOpacity style={styles.backButton} onPress={goBack}>
             <Text style={styles.backButtonText}>{t('common.back')}</Text>
@@ -1096,43 +1152,87 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
         {/* Step 1: Select Barber */}
         {currentStep === 1 && (
           <View style={styles.stepContent}>
-            <View style={styles.barbersGrid}>
-              {barbers.map((barber) => (
-                <TouchableOpacity
-                  key={barber.id}
-                  style={[
-                    styles.barberCard,
-                    selectedBarber?.id === barber.id && styles.selectedCard
-                  ]}
-                  onPress={() => handleBarberSelect(barber)}
-                  disabled={false}
-                >
-                  <LinearGradient
-                    colors={['#1a1a1a', '#000000', '#1a1a1a']}
-                    style={styles.barberGradient}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                  >
-                    <View style={styles.barberImage}>
-                      {barber.image ? (
-                        <Image
-                          source={{ uri: barber.image }}
-                          style={styles.barberPhoto}
-                          resizeMode="cover"
-                        />
-                      ) : (
-                        <Text style={styles.barberPlaceholder}>✂️</Text>
-                      )}
-                    </View>
-                    <Text style={styles.barberName}>{barber.name}</Text>
-                    <Text style={styles.barberExperience}>{barber.experience}</Text>
-                    <TouchableOpacity style={styles.detailsButton} onPress={() => handleBarberSelect(barber)}>
-                      <Text style={styles.detailsButtonText}>{t('booking.details')}</Text>
-                    </TouchableOpacity>
-                  </LinearGradient>
-                </TouchableOpacity>
-              ))}
-            </View>
+            <LinearGradient
+              colors={['#ffffff', '#f7f7f8', '#f2f3f5']}
+              style={styles.barberStage}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <View style={styles.barbersGrid}>
+                {barbers.map((barber, index) => {
+                  const fadeAnim = barberFadeAnims.current[index];
+                  return (
+                    <Animated.View
+                      key={barber.id}
+                      style={[
+                        styles.barberCircleItem,
+                        fadeAnim
+                          ? {
+                              opacity: fadeAnim,
+                              transform: [
+                                {
+                                  translateY: fadeAnim.interpolate({
+                                    inputRange: [0, 1],
+                                    outputRange: [16, 0],
+                                  }),
+                                },
+                                {
+                                  scale: fadeAnim.interpolate({
+                                    inputRange: [0, 1],
+                                    outputRange: [0.96, 1],
+                                  }),
+                                },
+                              ],
+                            }
+                          : null,
+                      ]}
+                    >
+                      <TouchableOpacity
+                        style={styles.barberCirclePressable}
+                        onPress={() => handleBarberSelect(barber)}
+                      >
+                        <LinearGradient
+                          colors={
+                            selectedBarber?.id === barber.id
+                              ? ['#f5d37a', '#c89f4d', '#f4dfae']
+                              : ['#2c2c2c', '#131313', '#2a2a2a']
+                          }
+                          style={[
+                            styles.barberCircleFrame,
+                            selectedBarber?.id === barber.id && styles.barberCircleFrameSelected,
+                          ]}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 1 }}
+                        >
+                          <View style={styles.barberCircleInner}>
+                            {barber.image ? (
+                              <Image
+                                source={{ uri: barber.image }}
+                                style={styles.barberCirclePhoto}
+                                resizeMode="cover"
+                              />
+                            ) : (
+                              <Text style={styles.barberPlaceholder}>✂️</Text>
+                            )}
+                          </View>
+                        </LinearGradient>
+                        <Text
+                          style={[
+                            styles.barberCircleName,
+                            selectedBarber?.id === barber.id && styles.barberCircleNameSelected,
+                          ]}
+                        >
+                          {barber.name}
+                        </Text>
+                        {!!barber.experience && (
+                          <Text style={styles.barberCircleExperience}>{barber.experience}</Text>
+                        )}
+                      </TouchableOpacity>
+                    </Animated.View>
+                  );
+                })}
+              </View>
+            </LinearGradient>
           </View>
         )}
 
@@ -1145,28 +1245,117 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
                   key={treatment.id}
                   style={[
                     styles.treatmentCard,
-                    selectedTreatment?.id === treatment.id && styles.selectedCard
+                    selectedTreatment?.id === treatment.id && styles.treatmentCardSelected
                   ]}
                   onPress={() => handleTreatmentSelect(treatment)}
                 >
-                  <LinearGradient
-                    colors={['#1a1a1a', '#000000', '#1a1a1a']}
-                    style={styles.treatmentGradient}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                  >
-                    <View style={styles.treatmentImage}>
-                      <Text style={styles.treatmentPlaceholder}>💇</Text>
-                    </View>
+                  <View style={styles.treatmentGradient}>
+                    <LinearGradient
+                      colors={['rgba(255,215,130,0.08)', 'rgba(214,154,50,0.56)', 'rgba(255,223,150,0.2)']}
+                      style={[
+                        styles.treatmentCornerSlash,
+                        styles.treatmentCornerLeft,
+                        selectedTreatment?.id === treatment.id && styles.treatmentCornerLeftSelected,
+                      ]}
+                    />
+                    <LinearGradient
+                      colors={['rgba(255,212,120,0.14)', 'rgba(215,158,56,0.72)', 'rgba(255,224,160,0.28)']}
+                      style={[
+                        styles.treatmentCornerSlash,
+                        styles.treatmentCornerRight,
+                        selectedTreatment?.id === treatment.id && styles.treatmentCornerRightSelected,
+                      ]}
+                    />
+                    <View
+                      style={[
+                        styles.treatmentAccent,
+                        selectedTreatment?.id === treatment.id && styles.treatmentAccentSelected,
+                      ]}
+                    />
                     <View style={styles.treatmentInfo}>
-                      <Text style={styles.treatmentName}>{treatment.name}</Text>
-                      <Text style={styles.treatmentDescription}>{treatment.description}</Text>
+                      <View style={styles.treatmentTopRow}>
+                        <Text
+                          style={[
+                            styles.treatmentName,
+                            selectedTreatment?.id === treatment.id && styles.treatmentNameSelected,
+                          ]}
+                        >
+                          {treatment.name}
+                        </Text>
+                        <View
+                          style={[
+                            styles.treatmentTag,
+                            selectedTreatment?.id === treatment.id && styles.treatmentTagSelected,
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.treatmentTagText,
+                              selectedTreatment?.id === treatment.id && styles.treatmentTagTextSelected,
+                            ]}
+                          >
+                            {selectedTreatment?.id === treatment.id ? 'נבחר' : 'לבחירה'}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <View
+                        style={[
+                          styles.treatmentImage,
+                          selectedTreatment?.id === treatment.id && styles.treatmentImageSelected,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.treatmentPlaceholder,
+                            selectedTreatment?.id === treatment.id && styles.treatmentPlaceholderSelected,
+                          ]}
+                        >
+                          ✂️
+                        </Text>
+                      </View>
+                      <Text
+                        style={[
+                          styles.treatmentDescription,
+                          selectedTreatment?.id === treatment.id && styles.treatmentDescriptionSelected,
+                        ]}
+                      >
+                        {treatment.description}
+                      </Text>
                       <View style={styles.treatmentDetails}>
-                        <Text style={styles.treatmentPrice}>{t('booking.price', { price: treatment.price })}</Text>
-                        <Text style={styles.treatmentDuration}>{t('booking.duration', { duration: treatment.duration })}</Text>
+                        <View
+                          style={[
+                            styles.treatmentMetaChip,
+                            selectedTreatment?.id === treatment.id && styles.treatmentMetaChipSelected,
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.treatmentPrice,
+                              selectedTreatment?.id === treatment.id && styles.treatmentMetaTextSelected,
+                            ]}
+                          >
+                            {t('booking.price', { price: treatment.price })}
+                          </Text>
+                        </View>
+                        <View
+                          style={[
+                            styles.treatmentMetaChip,
+                            selectedTreatment?.id === treatment.id && styles.treatmentMetaChipSelected,
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.treatmentDuration,
+                              selectedTreatment?.id === treatment.id && styles.treatmentMetaTextSelected,
+                            ]}
+                          >
+                            {t('booking.duration', { duration: treatment.duration })}
+                          </Text>
+                        </View>
                       </View>
                     </View>
-                  </LinearGradient>
+                  </View>
                 </TouchableOpacity>
               ))}
             </View>
@@ -1333,7 +1522,7 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
         {currentStep > 1 && (
           <View style={styles.summaryContainer}>
             <LinearGradient
-              colors={['#1a1a1a', '#000000', '#1a1a1a']}
+              colors={['#191919', '#090909', '#171717']}
               style={styles.summaryGradient}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
@@ -1367,6 +1556,13 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
                   <Text style={styles.summaryValue}>{selectedTime}</Text>
                 </View>
               )}
+              <View style={styles.summaryLogoWrap}>
+                <Image
+                  source={require('../../assets/images/icon.png')}
+                  style={styles.summaryLogo}
+                  resizeMode="contain"
+                />
+              </View>
             </LinearGradient>
           </View>
         )}
@@ -1737,6 +1933,11 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#222',
   },
+  stepTitleBookingRtlLeft: {
+    width: '100%',
+    textAlign: 'left',
+    writingDirection: 'rtl',
+  },
   backButton: {
     paddingHorizontal: 16,
     paddingVertical: 8,
@@ -1754,29 +1955,60 @@ const styles = StyleSheet.create({
   stepContent: {
     padding: 16,
   },
+  barberStage: {
+    borderRadius: 26,
+    paddingVertical: 18,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: '#ebedf0',
+    shadowColor: '#121212',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.08,
+    shadowRadius: 22,
+    elevation: 4,
+  },
   barbersGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
+    columnGap: 18,
+    rowGap: 22,
   },
-  barberCard: {
-    width: (width - 48) / 2,
-    borderRadius: 20,
-    marginBottom: 16,
+  barberCircleItem: {
+    width: 148,
+  },
+  barberCirclePressable: {
+    alignItems: 'center',
+  },
+  barberCircleFrame: {
+    width: 134,
+    height: 134,
+    borderRadius: 67,
+    padding: 3,
+    justifyContent: 'center',
+    alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.28,
     shadowRadius: 16,
     elevation: 8,
-    position: 'relative',
-    overflow: 'hidden',
   },
-  barberGradient: {
-    padding: 16,
+  barberCircleFrameSelected: {
+    shadowColor: '#f5d37a',
+    shadowOpacity: 0.65,
+    shadowRadius: 20,
+    elevation: 12,
+  },
+  barberCircleInner: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 999,
+    overflow: 'hidden',
+    backgroundColor: '#0f0f0f',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.12)',
+    justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
   },
   selectedCard: {
     borderWidth: 2,
@@ -1786,31 +2018,24 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.5,
     shadowRadius: 8,
   },
-  barberImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    marginBottom: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.2)',
-  },
   barberPlaceholder: {
-    fontSize: 30,
+    fontSize: 36,
     color: '#fff',
   },
-  barberName: {
+  barberCircleName: {
+    marginTop: 10,
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 4,
+    fontWeight: '800',
+    color: '#2a2a2a',
     textAlign: 'center',
   },
-  barberExperience: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.8)',
+  barberCircleNameSelected: {
+    color: '#8b6b2e',
+  },
+  barberCircleExperience: {
+    marginTop: 2,
+    fontSize: 12,
+    color: '#7a7a7a',
     textAlign: 'center',
   },
   unavailableBadge: {
@@ -1828,77 +2053,173 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     opacity: 0.8,
   },
-  barberPhoto: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    borderWidth: 2,
-    borderColor: '#fff',
-    marginBottom: 6,
+  barberCirclePhoto: {
+    width: '100%',
+    height: '100%',
   },
   treatmentsContainer: {
     marginBottom: 16,
   },
   treatmentCard: {
-    borderRadius: 20,
+    borderRadius: 26,
     marginBottom: 16,
+    backgroundColor: 'rgba(12,12,12,0.94)',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.34,
+    shadowRadius: 20,
+    elevation: 11,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.09)',
+  },
+  treatmentCardSelected: {
+    borderColor: '#d4a74d',
+    shadowColor: '#d4a74d',
+    shadowOpacity: 0.36,
+    shadowRadius: 20,
+    elevation: 12,
   },
   treatmentGradient: {
-    padding: 20,
-    flexDirection: 'row',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    flexDirection: 'row-reverse',
+    alignItems: 'stretch',
+    backgroundColor: 'rgba(16,16,16,0.92)',
+    position: 'relative',
+  },
+  treatmentCornerSlash: {
+    position: 'absolute',
+    top: -12,
+    width: 82,
+    height: 26,
+    borderRadius: 10,
+    zIndex: 3,
+    opacity: 0.7,
+  },
+  treatmentCornerLeft: {
+    left: -14,
+    transform: [{ rotate: '-24deg' }],
+  },
+  treatmentCornerLeftSelected: {
+    opacity: 0.95,
+  },
+  treatmentCornerRight: {
+    right: -14,
+    transform: [{ rotate: '24deg' }],
+  },
+  treatmentCornerRightSelected: {
+    opacity: 1,
+  },
+  treatmentTopRow: {
+    flexDirection: 'row-reverse',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  treatmentAccent: {
+    width: 8,
+    backgroundColor: 'rgba(212,167,77,0.38)',
+  },
+  treatmentAccentSelected: {
+    backgroundColor: '#d4a74d',
   },
   treatmentImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 16,
-    marginRight: 16,
+    width: 86,
+    height: 86,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+    marginBottom: 12,
+    alignSelf: 'flex-end',
+  },
+  treatmentImageSelected: {
+    backgroundColor: 'rgba(212,167,77,0.24)',
+    borderColor: 'rgba(212,167,77,0.7)',
   },
   treatmentPlaceholder: {
-    fontSize: 30,
-    color: '#fff',
+    fontSize: 34,
+    color: '#e5e7eb',
+  },
+  treatmentPlaceholderSelected: {
+    color: '#f4cf85',
+  },
+  treatmentTag: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.16)',
+  },
+  treatmentTagSelected: {
+    backgroundColor: 'rgba(212,167,77,0.2)',
+    borderColor: 'rgba(212,167,77,0.56)',
+  },
+  treatmentTagText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#d1d5db',
+  },
+  treatmentTagTextSelected: {
+    color: '#f4cf85',
   },
   treatmentInfo: {
     flex: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
   },
   treatmentName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#f5f5f5',
     marginBottom: 4,
     textAlign: 'right',
   },
+  treatmentNameSelected: {
+    color: '#f4cf85',
+  },
   treatmentDescription: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.8)',
-    marginBottom: 8,
+    fontSize: 13,
+    color: 'rgba(229,231,235,0.82)',
+    marginBottom: 12,
+    lineHeight: 18,
     textAlign: 'right',
   },
+  treatmentDescriptionSelected: {
+    color: 'rgba(244,207,133,0.82)',
+  },
   treatmentDetails: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: 'row-reverse',
+    justifyContent: 'flex-start',
+    gap: 8,
     alignItems: 'center',
   },
+  treatmentMetaChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+  },
+  treatmentMetaChipSelected: {
+    backgroundColor: 'rgba(212,167,77,0.2)',
+    borderColor: 'rgba(212,167,77,0.5)',
+  },
   treatmentPrice: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#f3f4f6',
   },
   treatmentDuration: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.7)',
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#e5e7eb',
+  },
+  treatmentMetaTextSelected: {
+    color: '#f4cf85',
   },
   datesContainer: {
     flexDirection: 'row',
@@ -1971,13 +2292,15 @@ const styles = StyleSheet.create({
   },
   summaryContainer: {
     margin: 16,
-    borderRadius: 20,
+    borderRadius: 22,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 8,
+    shadowOpacity: 0.34,
+    shadowRadius: 18,
+    elevation: 9,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
   },
   summaryGradient: {
     padding: 20,
@@ -1986,24 +2309,39 @@ const styles = StyleSheet.create({
   },
   summaryTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontWeight: '800',
+    color: '#f7f7f7',
     marginBottom: 16,
     textAlign: 'right',
   },
   summaryItem: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: 10,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   summaryLabel: {
-    fontSize: 16,
-    color: 'rgba(255,255,255,0.8)',
+    fontSize: 14,
+    color: 'rgba(229,231,235,0.76)',
   },
   summaryValue: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#fff',
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#f5f5f5',
+  },
+  summaryLogoWrap: {
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  summaryLogo: {
+    width: 102,
+    height: 102,
+    opacity: 0.76,
   },
   modalOverlay: {
     flex: 1,

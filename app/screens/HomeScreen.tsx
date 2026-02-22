@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as SplashScreen from 'expo-splash-screen';
 import { useRouter } from 'expo-router';
-import { collection, doc, getDoc, getDocs, getFirestore, query, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, getFirestore } from 'firebase/firestore';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -28,6 +29,34 @@ import TermsModal from '../components/TermsModal';
 import TopNav from '../components/TopNav';
 
 const { height } = Dimensions.get('window');
+
+type HomeImagesState = {
+  atmosphere: string;
+  aboutUs: string;
+  gallery: string[];
+};
+
+const EMPTY_HOME_IMAGES: HomeImagesState = {
+  atmosphere: '',
+  aboutUs: '',
+  gallery: [],
+};
+
+function areHomeImagesEqual(a: HomeImagesState, b: HomeImagesState): boolean {
+  if (a.atmosphere !== b.atmosphere) return false;
+  if (a.aboutUs !== b.aboutUs) return false;
+  if (a.gallery.length !== b.gallery.length) return false;
+  for (let i = 0; i < a.gallery.length; i++) {
+    if (a.gallery[i] !== b.gallery[i]) return false;
+  }
+  return true;
+}
+
+// Keep last loaded Home images in memory to avoid flicker when returning to screen.
+// On first app launch, preloadHomeData() in index.tsx has already populated CacheUtils
+// memory cache. We seed homeImagesMemory from it synchronously so the very first render
+// of HomeScreen already has the images and shows no blank background.
+let homeImagesMemory: HomeImagesState | null = CacheUtils.getHomeImagesSync();
 
 interface HomeScreenProps {
   onNavigate: (screen: string) => void;
@@ -64,30 +93,35 @@ const NeonButton: React.FC<{
 function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
   const { t } = useTranslation();
   const router = useRouter();
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !homeImagesMemory);
+  // Track if splash was already hidden (to avoid hiding again on back navigation)
+  const splashHiddenRef = useRef(false);
+  // If we already have images in memory, consider background loaded immediately
+  const [backgroundImageLoaded, setBackgroundImageLoaded] = useState(() => !!homeImagesMemory);
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [notificationPanelVisible, setNotificationPanelVisible] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
   const [showImageModal, setShowImageModal] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | number>('');
-  const [settingsImages, setSettingsImages] = useState<{
-    atmosphere: string;
-    aboutUs: string;
-    gallery: string[];
-  }>({
-    atmosphere: '',
-    aboutUs: '',
-    gallery: [],
-  });
+  const [settingsImages, setSettingsImages] = useState<HomeImagesState>(
+    () => homeImagesMemory || EMPTY_HOME_IMAGES
+  );
   
-  // Dynamic content states
-  const [welcomeMessage, setWelcomeMessage] = useState('');
-  const [subtitleMessage, setSubtitleMessage] = useState('');
-  const [aboutUsMessage, setAboutUsMessage] = useState('');
+  // Dynamic content states — seed synchronously from memory cache when available
+  const [welcomeMessage, setWelcomeMessage] = useState(
+    () => CacheUtils.getHomeContentSync()?.welcomeMessage || ''
+  );
+  const [subtitleMessage, setSubtitleMessage] = useState(
+    () => CacheUtils.getHomeContentSync()?.subtitleMessage || ''
+  );
+  const [aboutUsMessage, setAboutUsMessage] = useState(
+    () => CacheUtils.getHomeContentSync()?.aboutUsMessage || ''
+  );
   const [showPopup, setShowPopup] = useState(false);
   const [popupMessage, setPopupMessage] = useState('');
-  const [atmosphereLoadFailed, setAtmosphereLoadFailed] = useState(false);
+  const [atmosphereImageError, setAtmosphereImageError] = useState(false);
   const [aboutImageLoadFailed, setAboutImageLoadFailed] = useState(false);
+  const [imageRefreshInProgress, setImageRefreshInProgress] = useState(false);
 
   // Animation refs
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -158,23 +192,55 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
 
       const loadDataFromCache = async () => {
         try {
-          setLoading(true);
-          const [cachedImages, cachedContent] = await Promise.all([
+          const hasInMemoryHomeData =
+            settingsImages.gallery.length > 0 ||
+            !!settingsImages.atmosphere ||
+            !!settingsImages.aboutUs ||
+            !!welcomeMessage ||
+            !!subtitleMessage;
+
+          // Keep UI fast on back navigation: avoid showing a loader if we already
+          // have in-memory content from a previous render.
+          if (!hasInMemoryHomeData) {
+            setLoading(true);
+          }
+
+          const [cachedImages, cachedContent, dismissedPopupMessage] = await Promise.all([
             CacheUtils.getHomeImages(),
             CacheUtils.getHomeContent(),
+            CacheUtils.getDismissedPopupMessage(),
           ]);
 
           if (cancelled) return;
 
           if (cachedImages && cachedContent) {
             console.log('✅ Loading home data from cache');
-            setSettingsImages(cachedImages);
+            homeImagesMemory = cachedImages as HomeImagesState;
+            setSettingsImages(prev =>
+              areHomeImagesEqual(prev, cachedImages as HomeImagesState) ? prev : (cachedImages as HomeImagesState)
+            );
             setWelcomeMessage(cachedContent.welcomeMessage);
             setSubtitleMessage(cachedContent.subtitleMessage);
             setAboutUsMessage(cachedContent.aboutUsMessage);
-            if (cachedContent.showPopup && cachedContent.popupMessage) {
+            if (
+              cachedContent.showPopup &&
+              cachedContent.popupMessage &&
+              cachedContent.popupMessage !== dismissedPopupMessage
+            ) {
               setPopupMessage(cachedContent.popupMessage);
               setShowPopup(true);
+            } else {
+              setShowPopup(false);
+            }
+
+            const hasUsableCachedImages =
+              !!cachedImages.atmosphere || !!cachedImages.aboutUs || cachedImages.gallery.length > 0;
+            if (!hasUsableCachedImages) {
+              console.log('⚠️ Home image cache is empty - loading fresh from Firebase');
+              await Promise.all([
+                fetchImages(),
+                fetchDynamicContent(),
+              ]);
             }
           } else {
             console.log('⚠️ Cache miss - loading from Firebase');
@@ -206,8 +272,14 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
   );
 
   useEffect(() => {
-    if (!loading) {
-      // Start animations immediately (don't wait for image load)
+    if (!loading && backgroundImageLoaded) {
+      // Hide splash screen only once, when background image is fully loaded
+      if (!splashHiddenRef.current) {
+        splashHiddenRef.current = true;
+        SplashScreen.hideAsync().catch(() => {});
+      }
+
+      // Start animations immediately
       Animated.sequence([
         Animated.timing(fadeAnim, {
           toValue: 1,
@@ -238,15 +310,34 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
         }),
       ]).start();
     }
-  }, [loading]);
+  }, [loading, backgroundImageLoaded]);
 
+  const prevAtmosphereRef = useRef<string | null>(null);
   useEffect(() => {
-    setAtmosphereLoadFailed(false);
+    const newAtmosphere = settingsImages.atmosphere;
+    // Only reset when the URL actually changes to a different value
+    if (newAtmosphere !== prevAtmosphereRef.current) {
+      prevAtmosphereRef.current = newAtmosphere;
+      setAtmosphereImageError(false);
+      setBackgroundImageLoaded(false);
+    }
   }, [settingsImages.atmosphere]);
 
   useEffect(() => {
     setAboutImageLoadFailed(false);
   }, [settingsImages.aboutUs]);
+
+  const refreshImagesFromServer = async () => {
+    if (imageRefreshInProgress) return;
+    try {
+      setImageRefreshInProgress(true);
+      await fetchImages();
+    } catch (error) {
+      console.warn('Failed to refresh images after load error:', error);
+    } finally {
+      setImageRefreshInProgress(false);
+    }
+  };
 
   // Cleanup old waitlist entries (runs automatically on app start)
   const cleanupOldWaitlistData = async () => {
@@ -298,9 +389,10 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
         const data = popupDoc.data();
         if (data.isActive && data.message && data.expiresAt && data.expiresAt.toDate() > new Date()) {
           popupMessage = data.message;
-          showPopupValue = true;
+          const dismissedPopupMessage = await CacheUtils.getDismissedPopupMessage();
+          showPopupValue = popupMessage !== dismissedPopupMessage;
           setPopupMessage(popupMessage || '');
-          setShowPopup(true);
+          setShowPopup(showPopupValue);
         }
       }
 
@@ -334,13 +426,13 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
         const db = getFirestore();
         
         // Load gallery images from the gallery collection
-        const galleryQuery = query(collection(db, 'gallery'), where('isActive', '==', true));
-        const gallerySnapshot = await getDocs(galleryQuery);
+        const gallerySnapshot = await getDocs(collection(db, 'gallery'));
         const galleryImages: string[] = [];
         
         gallerySnapshot.forEach((doc) => {
           const data = doc.data();
-          if (data.type === 'gallery' && data.imageUrl) {
+          const isActive = data.isActive !== false;
+          if (isActive && data.type === 'gallery' && data.imageUrl) {
             galleryImages.push(data.imageUrl);
           }
         });
@@ -354,44 +446,63 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
           return orderA - orderB;
         });
         
-        // Load atmosphere and about us images from settings
-        let atmosphereImage = '';
-        let aboutUsImage = '';
+        // Pick active background/aboutus from gallery first (matches admin "active images")
+        const activeBackgroundImages = gallerySnapshot.docs
+          .map((doc) => doc.data())
+          .filter((data) => data.isActive !== false && data.type === 'background' && data.imageUrl);
+        const activeAboutUsImages = gallerySnapshot.docs
+          .map((doc) => doc.data())
+          .filter((data) => data.isActive !== false && data.type === 'aboutus' && data.imageUrl);
+
+        const pickTopImage = (items: any[]) =>
+          items
+            .sort((a, b) => (b.order || 0) - (a.order || 0))
+            .map((item) => item.imageUrl)[0] || '';
+
+        let atmosphereImage = pickTopImage(activeBackgroundImages);
+        let aboutUsImage = pickTopImage(activeAboutUsImages);
+
+        // Fallback to settings document if no active image in gallery
+        let settingsAtmosphereImage = '';
+        let settingsAboutUsImage = '';
         
         const settingsDocRef = doc(db, 'settings', 'images');
         const settingsDocSnap = await getDoc(settingsDocRef);
         if (settingsDocSnap.exists()) {
           const settingsData = settingsDocSnap.data();
-          atmosphereImage = settingsData.atmosphereImage || '';
-          aboutUsImage = settingsData.aboutUsImage || '';
+          settingsAtmosphereImage = settingsData.atmosphereImage || '';
+          settingsAboutUsImage = settingsData.aboutUsImage || '';
           console.log('📁 Settings document contains:', {
-            atmosphereImage: atmosphereImage ? '✅ Found' : '❌ Not found',
-            aboutUsImage: aboutUsImage ? '✅ Found' : '❌ Not found',
+            atmosphereImage: settingsAtmosphereImage ? '✅ Found' : '❌ Not found',
+            aboutUsImage: settingsAboutUsImage ? '✅ Found' : '❌ Not found',
             allData: settingsData
           });
         } else {
           console.log('📁 No settings/images document found');
         }
         
-        // Also check gallery collection for background/aboutus images
-        if (!atmosphereImage || !aboutUsImage) {
-          gallerySnapshot.forEach((doc) => {
-            const data = doc.data();
-            if (data.type === 'background' && data.imageUrl && !atmosphereImage) {
-              atmosphereImage = data.imageUrl;
-            }
-            if (data.type === 'aboutus' && data.imageUrl && !aboutUsImage) {
-              aboutUsImage = data.imageUrl;
-            }
-          });
-        }
+        if (!atmosphereImage) atmosphereImage = settingsAtmosphereImage;
+        if (!aboutUsImage) aboutUsImage = settingsAboutUsImage;
         
         const imagesData = {
           atmosphere: atmosphereImage,
           aboutUs: aboutUsImage,
           gallery: galleryImages,
         };
+
+        // Warm image cache so returning to Home won't re-fetch visibly.
+        const urlsToPrefetch = [
+          imagesData.atmosphere,
+          imagesData.aboutUs,
+          ...imagesData.gallery.slice(0, 6),
+        ].filter(Boolean) as string[];
+        await Promise.all(
+          urlsToPrefetch.map((url) =>
+            Image.prefetch(url).catch(() => false)
+          )
+        );
         
+        homeImagesMemory = imagesData;
         setSettingsImages(imagesData);
         
         // Update cache for next time
@@ -437,13 +548,13 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
             
             // Reload images after initialization
             console.log('🔄 Reloading images after initialization...');
-            const refreshedGalleryQuery = query(collection(db, 'gallery'), where('isActive', '==', true));
-            const refreshedGallerySnapshot = await getDocs(refreshedGalleryQuery);
+            const refreshedGallerySnapshot = await getDocs(collection(db, 'gallery'));
             const refreshedGalleryImages: string[] = [];
             
             refreshedGallerySnapshot.forEach((doc) => {
               const data = doc.data();
-              if (data.type === 'gallery' && data.imageUrl) {
+              const isActive = data.isActive !== false;
+              if (isActive && data.type === 'gallery' && data.imageUrl) {
                 refreshedGalleryImages.push(data.imageUrl);
               }
             });
@@ -454,6 +565,7 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
                   ...prev,
                   gallery: refreshedGalleryImages,
                 };
+                homeImagesMemory = updated;
                 // Update cache
                 CacheUtils.setHomeImages(updated, 30).catch(err => 
                   console.warn('Failed to update images cache after init:', err)
@@ -474,13 +586,13 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
             
             // Reload images after replacement
             console.log('🔄 Reloading images after replacement...');
-            const refreshedGalleryQuery = query(collection(db, 'gallery'), where('isActive', '==', true));
-            const refreshedGallerySnapshot = await getDocs(refreshedGalleryQuery);
+            const refreshedGallerySnapshot = await getDocs(collection(db, 'gallery'));
             const refreshedGalleryImages: string[] = [];
             
             refreshedGallerySnapshot.forEach((doc) => {
               const data = doc.data();
-              if (data.type === 'gallery' && data.imageUrl) {
+              const isActive = data.isActive !== false;
+              if (isActive && data.type === 'gallery' && data.imageUrl) {
                 refreshedGalleryImages.push(data.imageUrl);
               }
             });
@@ -491,6 +603,7 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
                   ...prev,
                   gallery: refreshedGalleryImages,
                 };
+                homeImagesMemory = updated;
                 // Update cache
                 CacheUtils.setHomeImages(updated, 30).catch(err => 
                   console.warn('Failed to update images cache after replacement:', err)
@@ -614,6 +727,18 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
     });
   };
 
+  const dismissPopupPermanently = async () => {
+    try {
+      if (popupMessage) {
+        await CacheUtils.setDismissedPopupMessage(popupMessage);
+      }
+    } catch (error) {
+      console.warn('Failed to persist popup dismissal:', error);
+    } finally {
+      setShowPopup(false);
+    }
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -634,13 +759,21 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
       <View style={styles.backgroundWrapper}>
         <ImageBackground
           source={
-            settingsImages.atmosphere && !atmosphereLoadFailed
+            settingsImages.atmosphere && !atmosphereImageError
               ? { uri: settingsImages.atmosphere }
               : require('../../assets/images/atmosphere/atmosphere.png')
           }
           style={styles.atmosphereImage}
           resizeMode="cover"
-          onError={() => setAtmosphereLoadFailed(true)}
+          onLoadEnd={() => {
+            // Hide splash only after background image is fully rendered
+            setBackgroundImageLoaded(true);
+          }}
+          onError={() => {
+            setAtmosphereImageError(true);
+            setBackgroundImageLoaded(true); // Show screen even if image fails
+            refreshImagesFromServer();
+          }}
         >
           <View style={styles.overlay} />
           <LinearGradient
@@ -855,7 +988,10 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
                 }
                 style={styles.aboutImageWide}
                 resizeMode="cover"
-                onError={() => setAboutImageLoadFailed(true)}
+                onError={() => {
+                  setAboutImageLoadFailed(true);
+                  refreshImagesFromServer();
+                }}
               />
               <View style={styles.aboutContent}>
                 <Text style={styles.aboutText}>
@@ -937,12 +1073,20 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
               </TouchableOpacity>
             </View>
             <Text style={styles.popupMessage}>{popupMessage}</Text>
-            <TouchableOpacity 
-              style={styles.popupButton} 
-              onPress={() => setShowPopup(false)}
-            >
-              <Text style={styles.popupButtonText}>הבנתי</Text>
-            </TouchableOpacity>
+            <View style={styles.popupButtonsRow}>
+              <TouchableOpacity
+                style={[styles.popupButton, styles.popupSecondaryButton]}
+                onPress={dismissPopupPermanently}
+              >
+                <Text style={[styles.popupButtonText, styles.popupSecondaryButtonText]}>אל תציג שוב</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.popupButton}
+                onPress={() => setShowPopup(false)}
+              >
+                <Text style={styles.popupButtonText}>הבנתי</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -1039,7 +1183,8 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     justifyContent: 'flex-end',
-    marginTop: 60, // move image down so overlay covers less
+    marginTop: 0,
+    opacity: 1,
   },
   overlay: {
     ...StyleSheet.absoluteFillObject,
@@ -1559,5 +1704,16 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  popupButtonsRow: {
+    flexDirection: 'row-reverse',
+    gap: 10,
+  },
+  popupSecondaryButton: {
+    flex: 1,
+    backgroundColor: '#e5e7eb',
+  },
+  popupSecondaryButtonText: {
+    color: '#374151',
   },
 });

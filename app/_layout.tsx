@@ -20,8 +20,10 @@ import i18n from './i18n';
 
 import { useColorScheme } from '../hooks/useColorScheme';
 
-// Hide splash screen immediately to prevent flicker
-SplashScreen.hideAsync();
+// Keep native splash visible until root layout is actually ready.
+SplashScreen.preventAutoHideAsync().catch(() => {
+  // ignore if already prevented
+});
 
 // Configure notification behavior
 Notifications.setNotificationHandler({
@@ -40,6 +42,14 @@ export default function RootLayout() {
   const [loaded] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
+
+  useEffect(() => {
+    if (loaded) {
+      SplashScreen.hideAsync().catch(() => {
+        // ignore if already hidden
+      });
+    }
+  }, [loaded]);
 
   // Setup notification response handler (auth-aware)
   useEffect(() => {

@@ -4470,14 +4470,29 @@ export const getUserNotifications = async (userId: string): Promise<{
 }[]> => {
   try {
     const notificationsRef = collection(db, 'notifications');
-    const q = query(
-      notificationsRef,
-      where('userId', '==', userId),
-      orderBy('createdAt', 'desc'),
-      limit(100)
-    );
-    
-    const querySnapshot = await getDocs(q);
+    let querySnapshot;
+    try {
+      const q = query(
+        notificationsRef,
+        where('userId', '==', userId),
+        orderBy('createdAt', 'desc'),
+        limit(100)
+      );
+      querySnapshot = await getDocs(q);
+    } catch (queryError: any) {
+      // Fallback when composite index (userId + createdAt) is not built yet.
+      if (queryError?.code !== 'failed-precondition') {
+        throw queryError;
+      }
+      console.warn('Notifications index missing, using fallback query without orderBy');
+      const fallbackQuery = query(
+        notificationsRef,
+        where('userId', '==', userId),
+        limit(100)
+      );
+      querySnapshot = await getDocs(fallbackQuery);
+    }
+
     const now = new Date();
     const cutoff = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     const batch = writeBatch(db);
@@ -4497,7 +4512,9 @@ export const getUserNotifications = async (userId: string): Promise<{
     });
     
     if (hasDeletes) await batch.commit();
-    
+
+    recent.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
     return recent.map(({ doc: d, data, createdAt }) => ({
       id: d.id,
       type: (data.type || 'general') as 'appointment' | 'general' | 'reminder',

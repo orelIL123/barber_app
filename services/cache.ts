@@ -37,6 +37,20 @@ class CacheManager {
     }
   }
 
+  // Get data synchronously from memory cache only (no AsyncStorage fallback).
+  // Returns null if not in memory or expired. Use this for instant initial state.
+  getSync<T>(key: string): T | null {
+    if (this.memoryCache.has(key)) {
+      const cacheItem = this.memoryCache.get(key) as CacheItem<T>;
+      if (this.isValid(cacheItem)) {
+        return cacheItem.data;
+      } else {
+        this.memoryCache.delete(key);
+      }
+    }
+    return null;
+  }
+
   // Get data from cache (memory first, then AsyncStorage)
   async get<T>(key: string): Promise<T | null> {
     // Check memory cache first
@@ -120,6 +134,7 @@ export const CACHE_KEYS = {
   AUTH_DATA: 'cache_auth_data',
   LOGIN_CREDENTIALS: 'cache_login_credentials',
   AUTH_STATE: 'cache_auth_state',
+  DISMISSED_POPUP_MESSAGE: 'cache_dismissed_popup_message',
 } as const;
 
 // Export singleton instance
@@ -181,6 +196,20 @@ export const CacheUtils = {
   },
 
   // Home screen data utilities
+  getHomeImagesSync(): { atmosphere: string; aboutUs: string; gallery: string[] } | null {
+    return cache.getSync<{ atmosphere: string; aboutUs: string; gallery: string[] }>(CACHE_KEYS.HOME_IMAGES);
+  },
+
+  getHomeContentSync(): {
+    welcomeMessage: string;
+    subtitleMessage: string;
+    aboutUsMessage: string;
+    popupMessage?: string;
+    showPopup?: boolean;
+  } | null {
+    return cache.getSync(CACHE_KEYS.HOME_CONTENT);
+  },
+
   async getHomeImages() {
     return cache.get<{
       atmosphere: string;
@@ -215,6 +244,19 @@ export const CacheUtils = {
     showPopup?: boolean;
   }, ttlMinutes: number = 30) {
     return cache.set(CACHE_KEYS.HOME_CONTENT, content, ttlMinutes);
+  },
+
+  async getDismissedPopupMessage() {
+    return cache.get<string>(CACHE_KEYS.DISMISSED_POPUP_MESSAGE);
+  },
+
+  async setDismissedPopupMessage(message: string) {
+    // Keep for a long period; can be overridden by a new popup message.
+    return cache.set(CACHE_KEYS.DISMISSED_POPUP_MESSAGE, message, 60 * 24 * 365);
+  },
+
+  async clearDismissedPopupMessage() {
+    return cache.clear(CACHE_KEYS.DISMISSED_POPUP_MESSAGE);
   },
 
   async clearHomeData() {

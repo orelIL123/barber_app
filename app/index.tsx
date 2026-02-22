@@ -1,9 +1,14 @@
+import * as SplashScreen from 'expo-splash-screen';
 import { useRouter } from 'expo-router';
-import { collection, doc, getDoc, getDocs, getFirestore, query, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, getFirestore } from 'firebase/firestore';
 import { useEffect } from 'react';
 import { Image, StyleSheet, View } from 'react-native';
 import { authManager } from '../services/authManager';
 import { CacheUtils } from '../services/cache';
+import { getBarbers, getTreatments } from '../services/firebase';
+
+// Keep splash visible until HomeScreen background image loads
+SplashScreen.preventAutoHideAsync();
 
 // Preload home screen data (images and content)
 const preloadHomeData = async (): Promise<void> => {
@@ -17,13 +22,13 @@ const preloadHomeData = async (): Promise<void> => {
       (async () => {
         try {
           // Load gallery images
-          const galleryQuery = query(collection(db, 'gallery'), where('isActive', '==', true));
-          const gallerySnapshot = await getDocs(galleryQuery);
+          const gallerySnapshot = await getDocs(collection(db, 'gallery'));
           const galleryImages: string[] = [];
           
           gallerySnapshot.forEach((doc) => {
             const data = doc.data();
-            if (data.type === 'gallery' && data.imageUrl) {
+            const isActive = data.isActive !== false;
+            if (isActive && data.type === 'gallery' && data.imageUrl) {
               galleryImages.push(data.imageUrl);
             }
           });
@@ -37,30 +42,36 @@ const preloadHomeData = async (): Promise<void> => {
             return orderA - orderB;
           });
           
-          // Load atmosphere and about us images from settings
-          let atmosphereImage = '';
-          let aboutUsImage = '';
+          // Pick active background/aboutus from gallery first (matches admin "active images")
+          const activeBackgroundImages = gallerySnapshot.docs
+            .map((doc) => doc.data())
+            .filter((data) => data.isActive !== false && data.type === 'background' && data.imageUrl);
+          const activeAboutUsImages = gallerySnapshot.docs
+            .map((doc) => doc.data())
+            .filter((data) => data.isActive !== false && data.type === 'aboutus' && data.imageUrl);
+
+          const pickTopImage = (items: any[]) =>
+            items
+              .sort((a, b) => (b.order || 0) - (a.order || 0))
+              .map((item) => item.imageUrl)[0] || '';
+
+          let atmosphereImage = pickTopImage(activeBackgroundImages);
+          let aboutUsImage = pickTopImage(activeAboutUsImages);
+
+          // Fallback to settings document if no active image in gallery
+          let settingsAtmosphereImage = '';
+          let settingsAboutUsImage = '';
           
           const settingsDocRef = doc(db, 'settings', 'images');
           const settingsDocSnap = await getDoc(settingsDocRef);
           if (settingsDocSnap.exists()) {
             const settingsData = settingsDocSnap.data();
-            atmosphereImage = settingsData.atmosphereImage || '';
-            aboutUsImage = settingsData.aboutUsImage || '';
+            settingsAtmosphereImage = settingsData.atmosphereImage || '';
+            settingsAboutUsImage = settingsData.aboutUsImage || '';
           }
           
-          // Also check gallery collection for background/aboutus images
-          if (!atmosphereImage || !aboutUsImage) {
-            gallerySnapshot.forEach((doc) => {
-              const data = doc.data();
-              if (data.type === 'background' && data.imageUrl && !atmosphereImage) {
-                atmosphereImage = data.imageUrl;
-              }
-              if (data.type === 'aboutus' && data.imageUrl && !aboutUsImage) {
-                aboutUsImage = data.imageUrl;
-              }
-            });
-          }
+          if (!atmosphereImage) atmosphereImage = settingsAtmosphereImage;
+          if (!aboutUsImage) aboutUsImage = settingsAboutUsImage;
           
           return {
             atmosphere: atmosphereImage,
@@ -134,9 +145,28 @@ const preloadHomeData = async (): Promise<void> => {
       })(),
     ]);
 
-    // Save to cache
+    const hasUsableHomeImages =
+      !!imagesData.atmosphere || !!imagesData.aboutUs || imagesData.gallery.length > 0;
+
+    // Prefetch home images so they are in the native image cache when HomeScreen mounts.
+    // We await the atmosphere (background) image so it is guaranteed ready before navigation.
+    // Gallery images are prefetched in parallel but we don't block on them.
+    if (hasUsableHomeImages) {
+      const criticalUrls = [imagesData.atmosphere, imagesData.aboutUs]
+        .filter((url): url is string => typeof url === 'string' && url.startsWith('http'));
+      const galleryUrls = imagesData.gallery
+        .slice(0, 6)
+        .filter((url): url is string => typeof url === 'string' && url.startsWith('http'));
+
+      // Critical images: await so they are ready before HomeScreen mounts
+      await Promise.all(criticalUrls.map((url) => Image.prefetch(url).catch(() => false)));
+      // Gallery: fire-and-forget (lower priority)
+      Promise.all(galleryUrls.map((url) => Image.prefetch(url).catch(() => false))).catch(() => false);
+    }
+
+    // Save to cache (don't overwrite existing image cache with an empty payload).
     await Promise.all([
-      CacheUtils.setHomeImages(imagesData, 30),
+      hasUsableHomeImages ? CacheUtils.setHomeImages(imagesData, 30) : Promise.resolve(),
       CacheUtils.setHomeContent(contentData, 30),
     ]);
 
@@ -152,12 +182,54 @@ const preloadHomeData = async (): Promise<void> => {
   }
 };
 
+// Preload barbers + treatments and warm remote image cache during splash
+const preloadBookingData = async (): Promise<void> => {
+  try {
+    console.log('🔄 Preloading booking data (barbers + treatments)...');
+
+    const [barbers, treatments] = await Promise.all([
+      getBarbers(false),
+      getTreatments(true),
+    ]);
+
+    // Store in cache so non-realtime screens can render faster.
+    await Promise.all([
+      CacheUtils.setBarbers(barbers, 30),
+      CacheUtils.setTreatments(treatments, 60),
+    ]);
+
+    const barberImageUrls = barbers
+      .map((b: any) => b.image || b.photoUrl || '')
+      .filter((url: string) => typeof url === 'string' && /^https?:\/\//.test(url));
+
+    const treatmentImageUrls = treatments
+      .map((t: any) => t.image || '')
+      .filter((url: string) => typeof url === 'string' && /^https?:\/\//.test(url));
+
+    const uniqueUrls = Array.from(new Set([...barberImageUrls, ...treatmentImageUrls]));
+
+    await Promise.all(
+      uniqueUrls.map((url) =>
+        Image.prefetch(url).catch(() => false)
+      )
+    );
+
+    console.log('✅ Booking data preloaded:', {
+      barbers: barbers.length,
+      treatments: treatments.length,
+      prefetchedImages: uniqueUrls.length,
+    });
+  } catch (error) {
+    console.warn('Failed to preload booking data:', error);
+  }
+};
+
 export default function Index() {
   const router = useRouter();
 
   useEffect(() => {
     let authStateChecked = false;
-    const SPLASH_MIN_MS = 5000; // 5 seconds minimum so everything has time to load
+    const SPLASH_MIN_MS = 2000; // Minimum 2 seconds for better UX (not too abrupt)
 
     const checkAuthState = async (): Promise<'/(tabs)' | '/auth-choice'> => {
       try {
@@ -165,7 +237,11 @@ export default function Index() {
         if (authStateChecked) return '/(tabs)';
         authStateChecked = true;
 
-        await preloadHomeData();
+        // Preload data in parallel (HomeScreen will wait for background image)
+        await Promise.all([
+          preloadHomeData(),
+          preloadBookingData(),
+        ]);
 
         const isAuthenticated = await authManager.isAuthenticated();
         if (isAuthenticated) return '/(tabs)';
@@ -178,13 +254,15 @@ export default function Index() {
       }
     };
 
+    // Navigate after auth check + min splash time
+    // Actual splash hide happens in HomeScreen after background image loads
     Promise.all([
       checkAuthState(),
       new Promise<void>(r => setTimeout(r, SPLASH_MIN_MS)),
     ]).then(([route]) => router.replace(route as string));
   }, [router]);
 
-  // Show splash until loaded (minimum 5 seconds)
+  // Show custom splash - native splash will stay visible until HomeScreen image loads
   return (
     <View style={styles.container}>
       <Image
