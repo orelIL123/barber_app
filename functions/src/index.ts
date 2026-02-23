@@ -140,3 +140,133 @@ export const updateEmailAndSendReset = functions.https.onCall(async (data, conte
   }
 });
 
+// ──────────────────────────────────────────────
+//  Custom Claims – Admin role management
+// ──────────────────────────────────────────────
+
+/**
+ * setAdminClaim — callable by an existing admin.
+ * Sets { admin: true } on a user's Auth token.
+ * Usage from client: httpsCallable(functions, 'setAdminClaim')({ uid: 'xxx' })
+ */
+export const setAdminClaim = functions.https.onCall(async (data, context) => {
+  // Only allow calls from authenticated admins
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Must be authenticated');
+  }
+
+  // Check caller is admin via custom claim OR Firestore fallback
+  const callerClaims = context.auth.token;
+  let callerIsAdmin = callerClaims.admin === true;
+
+  if (!callerIsAdmin) {
+    // Fallback: check Firestore
+    const callerDoc = await admin.firestore().collection('users').doc(context.auth.uid).get();
+    callerIsAdmin = callerDoc.exists && callerDoc.data()?.isAdmin === true;
+  }
+
+  if (!callerIsAdmin) {
+    throw new functions.https.HttpsError('permission-denied', 'Only admins can set admin claims');
+  }
+
+  const { uid } = data;
+  if (!uid || typeof uid !== 'string') {
+    throw new functions.https.HttpsError('invalid-argument', 'uid (string) is required');
+  }
+
+  try {
+    await admin.auth().setCustomUserClaims(uid, { admin: true });
+    console.log(`✅ Admin claim set for user ${uid}`);
+    return { success: true, message: `Admin claim set for ${uid}` };
+  } catch (error: any) {
+    console.error(`❌ Error setting admin claim for ${uid}:`, error);
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
+
+/**
+ * syncAdminClaims — one-time / maintenance callable.
+ * Scans all Firestore users with isAdmin=true and sets { admin: true } claim.
+ * Call once after deploying, then never again (unless you add new admins manually).
+ * Can be called by any authenticated admin.
+ */
+export const syncAdminClaims = functions.https.onCall(async (_data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Must be authenticated');
+  }
+
+  // Allow call from Firestore-based admin (for first-time bootstrap)
+  const callerDoc = await admin.firestore().collection('users').doc(context.auth.uid).get();
+  if (!callerDoc.exists || !callerDoc.data()?.isAdmin) {
+    throw new functions.https.HttpsError('permission-denied', 'Only admins can sync claims');
+  }
+
+  try {
+    const snapshot = await admin.firestore()
+      .collection('users')
+      .where('isAdmin', '==', true)
+      .get();
+
+    const results: string[] = [];
+
+    for (const userDoc of snapshot.docs) {
+      const userData = userDoc.data();
+      const authUid = userData.authUid || userDoc.id;
+
+      try {
+        await admin.auth().setCustomUserClaims(authUid, { admin: true });
+        results.push(`✅ ${authUid} (${userData.email || 'no email'})`);
+        console.log(`✅ Admin claim synced for ${authUid}`);
+      } catch (err: any) {
+        results.push(`❌ ${authUid}: ${err.message}`);
+        console.error(`❌ Failed to sync claim for ${authUid}:`, err);
+      }
+    }
+
+    // Also set the claim for the caller
+    await admin.auth().setCustomUserClaims(context.auth.uid, { admin: true });
+    results.push(`✅ ${context.auth.uid} (caller)`);
+
+    return { success: true, synced: results.length, details: results };
+  } catch (error: any) {
+    console.error('❌ Error syncing admin claims:', error);
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
+
+/**
+ * onAdminFlagChanged — Firestore trigger.
+ * When a user document's isAdmin field changes to true, automatically set the claim.
+ * When it changes to false, remove the claim.
+ */
+export const onAdminFlagChanged = functions.firestore
+  .document('users/{userId}')
+  .onWrite(async (change, context) => {
+    const userId = context.params.userId;
+    const before = change.before.data();
+    const after = change.after.data();
+
+    // Document deleted
+    if (!after) return;
+
+    const wasBefore = before?.isAdmin === true;
+    const isNow = after.isAdmin === true;
+
+    // No change in admin status
+    if (wasBefore === isNow) return;
+
+    const authUid = after.authUid || userId;
+
+    try {
+      if (isNow) {
+        await admin.auth().setCustomUserClaims(authUid, { admin: true });
+        console.log(`✅ Admin claim ADDED for ${authUid}`);
+      } else {
+        await admin.auth().setCustomUserClaims(authUid, { admin: false });
+        console.log(`🚫 Admin claim REMOVED for ${authUid}`);
+      }
+    } catch (error) {
+      console.error(`❌ Error updating admin claim for ${authUid}:`, error);
+    }
+  });
+

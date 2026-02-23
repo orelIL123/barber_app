@@ -1,0 +1,92 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ──────────────────────────────────────
+    //  Helper functions
+    // ──────────────────────────────────────
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated()
+          && request.auth.token.admin == true;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated()
+          && request.auth.uid == userId;
+    }
+
+    // ──────────────────────────────────────
+    //  PUBLIC READ — Gallery
+    //  כל אחד (כולל אורח) יכול לקרוא גלריה
+    // ──────────────────────────────────────
+    match /gallery/{imageId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ──────────────────────────────────────
+    //  PUBLIC READ — Settings (images, homeMessages, aboutUsText, popupMessage, aboutus)
+    //  כל אחד (כולל אורח) יכול לקרוא הגדרות ציבוריות
+    // ──────────────────────────────────────
+    match /settings/{settingId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ──────────────────────────────────────
+    //  Users
+    // ──────────────────────────────────────
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isAuthenticated();
+      allow update: if isOwner(userId) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ──────────────────────────────────────
+    //  Appointments
+    // ──────────────────────────────────────
+    match /appointments/{appointmentId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
+
+    // ──────────────────────────────────────
+    //  Barbers
+    // ──────────────────────────────────────
+    match /barbers/{barberId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ──────────────────────────────────────
+    //  Treatments
+    // ──────────────────────────────────────
+    match /treatments/{treatmentId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ──────────────────────────────────────
+    //  Waitlist
+    // ──────────────────────────────────────
+    match /waitlist/{entryId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isOwner(resource.data.userId) || isAdmin();
+    }
+
+    // ──────────────────────────────────────
+    //  Admin Settings (notification settings etc.)
+    // ──────────────────────────────────────
+    match /adminSettings/{settingId} {
+      allow read, write: if isAdmin();
+    }
+  }
+}

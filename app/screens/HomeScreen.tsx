@@ -197,6 +197,21 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
           const alreadyLoaded = hasHomeLoadedSuccessfully || (await CacheUtils.getHomeLoadedOnce());
           if (alreadyLoaded) {
             hasHomeLoadedSuccessfully = true;
+
+            // If images are empty (module loaded before preload finished), hydrate from cache now
+            const cachedImages = homeImagesMemory || (await CacheUtils.getHomeImages());
+            if (cachedImages && (cachedImages.atmosphere || cachedImages.aboutUs || cachedImages.gallery.length > 0)) {
+              const typed = cachedImages as HomeImagesState;
+              homeImagesMemory = typed;
+              if (!cancelled) {
+                setSettingsImages(prev => areHomeImagesEqual(prev, typed) ? prev : typed);
+              }
+            } else {
+              // Cache exists but is empty — load fresh from Firebase
+              console.log('⚠️ Home cache empty despite alreadyLoaded — fetching fresh images');
+              await fetchImages();
+            }
+
             cleanupOldWaitlistData();
             return;
           }
@@ -754,6 +769,14 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
   // Show scissors overlay until both data and background image are ready
   const homeReady = !loading && backgroundImageLoaded;
 
+  // DEBUG: log the URLs being used for background images
+  console.log('🖼️ Image render state:', {
+    atmosphereUrl: settingsImages.atmosphere?.substring(0, 100) || '(empty)',
+    aboutUsUrl: settingsImages.aboutUs?.substring(0, 100) || '(empty)',
+    atmosphereError: atmosphereImageError,
+    aboutUsError: aboutImageLoadFailed,
+  });
+
   return (
     <SafeAreaView style={styles.container}>
       <TopNav 
@@ -774,7 +797,11 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
             // Hide splash only after background image is fully rendered
             setBackgroundImageLoaded(true);
           }}
-          onError={() => {
+          onError={(e) => {
+            console.error('❌ Atmosphere image FAILED to load:', {
+              url: settingsImages.atmosphere?.substring(0, 120),
+              error: e?.nativeEvent?.error || 'unknown',
+            });
             setAtmosphereImageError(true);
             setBackgroundImageLoaded(true); // Show screen even if image fails
             refreshImagesFromServer();
@@ -993,7 +1020,11 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
                 }
                 style={styles.aboutImageWide}
                 resizeMode="cover"
-                onError={() => {
+                onError={(e) => {
+                  console.error('❌ About Us image FAILED to load:', {
+                    url: settingsImages.aboutUs?.substring(0, 120),
+                    error: e?.nativeEvent?.error || 'unknown',
+                  });
                   setAboutImageLoadFailed(true);
                   refreshImagesFromServer();
                 }}

@@ -369,6 +369,21 @@ const saveAuthDataAfterLogin = async (user: User) => {
       
       await AuthStorageService.saveAuthData(authData);
       console.log('✅ Auth data saved successfully');
+
+      // If the user is admin, ensure their custom claims are synced
+      // and force-refresh the token so Storage/Firestore rules see admin=true
+      if (userProfile.isAdmin) {
+        try {
+          console.log('👑 Admin user detected – syncing custom claims...');
+          const syncFn = httpsCallable(functions, 'syncAdminClaims');
+          await syncFn({});
+          // Force-refresh the ID token to pick up the new claim
+          await user.getIdToken(true);
+          console.log('✅ Admin custom claims synced & token refreshed');
+        } catch (claimError) {
+          console.warn('⚠️ Failed to sync admin claims (will retry next login):', claimError);
+        }
+      }
     } else {
       console.log('❌ No user profile found for user:', user.uid);
     }

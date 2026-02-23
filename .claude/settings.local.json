@@ -19,7 +19,9 @@
       "WebSearch",
       "Bash(cat:*)",
       "Bash(eas update:*)",
-      "Bash(npx ts-node:*)"
+      "Bash(npx ts-node:*)",
+      "mcp__ide__getDiagnostics",
+      "Bash(ls /Users/x/Documents/BARBERAPP/barber_app/app/(tabs)/)"
     ],
     "deny": []
   }
