@@ -135,6 +135,7 @@ export const CACHE_KEYS = {
   LOGIN_CREDENTIALS: 'cache_login_credentials',
   AUTH_STATE: 'cache_auth_state',
   DISMISSED_POPUP_MESSAGE: 'cache_dismissed_popup_message',
+  HOME_LOADED_ONCE: 'cache_home_loaded_once',
 } as const;
 
 // Export singleton instance
@@ -202,7 +203,7 @@ export const CacheUtils = {
 
   getHomeContentSync(): {
     welcomeMessage: string;
-    subtitleMessage: string;
+    subtitleMessage?: string;
     aboutUsMessage: string;
     popupMessage?: string;
     showPopup?: boolean;
@@ -229,7 +230,7 @@ export const CacheUtils = {
   async getHomeContent() {
     return cache.get<{
       welcomeMessage: string;
-      subtitleMessage: string;
+      subtitleMessage?: string;
       aboutUsMessage: string;
       popupMessage?: string;
       showPopup?: boolean;
@@ -238,7 +239,7 @@ export const CacheUtils = {
 
   async setHomeContent(content: {
     welcomeMessage: string;
-    subtitleMessage: string;
+    subtitleMessage?: string;
     aboutUsMessage: string;
     popupMessage?: string;
     showPopup?: boolean;
@@ -263,7 +264,16 @@ export const CacheUtils = {
     await Promise.all([
       cache.clear(CACHE_KEYS.HOME_IMAGES),
       cache.clear(CACHE_KEYS.HOME_CONTENT),
+      cache.clear(CACHE_KEYS.HOME_LOADED_ONCE),
     ]);
+  },
+
+  async getHomeLoadedOnce() {
+    return cache.get<boolean>(CACHE_KEYS.HOME_LOADED_ONCE);
+  },
+
+  async setHomeLoadedOnce(ttlMinutes: number = 60 * 24) {
+    return cache.set(CACHE_KEYS.HOME_LOADED_ONCE, true, ttlMinutes);
   },
 
   // Auth data utilities

@@ -12,7 +12,7 @@ import {
     View,
 } from 'react-native';
 import { CacheUtils } from '../../services/cache';
-import { cleanupOldAppointments, db } from '../../services/firebase';
+import { cleanupOldAppointments, db, sendNotificationToAllUsers } from '../../services/firebase';
 import ToastMessage from '../components/ToastMessage';
 import TopNav from '../components/TopNav';
 
@@ -28,7 +28,7 @@ const AdminSettingsScreen: React.FC<AdminSettingsScreenProps> = ({ onNavigate, o
   
   // Settings states
   const [welcomeMessage, setWelcomeMessage] = useState('שלום, ברוכים הבאים');
-  const [subtitleMessage, setSubtitleMessage] = useState('ל-TURGI ברברשופ');
+  const [subtitleMessage, setSubtitleMessage] = useState('איך נוכל לעזור לך היום?');
   const [aboutUsText, setAboutUsText] = useState('ברוכים הבאים למספרה של רון תורג׳מן! כאן תיהנו מחוויה אישית, מקצועית ומפנקת, עם יחס חם לכל לקוח. רון, בעל ניסיון של שנים בתחום, מזמין אתכם להתרווח, להתחדש ולהרגיש בבית.');
   const [popupMessage, setPopupMessage] = useState('');
 
@@ -87,12 +87,12 @@ const AdminSettingsScreen: React.FC<AdminSettingsScreenProps> = ({ onNavigate, o
       if (welcomeDoc.exists()) {
         const data = welcomeDoc.data();
         setWelcomeMessage(data.welcome || 'שלום, ברוכים הבאים');
-        setSubtitleMessage(data.subtitle || 'ל-TURGI ברברשופ');
+        setSubtitleMessage(data.subtitle || 'איך נוכל לעזור לך היום?');
       } else {
         // Create default if doesn't exist
         await setDoc(doc(db, 'settings', 'homeMessages'), {
           welcome: 'שלום, ברוכים הבאים',
-          subtitle: 'ל-TURGI ברברשופ',
+          subtitle: 'איך נוכל לעזור לך היום?',
           createdAt: new Date()
         });
       }
@@ -165,16 +165,22 @@ const AdminSettingsScreen: React.FC<AdminSettingsScreenProps> = ({ onNavigate, o
 
     try {
       setLoading(true);
+      // 1. שמירה לפופאפ בתוך האפליקציה (24 שעות)
       await setDoc(doc(db, 'settings', 'popupMessage'), {
         message: popupMessage,
         isActive: true,
         createdAt: new Date(),
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
       });
-      // Invalidate cache so users see updated data immediately
       await CacheUtils.clearHomeData();
+
+      // 2. גם Push למשתמשים שאישרו התראות
+      const sentPush = await sendNotificationToAllUsers('הודעה מהספר', popupMessage);
+
       setPopupMessage('');
-      showToast('ההודעה נשלחה לכל המשתמשים!');
+      showToast(sentPush > 0 
+        ? `ההודעה נשלחה! פופאפ + Push ל-${sentPush} משתמשים` 
+        : 'ההודעה נשלחה! יופיע כפופאפ (אין משתמשים עם Push)');
     } catch (error) {
       console.error('Error sending popup message:', error);
       showToast('שגיאה בשליחת ההודעה', 'error');
@@ -215,29 +221,33 @@ const AdminSettingsScreen: React.FC<AdminSettingsScreenProps> = ({ onNavigate, o
       <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
         {/* Welcome Messages Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>הודעות ברכה בעמוד הבית</Text>
+          <Text style={styles.sectionTitle}>הודעת ברכה בעמוד הבית</Text>
+          <Text style={styles.sectionDescription}>
+            הטקסט שיוצג בראש מסך הבית (רק מה שתגדיר כאן)
+          </Text>
           
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>הודעת ברכה ראשית</Text>
+            <Text style={styles.inputLabel}>כותרת ראשית</Text>
             <TextInput
-              style={styles.textInput}
+              style={[styles.textInput, styles.multilineInput]}
               value={welcomeMessage}
               onChangeText={setWelcomeMessage}
-              placeholder="שלום, ברוכים הבאים"
+              placeholder="שלום חבר יקר"
               textAlign="right"
               multiline
+              numberOfLines={2}
             />
           </View>
-
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>כותרת משנה</Text>
+            <Text style={styles.inputLabel}>כותרת משנית</Text>
             <TextInput
-              style={styles.textInput}
+              style={[styles.textInput, styles.multilineInput]}
               value={subtitleMessage}
               onChangeText={setSubtitleMessage}
-              placeholder="ל-TURGI ברברשופ"
+              placeholder="איך נוכל לעזור לך היום? ✂️"
               textAlign="right"
               multiline
+              numberOfLines={2}
             />
           </View>
 
@@ -282,7 +292,7 @@ const AdminSettingsScreen: React.FC<AdminSettingsScreenProps> = ({ onNavigate, o
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>שליחת הודעה לכל המשתמשים</Text>
           <Text style={styles.sectionDescription}>
-            ההודעה תופיע כחלונית קופצת לכל המשתמשים במשך 24 שעות
+            פופאפ בתוך האפליקציה (24 שעות) + Push למשתמשים שאישרו התראות
           </Text>
           
           <View style={styles.inputGroup}>

@@ -1,9 +1,12 @@
 import { Feather, Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRef } from "react";
-import { Animated, Dimensions, StyleSheet, TouchableOpacity, View } from "react-native";
+import { Animated, Dimensions, Image, StyleSheet, TouchableOpacity, View } from "react-native";
 
 const { width: screenWidth } = Dimensions.get('window');
+
+// Bundled asset - same pattern as gallery fallback (require). Never from Firebase.
+const TAB_LOGO = require('../../assets/images/icon_booking_tab.png');
 
 export default function BottomNav({ onOrderPress, onTabPress, activeTab }: {
   onOrderPress?: () => void;
@@ -80,11 +83,9 @@ export default function BottomNav({ onOrderPress, onTabPress, activeTab }: {
             end={{ x: 1, y: 1 }}
           >
             <TouchableOpacity style={styles.fab} onPress={handleOrderPress} activeOpacity={0.85}>
-              <Animated.Image
-                source={require("../../assets/images/icon_booking.png")}
-                style={[styles.fabIcon, { transform: [{ rotate: spin }] }]}
-                resizeMode="cover"
-              />
+              <Animated.View style={[styles.fabIconWrap, { transform: [{ rotate: spin }] }]}>
+                <Image source={TAB_LOGO} style={styles.fabIcon} resizeMode="cover" />
+              </Animated.View>
             </TouchableOpacity>
           </LinearGradient>
         </View>
@@ -196,6 +197,12 @@ const styles = StyleSheet.create({
     shadowRadius: 20,
     elevation: 20,
     backdropFilter: "blur(10px)",
+  },
+  fabIconWrap: {
+    width: screenWidth < 380 ? 70 : 78,
+    height: screenWidth < 380 ? 70 : 78,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   fabIcon: {
     width: screenWidth < 380 ? 70 : 78,

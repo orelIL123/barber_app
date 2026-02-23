@@ -1,25 +1,25 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
-import * as SplashScreen from 'expo-splash-screen';
 import { useRouter } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
 import { collection, doc, getDoc, getDocs, getFirestore } from 'firebase/firestore';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-    Alert,
-    Animated,
-    Dimensions,
-    Image,
-    ImageBackground,
-    Linking,
-    Modal,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Alert,
+  Animated,
+  Dimensions,
+  Image,
+  ImageBackground,
+  Linking,
+  Modal,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { CacheUtils } from '../../services/cache';
 import NotificationPanel from '../components/NotificationPanel';
@@ -57,6 +57,7 @@ function areHomeImagesEqual(a: HomeImagesState, b: HomeImagesState): boolean {
 // memory cache. We seed homeImagesMemory from it synchronously so the very first render
 // of HomeScreen already has the images and shows no blank background.
 let homeImagesMemory: HomeImagesState | null = CacheUtils.getHomeImagesSync();
+let hasHomeLoadedSuccessfully = false;
 
 interface HomeScreenProps {
   onNavigate: (screen: string) => void;
@@ -112,7 +113,7 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
     () => CacheUtils.getHomeContentSync()?.welcomeMessage || ''
   );
   const [subtitleMessage, setSubtitleMessage] = useState(
-    () => CacheUtils.getHomeContentSync()?.subtitleMessage || ''
+    () => CacheUtils.getHomeContentSync()?.subtitleMessage || 'איך אוכל לעזור לך היום? ✂️'
   );
   const [aboutUsMessage, setAboutUsMessage] = useState(
     () => CacheUtils.getHomeContentSync()?.aboutUsMessage || ''
@@ -192,18 +193,15 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
 
       const loadDataFromCache = async () => {
         try {
-          const hasInMemoryHomeData =
-            settingsImages.gallery.length > 0 ||
-            !!settingsImages.atmosphere ||
-            !!settingsImages.aboutUs ||
-            !!welcomeMessage ||
-            !!subtitleMessage;
-
-          // Keep UI fast on back navigation: avoid showing a loader if we already
-          // have in-memory content from a previous render.
-          if (!hasInMemoryHomeData) {
-            setLoading(true);
+          // Skip reload when returning from admin — נטען רק בהפעלה הראשונית
+          const alreadyLoaded = hasHomeLoadedSuccessfully || (await CacheUtils.getHomeLoadedOnce());
+          if (alreadyLoaded) {
+            hasHomeLoadedSuccessfully = true;
+            cleanupOldWaitlistData();
+            return;
           }
+
+          setLoading(true);
 
           const [cachedImages, cachedContent, dismissedPopupMessage] = await Promise.all([
             CacheUtils.getHomeImages(),
@@ -215,12 +213,14 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
 
           if (cachedImages && cachedContent) {
             console.log('✅ Loading home data from cache');
+            hasHomeLoadedSuccessfully = true;
+            await CacheUtils.setHomeLoadedOnce();
             homeImagesMemory = cachedImages as HomeImagesState;
             setSettingsImages(prev =>
               areHomeImagesEqual(prev, cachedImages as HomeImagesState) ? prev : (cachedImages as HomeImagesState)
             );
             setWelcomeMessage(cachedContent.welcomeMessage);
-            setSubtitleMessage(cachedContent.subtitleMessage);
+            setSubtitleMessage(cachedContent.subtitleMessage || 'איך אוכל לעזור לך היום? ✂️');
             setAboutUsMessage(cachedContent.aboutUsMessage);
             if (
               cachedContent.showPopup &&
@@ -243,11 +243,15 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
               ]);
             }
           } else {
-            console.log('⚠️ Cache miss - loading from Firebase');
+            // Cache was cleared (e.g. by admin after changing images).
+            homeImagesMemory = null;
+            console.log('⚠️ Cache miss - loading from Firebase (admin may have changed images)');
             await Promise.all([
               fetchImages(),
               fetchDynamicContent(),
             ]);
+            hasHomeLoadedSuccessfully = true;
+            await CacheUtils.setHomeLoadedOnce();
           }
         } catch (error) {
           if (!cancelled) {
@@ -256,6 +260,8 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
               fetchImages(),
               fetchDynamicContent(),
             ]);
+            hasHomeLoadedSuccessfully = true;
+            await CacheUtils.setHomeLoadedOnce();
           }
         } finally {
           if (!cancelled) setLoading(false);
@@ -323,6 +329,12 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
     }
   }, [settingsImages.atmosphere]);
 
+  // Safety: never stick on loader more than 8 seconds
+  useEffect(() => {
+    const t = setTimeout(() => setBackgroundImageLoaded(true), 8000);
+    return () => clearTimeout(t);
+  }, []);
+
   useEffect(() => {
     setAboutImageLoadFailed(false);
   }, [settingsImages.aboutUs]);
@@ -355,15 +367,16 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
     try {
       const db = getFirestore();
       
-      // Load welcome messages
+      // Load welcome messages (only what admin defined)
       const welcomeDoc = await getDoc(doc(db, 'settings', 'homeMessages'));
       let welcomeMessage = t('home.welcome');
-      let subtitleMessage = t('home.subtitle');
+      const defaultSubtitle = 'איך אוכל לעזור לך היום? ✂️';
+      let subtitleMessage = defaultSubtitle;
       
       if (welcomeDoc.exists()) {
         const data = welcomeDoc.data();
         welcomeMessage = data.welcome || welcomeMessage;
-        subtitleMessage = data.subtitle || subtitleMessage;
+        subtitleMessage = data.subtitle || defaultSubtitle;
       }
       
       setWelcomeMessage(welcomeMessage);
@@ -412,10 +425,9 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
       console.warn('Failed to fetch dynamic content:', error);
       // Fallback to translation values
       const fallbackWelcome = t('home.welcome');
-      const fallbackSubtitle = t('home.subtitle');
       const fallbackAboutUs = 'ברוכים הבאים למספרה של רון תורג׳מן! כאן תיהנו מחוויה אישית, מקצועית ומפנקת, עם יחס חם לכל לקוח. רון, בעל ניסיון של שנים בתחום, מזמין אתכם להתרווח, להתחדש ולהרגיש בבית.';
       setWelcomeMessage(fallbackWelcome);
-      setSubtitleMessage(fallbackSubtitle);
+      setSubtitleMessage('איך אוכל לעזור לך היום? ✂️');
       setAboutUsMessage(fallbackAboutUs);
     }
   };
@@ -739,15 +751,8 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
     }
   };
 
-  if (loading) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ScissorsLoader size={60} color="#007bff" accessibilityLabel={t('common.loading')} />
-        </View>
-      </SafeAreaView>
-    );
-  }
+  // Show scissors overlay until both data and background image are ready
+  const homeReady = !loading && backgroundImageLoaded;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -858,7 +863,7 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
             />
             <View style={styles.greetingContainer}>
               <Text style={styles.greeting}>{welcomeMessage || t('home.welcome')}</Text>
-              <Text style={styles.subtitle}>{subtitleMessage || t('home.subtitle')}</Text>
+              <Text style={styles.subtitle}>{subtitleMessage || 'איך אוכל לעזור לך היום? ✂️'}</Text>
             </View>
           </Animated.View>
 
@@ -1057,11 +1062,11 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
       />
       <TermsModal visible={showTerms} onClose={() => setShowTerms(false)} />
       
-      {/* Admin Popup Message */}
+      {/* Admin Popup Message — מוצג רק אחרי שלוגו המספריים נעלם */}
       <Modal
         animationType="fade"
         transparent={true}
-        visible={showPopup}
+        visible={showPopup && homeReady}
         onRequestClose={() => setShowPopup(false)}
       >
         <View style={styles.popupOverlay}>
@@ -1119,6 +1124,11 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
           </TouchableOpacity>
         </View>
       </Modal>
+      {!homeReady && (
+        <View style={styles.loadingOverlay}>
+          <ScissorsLoader size={60} color="#007bff" accessibilityLabel={t('common.loading')} />
+        </View>
+      )}
     </SafeAreaView>
   );
 };
@@ -1150,11 +1160,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#856404',
   },
-  loadingContainer: {
-    flex: 1,
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#0a0a0a',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f8f9fa',
+    zIndex: 9999,
   },
   loadingText: {
     fontSize: 18,

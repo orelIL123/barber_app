@@ -1,9 +1,63 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateEmailAndSendReset = exports.deleteUserAuth = void 0;
-const functions = require("firebase-functions");
+exports.updateEmailAndSendReset = exports.deleteUserAuth = exports.sendPushNotification = void 0;
+const expo_server_sdk_1 = require("expo-server-sdk");
 const admin = require("firebase-admin");
+const functions = require("firebase-functions");
+const params_1 = require("firebase-functions/params");
+const https_1 = require("firebase-functions/v2/https");
 admin.initializeApp();
+const expoAccessToken = (0, params_1.defineSecret)('EXPO_ACCESS_TOKEN');
+/**
+ * Cloud Function לשליחת Push דרך Expo (עם Access Token)
+ * פותר את שגיאת 403 "Insufficient permissions"
+ *
+ * הגדרת Token: firebase functions:secrets:set EXPO_ACCESS_TOKEN
+ * לקבלת Token: https://expo.dev/accounts/orel895/settings/access-tokens
+ */
+exports.sendPushNotification = (0, https_1.onCall)({ secrets: [expoAccessToken] }, async (request) => {
+    if (!request.auth) {
+        throw new https_1.HttpsError('unauthenticated', 'Must be authenticated');
+    }
+    const { pushToken, title, body, data: payloadData } = request.data || {};
+    if (!pushToken || !title || !body) {
+        throw new https_1.HttpsError('invalid-argument', 'pushToken, title, body are required');
+    }
+    if (!pushToken.startsWith('ExponentPushToken[')) {
+        throw new https_1.HttpsError('invalid-argument', 'Invalid Expo push token format');
+    }
+    const token = expoAccessToken.value();
+    if (!token) {
+        throw new https_1.HttpsError('failed-precondition', 'Push notifications not configured. Run: firebase functions:secrets:set EXPO_ACCESS_TOKEN');
+    }
+    const expo = new expo_server_sdk_1.Expo({ accessToken: token });
+    const message = {
+        to: pushToken,
+        sound: 'default',
+        title,
+        body,
+        data: payloadData || {},
+    };
+    try {
+        const chunks = expo.chunkPushNotifications([message]);
+        for (const chunk of chunks) {
+            const tickets = await expo.sendPushNotificationsAsync(chunk);
+            const ticket = tickets[0];
+            if ((ticket === null || ticket === void 0 ? void 0 : ticket.status) === 'error') {
+                console.error('📱 Push ticket error:', ticket.message, ticket.details);
+                throw new Error(ticket.message || 'Push delivery error');
+            }
+            if ((ticket === null || ticket === void 0 ? void 0 : ticket.status) === 'ok') {
+                console.log('✅ Push sent successfully', ticket.id ? `(id: ${ticket.id})` : '');
+            }
+        }
+        return { success: true };
+    }
+    catch (error) {
+        console.error('❌ Error sending push:', error);
+        throw new https_1.HttpsError('internal', error.message || 'Failed to send push');
+    }
+});
 exports.deleteUserAuth = functions.https.onCall(async (data, context) => {
     var _a, _b;
     if (!context.auth) {

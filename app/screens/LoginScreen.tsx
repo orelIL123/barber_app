@@ -2,27 +2,27 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Dimensions,
-  Image,
-  KeyboardAvoidingView,
-  Linking,
-  Modal,
-  Platform,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Alert,
+    Dimensions,
+    Image,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import { authManager } from '../../services/authManager';
-import { callUpdateEmailAndSendReset, checkUserExistsForPasswordReset, loginUser, loginWithPhoneAndPassword, registerForPushNotifications, sendResetEmail } from '../../services/firebase';
-import { sendSms } from '../services/messaging/instance';
+import { callUpdateEmailAndSendReset, checkUserExistsForPasswordReset, loginUser, loginWithPhoneAndPassword, sendResetEmail } from '../../services/firebase';
+import { registerPushTokenForUser } from '../../services/notifications';
 import { colors } from '../constants/colors';
 import { CONTACT_INFO } from '../constants/contactInfo';
+import { sendSms } from '../services/messaging/instance';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -141,15 +141,15 @@ export default function LoginScreen() {
         await loginWithPhoneAndPassword(normalizedInput, password);
       }
 
-      // Register for push notifications after successful login
+      // Register for push notifications after successful login (projectId + both token fields)
       try {
         const user = authManager.getCurrentUser();
         if (user) {
-          await registerForPushNotifications(user.uid);
-          console.log('✅ LoginScreen: Push notifications registered for user:', user.uid);
+          await registerPushTokenForUser(user.uid);
+          console.log('✅ LoginScreen: Push token registered for user:', user.uid);
         }
       } catch (error) {
-        console.error('❌ LoginScreen: Error registering for push notifications:', error);
+        console.error('❌ LoginScreen: Error registering push token:', error);
         // Don't fail login if push registration fails
       }
 

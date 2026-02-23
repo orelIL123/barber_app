@@ -32,7 +32,7 @@ export default function TabLayout() {
       }
     }
     else if (tab === 'shop') router.replace('/(tabs)/explore');
-    else if (tab === 'settings') router.replace('/settings');
+    else if (tab === 'settings') router.replace('/(tabs)/settings');
   };
 
   // ניווט מהיר מה־FAB - מנתב לספר בוקינג

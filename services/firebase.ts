@@ -1533,11 +1533,10 @@ export const createAppointment = async (appointmentData: Omit<Appointment, 'id' 
       console.log('❌ Failed to send admin notification:', adminNotificationError);
     }
     
-    // Schedule LOCAL notification reminders ONLY (removed Firestore-based reminders to avoid duplicates)
+    // Schedule reminders: LOCAL (device) + Firestore (for Push to customer + admin)
     // Skip for manual clients - no user to send reminders to
     if (appointmentData.userId !== 'manual-client') {
       try {
-        console.log('📱 Scheduling LOCAL appointment reminders...');
         let appointmentDate: Date;
         if (typeof (appointmentData.date as any)?.toDate === 'function') {
           appointmentDate = (appointmentData.date as any).toDate();
@@ -1548,17 +1547,33 @@ export const createAppointment = async (appointmentData: Omit<Appointment, 'id' 
             ? appointmentData.date.toDate()
             : new Date(appointmentData.date as string | number);
         }
+
+        // 1. LOCAL reminders (device, works when app in background)
+        console.log('📱 Scheduling LOCAL appointment reminders...');
         await scheduleLocalAppointmentReminders({
           id: docRef.id,
           startsAt: appointmentDate.toISOString(),
         });
-        console.log('✅ LOCAL appointment reminders scheduled successfully');
-      } catch (localScheduleError) {
-        console.log('❌ Failed to schedule LOCAL appointment reminders:', localScheduleError);
+        console.log('✅ LOCAL appointment reminders scheduled');
+
+        // 2. Firestore reminders (processScheduledReminders sends Push to customer + admin)
+        console.log('📱 Scheduling Firestore reminders for Push...');
+        const dateAsTimestamp = appointmentData.date instanceof Timestamp ? appointmentData.date : Timestamp.fromDate(appointmentDate);
+        await scheduleAppointmentReminders(docRef.id, {
+          userId: appointmentData.userId,
+          barberId: appointmentData.barberId,
+          treatmentId: appointmentData.treatmentId,
+          date: dateAsTimestamp,
+          status: appointmentData.status,
+          duration: appointmentData.duration ?? 25,
+        });
+        console.log('✅ Firestore reminders scheduled');
+      } catch (reminderError) {
+        console.log('❌ Failed to schedule reminders:', reminderError);
         // Don't fail the appointment creation if reminder scheduling fails
       }
     } else {
-      console.log('⏭️ Skipping local reminders for manual client');
+      console.log('⏭️ Skipping reminders for manual client');
     }
 
     return docRef.id;
@@ -3383,37 +3398,11 @@ export const sendPushNotification = async (pushToken: string, title: string, bod
       throw new Error('Invalid Expo push token format');
     }
 
-    const message = {
-      to: pushToken,
-      sound: 'default',
-      title: title,
-      body: body,
-      data: data || {},
-    };
+    const sendPush = httpsCallable<{ pushToken: string; title: string; body: string; data?: any }, { success: boolean }>(functions, 'sendPushNotification');
+    const result = await sendPush({ pushToken, title, body, data: data || {} });
 
-    const response = await fetch('https://exp.host/--/api/v2/push/send', {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        'Accept-encoding': 'gzip, deflate',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(message),
-    });
-
-    const json = await response.json().catch(() => ({}));
-    const ticket = Array.isArray(json.data) ? json.data[0] : json.data;
-
-    if (!response.ok) {
-      console.error('📱 Push API error', response.status, json?.errors || json);
-      throw new Error(json?.errors?.[0]?.message || `Push API ${response.status}`);
-    }
-    if (ticket?.status === 'error') {
-      console.error('📱 Push ticket error:', ticket.message, ticket.details);
-      throw new Error(ticket.message || 'Push delivery error');
-    }
-    if (ticket?.status === 'ok') {
-      console.log('✅ Push notification sent successfully', ticket.id ? `(id: ${ticket.id})` : '');
+    if (result.data?.success) {
+      console.log('✅ Push notification sent successfully');
     }
   } catch (error) {
     console.error('Error sending push notification:', error);

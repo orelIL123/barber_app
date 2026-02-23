@@ -211,17 +211,8 @@ const AdminTeamScreen: React.FC<AdminTeamScreenProps> = ({ onNavigate, onBack })
       showToast('נא למלא שם הספר', 'error');
       return false;
     }
-    if (!formData.experience.trim()) {
-      showToast('נא למלא ניסיון', 'error');
-      return false;
-    }
     if (!formData.rating || isNaN(Number(formData.rating)) || Number(formData.rating) < 1 || Number(formData.rating) > 5) {
       showToast('נא למלא דירוג תקין (1-5)', 'error');
-      return false;
-    }
-    const validSpecialties = formData.specialties.filter(s => s.trim());
-    if (validSpecialties.length === 0) {
-      showToast('נא למלא לפחות התמחות אחת', 'error');
       return false;
     }
     return true;
@@ -416,7 +407,12 @@ const AdminTeamScreen: React.FC<AdminTeamScreenProps> = ({ onNavigate, onBack })
               </View>
             ) : (
               barbers.map((barber) => (
-                <View key={barber.id} style={styles.barberCard}>
+                <TouchableOpacity
+                  key={barber.id}
+                  style={styles.barberCard}
+                  activeOpacity={1}
+                  onPress={() => openEditModal(barber)}
+                >
                   <View style={styles.barberHeader}>
                     <View style={styles.barberImageContainer}>
                       <Image
@@ -435,7 +431,10 @@ const AdminTeamScreen: React.FC<AdminTeamScreenProps> = ({ onNavigate, onBack })
                           styles.availabilityBadge,
                           (barber.available !== false) ? styles.availableBadge : styles.unavailableBadge
                         ]}
-                        onPress={() => toggleAvailability(barber.id, barber.available)}
+                        onPress={(e) => {
+                          e?.stopPropagation?.();
+                          toggleAvailability(barber.id, barber.available);
+                        }}
                       >
                         <Text style={styles.availabilityText}>
                           {(barber.available !== false) ? 'זמין' : 'לא זמין'}
@@ -453,13 +452,19 @@ const AdminTeamScreen: React.FC<AdminTeamScreenProps> = ({ onNavigate, onBack })
                           <View style={styles.phoneActions}>
                             <TouchableOpacity
                               style={styles.phoneButton}
-                              onPress={() => barber.phone && handlePhoneCall(barber.phone)}
+                              onPress={(e) => {
+                                e?.stopPropagation?.();
+                                barber.phone && handlePhoneCall(barber.phone);
+                              }}
                             >
                               <Ionicons name="call" size={16} color="#007bff" />
                             </TouchableOpacity>
                             <TouchableOpacity
                               style={styles.whatsappButton}
-                              onPress={() => barber.phone && handleWhatsApp(barber.phone)}
+                              onPress={(e) => {
+                                e?.stopPropagation?.();
+                                barber.phone && handleWhatsApp(barber.phone);
+                              }}
                             >
                               <Ionicons name="logo-whatsapp" size={16} color="#25D366" />
                             </TouchableOpacity>
@@ -497,19 +502,29 @@ const AdminTeamScreen: React.FC<AdminTeamScreenProps> = ({ onNavigate, onBack })
                     <View style={styles.barberActions}>
                       <TouchableOpacity
                         style={styles.editButton}
-                        onPress={() => openEditModal(barber)}
+                        onPress={(e) => {
+                          e?.stopPropagation?.();
+                          openEditModal(barber);
+                        }}
+                        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                        activeOpacity={0.6}
                       >
                         <Ionicons name="create" size={20} color="#007bff" />
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={styles.deleteButton}
-                        onPress={() => handleDelete(barber.id, barber.name)}
+                        onPress={(e) => {
+                          e?.stopPropagation?.();
+                          handleDelete(barber.id, barber.name);
+                        }}
+                        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                        activeOpacity={0.6}
                       >
                         <Ionicons name="trash" size={20} color="#dc3545" />
                       </TouchableOpacity>
                     </View>
                   </View>
-                </View>
+                </TouchableOpacity>
               ))
             )}
           </ScrollView>
@@ -550,7 +565,7 @@ const AdminTeamScreen: React.FC<AdminTeamScreenProps> = ({ onNavigate, onBack })
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>ניסיון</Text>
+                <Text style={styles.inputLabel}>ניסיון (אופציונלי)</Text>
                 <TextInput
                   style={styles.textInput}
                   value={formData.experience}
@@ -585,7 +600,7 @@ const AdminTeamScreen: React.FC<AdminTeamScreenProps> = ({ onNavigate, onBack })
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>התמחויות</Text>
+                <Text style={styles.inputLabel}>התמחויות (אופציונלי)</Text>
                 {formData.specialties.map((specialty, index) => (
                   <View key={index} style={styles.specialtyInput}>
                     <TextInput
@@ -940,6 +955,7 @@ const styles = StyleSheet.create({
     margin: 20,
     width: '90%',
     maxWidth: 400,
+    height: '85%',
     maxHeight: '90%',
   },
   modalHeader: {
@@ -956,6 +972,7 @@ const styles = StyleSheet.create({
   modalBody: {
     flex: 1,
     marginBottom: 20,
+    minHeight: 300,
   },
   inputGroup: {
     marginBottom: 16,

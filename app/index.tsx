@@ -1,5 +1,5 @@
-import * as SplashScreen from 'expo-splash-screen';
 import { useRouter } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
 import { collection, doc, getDoc, getDocs, getFirestore } from 'firebase/firestore';
 import { useEffect } from 'react';
 import { Image, StyleSheet, View } from 'react-native';
@@ -94,14 +94,15 @@ const preloadHomeData = async (): Promise<void> => {
           const defaultAboutUs = 'ברוכים הבאים למספרה של רון תורג׳מן! כאן תיהנו מחוויה אישית, מקצועית ומפנקת, עם יחס חם לכל לקוח. רון, בעל ניסיון של שנים בתחום, מזמין אתכם להתרווח, להתחדש ולהרגיש בבית.';
           
           // Load welcome messages
+          const defaultSubtitle = 'איך אוכל לעזור לך היום? ✂️';
           const welcomeDoc = await getDoc(doc(db, 'settings', 'homeMessages'));
           let welcomeMessage = 'שלום, ברוכים הבאים';
-          let subtitleMessage = 'ל-TURGI ברברשופ';
+          let subtitleMessage = defaultSubtitle;
           
           if (welcomeDoc.exists()) {
             const data = welcomeDoc.data();
             welcomeMessage = data.welcome || welcomeMessage;
-            subtitleMessage = data.subtitle || subtitleMessage;
+            subtitleMessage = data.subtitle || defaultSubtitle;
           }
           
           // Load about us text
@@ -136,7 +137,7 @@ const preloadHomeData = async (): Promise<void> => {
           console.warn('Failed to preload content:', error);
           return {
             welcomeMessage: 'שלום, ברוכים הבאים',
-            subtitleMessage: 'ל-TURGI ברברשופ',
+            subtitleMessage: 'איך אוכל לעזור לך היום? ✂️',
             aboutUsMessage: 'ברוכים הבאים למספרה של רון תורג׳מן! כאן תיהנו מחוויה אישית, מקצועית ומפנקת, עם יחס חם לכל לקוח. רון, בעל ניסיון של שנים בתחום, מזמין אתכם להתרווח, להתחדש ולהרגיש בבית.',
             popupMessage: undefined,
             showPopup: false,

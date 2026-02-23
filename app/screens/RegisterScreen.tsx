@@ -17,7 +17,8 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
-import { registerForPushNotifications, registerUserWithPhone, sendSMSVerification } from '../../services/firebase';
+import { registerUserWithPhone, sendSMSVerification } from '../../services/firebase';
+import { registerPushTokenForUser } from '../../services/notifications';
 import { colors } from '../constants/colors';
 import { CONTACT_INFO } from '../constants/contactInfo';
 
@@ -90,16 +91,16 @@ export default function RegisterScreen() {
       // Only call registerUserWithPhone - it will handle verification internally
       await registerUserWithPhone(phone, fullName, verificationId, verificationCode, password);
 
-      // Register for push notifications after successful registration
+      // Register push token after successful registration (projectId + both token fields)
       try {
         const { getCurrentUser } = await import('../../services/firebase');
         const user = getCurrentUser();
         if (user) {
-          await registerForPushNotifications(user.uid);
-          console.log('✅ Push notifications registered for new user:', user.uid);
+          await registerPushTokenForUser(user.uid);
+          console.log('✅ Push token registered for new user:', user.uid);
         }
       } catch (error) {
-        console.error('❌ Error registering for push notifications:', error);
+        console.error('❌ Error registering push token:', error);
         // Don't fail registration if push registration fails
       }
 

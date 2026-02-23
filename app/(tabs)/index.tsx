@@ -11,43 +11,43 @@ export default function HomeTab() {
     console.log('handleNavigate called with screen:', screen);
     switch (screen) {
       case 'profile':
-        router.replace('/profile');
+        router.push('/profile');
         break;
       case 'team':
-        router.replace('/team');
+        router.push('/team');
         break;
       case 'booking':
-        router.replace('/booking');
+        router.push('/booking');
         break;
       case 'explore':
-        router.replace('/explore');
+        router.push('/explore');
         break;
       case 'settings':
-        router.replace('/settings');
+        router.push('/settings');
         break;
       case 'my-appointments':
         router.push('/my-appointments');
         break;
       case 'admin-home':
-        router.replace('/admin-home');
+        router.push('/admin-home');
         break;
       case 'admin-appointments':
-        router.replace('/admin-appointments');
+        router.push('/admin-appointments');
         break;
       case 'admin-treatments':
-        router.replace('/admin-treatments');
+        router.push('/admin-treatments');
         break;
       case 'admin-team':
-        router.replace('/admin-team');
+        router.push('/admin-team');
         break;
       case 'admin-gallery':
-        router.replace('/admin-gallery');
+        router.push('/admin-gallery');
         break;
       case 'admin-availability':
-        router.replace('/admin-availability');
+        router.push('/admin-availability');
         break;
       case 'admin-settings':
-        router.replace('/admin-settings');
+        router.push('/admin-settings');
         break;
       case 'auth-choice':
         console.log('Navigating to AuthChoiceScreen');

@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { doc, getFirestore, setDoc } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
 import {
+    ActivityIndicator,
     Alert,
     Dimensions,
     Modal,
@@ -15,6 +16,7 @@ import {
     View,
 } from 'react-native';
 import { checkIsAdmin, getAllUsers, getCurrentUser, sendNotificationToAllUsers } from '../../services/firebase';
+import { registerPushTokenForUser } from '../../services/notifications';
 import { ScissorsLoader } from '../components/ScissorsLoader';
 import TopNav from '../components/TopNav';
 import { colors } from '../constants/colors';
@@ -65,6 +67,7 @@ const AdminNotificationSettingsScreen: React.FC<AdminNotificationSettingsScreenP
   const [broadcastMessage, setBroadcastMessage] = useState('');
   const [sendSMS, setSendSMS] = useState(false);
   const [sendingBroadcast, setSendingBroadcast] = useState(false);
+  const [refreshingToken, setRefreshingToken] = useState(false);
 
   useEffect(() => {
     checkAdminStatus();
@@ -218,6 +221,20 @@ const AdminNotificationSettingsScreen: React.FC<AdminNotificationSettingsScreenP
     }
   };
 
+  const handleRefreshPushToken = async () => {
+    const user = getCurrentUser();
+    if (!user) return;
+    setRefreshingToken(true);
+    try {
+      await registerPushTokenForUser(user.uid);
+      Alert.alert('הצלחה', 'Token ההתראות עודכן. התראות אמורות להגיע עכשיו.');
+    } catch (e: any) {
+      Alert.alert('שגיאה', e?.message || 'לא הצלחנו לרענן. וודא הרשאות התראות מופעלות.');
+    } finally {
+      setRefreshingToken(false);
+    }
+  };
+
   const handleSendBroadcast = async () => {
     if (!broadcastTitle.trim() || !broadcastMessage.trim()) {
       Alert.alert('שגיאה', 'נא למלא את כל השדות');
@@ -326,7 +343,7 @@ const AdminNotificationSettingsScreen: React.FC<AdminNotificationSettingsScreenP
         showBackButton={true}
       />
       
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>התראות מנהל</Text>
           <Text style={styles.sectionSubtitle}>
@@ -487,6 +504,29 @@ const AdminNotificationSettingsScreen: React.FC<AdminNotificationSettingsScreenP
           </View>
         )}
 
+        {/* Refresh Token Section - for admin */}
+        <View style={styles.broadcastSection}>
+          <View style={styles.broadcastHeader}>
+            <Ionicons name="refresh-circle" size={24} color="#007bff" />
+            <Text style={styles.broadcastTitle}>רענן Token התראות</Text>
+          </View>
+          <Text style={styles.broadcastDescription}>
+            אם לא מקבלים התראות – לחץ כדי לרענן את ה-Token. חשוב אם הרשאות ההתראות הופעלו אחרי הכניסה.
+          </Text>
+          <TouchableOpacity
+            style={[styles.refreshTokenButton, refreshingToken && styles.refreshTokenDisabled]}
+            onPress={handleRefreshPushToken}
+            disabled={refreshingToken}
+          >
+            {refreshingToken ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Ionicons name="refresh" size={20} color="#fff" />
+            )}
+            <Text style={styles.broadcastButtonText}>{refreshingToken ? 'מרענן...' : 'רענן Token שלי'}</Text>
+          </TouchableOpacity>
+        </View>
+
         {/* Broadcast Message Section */}
         <View style={styles.broadcastSection}>
           <View style={styles.broadcastHeader}>
@@ -494,7 +534,8 @@ const AdminNotificationSettingsScreen: React.FC<AdminNotificationSettingsScreenP
             <Text style={styles.broadcastTitle}>שליחת הודעה לכל המשתמשים</Text>
           </View>
           <Text style={styles.broadcastDescription}>
-            שלח הודעה לכל המשתמשים כ-Push Notification
+            שלח הודעה לכל המשתמשים כ-Push Notification{'\n'}
+            נשלח רק למשתמשים שאישרו התראות (יש להם Push Token)
           </Text>
           <TouchableOpacity 
             style={styles.broadcastButton}
@@ -764,6 +805,19 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginLeft: 8,
     fontFamily: 'Heebo-Medium',
+  },
+  refreshTokenButton: {
+    backgroundColor: '#28a745',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    gap: 8,
+  },
+  refreshTokenDisabled: {
+    opacity: 0.7,
   },
   // Modal styles
   modalOverlay: {

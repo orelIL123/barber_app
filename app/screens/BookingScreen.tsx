@@ -1,5 +1,4 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import * as Notifications from 'expo-notifications';
 import { collection, getDocs, getFirestore, onSnapshot, query, QuerySnapshot, Timestamp, where } from 'firebase/firestore';
 import React, { memo, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -935,17 +934,7 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
       }));
       setShowSuccessModal(true);
 
-      // אחרי יצירת התור בהצלחה:
-      if (selectedDate && selectedTime && selectedTreatment) {
-        const parsed = parseHHMM(selectedTime);
-        if (parsed) {
-          const appointmentDate = new Date(selectedDate);
-          appointmentDate.setHours(parsed.hours, parsed.minutes, 0, 0);
-          await scheduleAppointmentReminders(appointmentDate, selectedTreatment.name);
-        } else {
-          console.warn('⚠️ Skipping reminder scheduling due to invalid selectedTime:', selectedTime);
-        }
-      }
+      // createAppointment כבר מפעיל תזכורות (לוקאלי + Firestore Push) - אין צורך לקרוא שוב
 
     } catch (error: any) {
       console.error('❌ Error creating appointment:', error);
@@ -1021,74 +1010,6 @@ const BookingScreen: React.FC<BookingScreenProps> = ({ onNavigate, onBack, onClo
       case 3: return 'בחר תאריך';
       case 4: return 'בחר שעה';
       default: return 'הזמנת תור';
-    }
-  };
-
-  // פונקציה לתזמון התראות פוש ללקוח שעה ורבע שעה לפני התור
-  const scheduleAppointmentReminders = async (appointmentDate: Date, treatmentName: string) => {
-    const now = new Date();
-
-    // Check if appointment is in the future
-    const timeUntilAppointment = appointmentDate.getTime() - now.getTime();
-    const hoursUntilAppointment = timeUntilAppointment / (1000 * 60 * 60);
-
-    console.log('📅 Appointment date:', appointmentDate.toLocaleString());
-    console.log('⏰ Current time:', now.toLocaleString());
-    console.log('⏱️ Hours until appointment:', hoursUntilAppointment);
-
-    // Only schedule reminders if appointment is in the future
-    if (hoursUntilAppointment <= 0) {
-      console.log('❌ Appointment is in the past, skipping reminders');
-      return;
-    }
-
-    // Don't schedule local notifications for appointments more than 24 hours away
-    // The cloud scheduler will handle those via scheduledReminders collection
-    if (hoursUntilAppointment > 24) {
-      console.log('✅ Appointment is more than 24 hours away - cloud scheduler will handle reminders');
-      return;
-    }
-
-    // Calculate notification times
-    const hourBefore = new Date(appointmentDate.getTime() - 60 * 60 * 1000);
-    const quarterBefore = new Date(appointmentDate.getTime() - 15 * 60 * 1000);
-
-    const secondsUntilHour = Math.floor((hourBefore.getTime() - now.getTime()) / 1000);
-    const secondsUntilQuarter = Math.floor((quarterBefore.getTime() - now.getTime()) / 1000);
-
-    console.log('⏰ Seconds until hour reminder:', secondsUntilHour);
-    console.log('⏰ Seconds until quarter reminder:', secondsUntilQuarter);
-
-    // Schedule hour reminder only if it's in the future and appointment is at least 1 hour away
-    if (secondsUntilHour > 0 && hoursUntilAppointment >= 1) {
-      console.log('✅ Scheduling hour reminder for', new Date(now.getTime() + secondsUntilHour * 1000).toLocaleString());
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: 'תזכורת לתור! 💈',
-          body: `יש לך תור ל-${treatmentName} בעוד שעה!`,
-          sound: true,
-          priority: Notifications.AndroidNotificationPriority.HIGH,
-        },
-        trigger: { seconds: secondsUntilHour, repeats: false, channelId: 'default' },
-      });
-    } else {
-      console.log('❌ Hour reminder not scheduled - too soon or in past');
-    }
-
-    // Schedule quarter reminder only if it's in the future and appointment is at least 15 minutes away
-    if (secondsUntilQuarter > 0 && hoursUntilAppointment >= 0.25) {
-      console.log('✅ Scheduling quarter reminder for', new Date(now.getTime() + secondsUntilQuarter * 1000).toLocaleString());
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: 'תזכורת לתור! 💈',
-          body: `יש לך תור ל-${treatmentName} בעוד רבע שעה!`,
-          sound: true,
-          priority: Notifications.AndroidNotificationPriority.HIGH,
-        },
-        trigger: { seconds: secondsUntilQuarter, repeats: false, channelId: 'default' },
-      });
-    } else {
-      console.log('❌ Quarter reminder not scheduled - too soon or in past');
     }
   };
 

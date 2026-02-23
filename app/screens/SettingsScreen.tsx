@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+    ActivityIndicator,
     Alert,
     Linking,
     SafeAreaView,
@@ -12,6 +13,8 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
+import { getCurrentUser } from '../../services/firebase';
+import { registerPushTokenForUser } from '../../services/notifications';
 import TermsModal from '../components/TermsModal';
 import TopNav from '../components/TopNav';
 import { changeLanguage } from '../i18n';
@@ -27,6 +30,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onNavigate, onBack }) =
   const [appointmentReminders, setAppointmentReminders] = useState(true);
   const [generalNotifications, setGeneralNotifications] = useState(true);
   const [showTerms, setShowTerms] = useState(false);
+  const [refreshingToken, setRefreshingToken] = useState(false);
 
   const languages = [
     { code: 'he', name: t('settings.hebrew'), flag: '🇮🇱' },
@@ -78,6 +82,23 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onNavigate, onBack }) =
     Linking.openURL('mailto:support@turgibarber.com?subject=תמיכה באפליקציה').catch(() => {
       Alert.alert('שגיאה', 'לא ניתן לפתוח את אפליקציית המייל');
     });
+  };
+
+  const handleRefreshPushToken = async () => {
+    const user = getCurrentUser();
+    if (!user) {
+      Alert.alert('שגיאה', 'יש להתחבר תחילה');
+      return;
+    }
+    setRefreshingToken(true);
+    try {
+      await registerPushTokenForUser(user.uid);
+      Alert.alert('הצלחה', 'Token ההתראות עודכן. עכשיו אמורות להגיע התראות.');
+    } catch (e: any) {
+      Alert.alert('שגיאה', e?.message || 'לא הצלחנו לרענן. וודא שהרשאות ההתראות מופעלות.');
+    } finally {
+      setRefreshingToken(false);
+    }
   };
 
   return (
@@ -158,6 +179,19 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onNavigate, onBack }) =
                 thumbColor={generalNotifications ? '#fff' : '#f4f3f4'}
               />
             </View>
+
+            <TouchableOpacity
+              style={[styles.refreshTokenButton, refreshingToken && styles.refreshTokenButtonDisabled]}
+              onPress={handleRefreshPushToken}
+              disabled={refreshingToken}
+            >
+              {refreshingToken ? (
+                <ActivityIndicator size="small" color="#007bff" />
+              ) : (
+                <Ionicons name="refresh" size={20} color="#007bff" />
+              )}
+              <Text style={styles.refreshTokenText}>רענן Token התראות</Text>
+            </TouchableOpacity>
           </View>
 
           {/* Legal & Support */}
@@ -316,6 +350,25 @@ const styles = StyleSheet.create({
     marginVertical: 8,
     textAlign: 'right',
     textDecorationLine: 'underline',
+  },
+  refreshTokenButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    marginTop: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#007bff',
+    gap: 8,
+  },
+  refreshTokenButtonDisabled: {
+    opacity: 0.6,
+  },
+  refreshTokenText: {
+    color: '#007bff',
+    fontSize: 15,
+    fontWeight: '600',
   },
 });
 
