@@ -88,5 +88,56 @@ service cloud.firestore {
     match /adminSettings/{settingId} {
       allow read, write: if isAdmin();
     }
+
+    // ──────────────────────────────────────
+    //  Shop Items — כולם יכולים לקרוא, רק אדמין כותב
+    // ──────────────────────────────────────
+    match /shopItems/{itemId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ──────────────────────────────────────
+    //  Availability — כולם יכולים לקרוא (לצורך הזמנה), רק אדמין כותב
+    // ──────────────────────────────────────
+    match /availability/{availabilityId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ──────────────────────────────────────
+    //  Daily Availability — כולם יכולים לקרוא (לצורך הזמנה), רק אדמין כותב
+    // ──────────────────────────────────────
+    match /dailyAvailability/{docId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ──────────────────────────────────────
+    //  Notifications — כל משתמש קורא/מוחק/מעדכן את ההודעות שלו, אדמין יכול הכל
+    // ──────────────────────────────────────
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated()
+                  && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated()
+                    && (resource.data.userId == request.auth.uid || isAdmin());
+      allow delete: if isAuthenticated()
+                    && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
+    // ──────────────────────────────────────
+    //  Push Tokens — רק אדמין (ניקוי בעת מחיקת משתמש)
+    // ──────────────────────────────────────
+    match /pushTokens/{tokenId} {
+      allow read, write: if isAdmin();
+    }
+
+    // ──────────────────────────────────────
+    //  Scheduled Reminders — רק אדמין (ניקוי בעת מחיקת משתמש)
+    // ──────────────────────────────────────
+    match /scheduledReminders/{reminderId} {
+      allow read, write: if isAdmin();
+    }
   }
 }
