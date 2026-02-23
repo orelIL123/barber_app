@@ -1,4 +1,5 @@
 import { Feather, Ionicons } from "@expo/vector-icons";
+import { Asset } from "expo-asset";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRef } from "react";
 import { Animated, Dimensions, Image, StyleSheet, TouchableOpacity, View } from "react-native";
@@ -7,6 +8,14 @@ const { width: screenWidth } = Dimensions.get('window');
 
 // Bundled asset - same pattern as gallery fallback (require). Never from Firebase.
 const TAB_LOGO = require('../../assets/images/icon_booking_tab.png');
+
+// Pre-resolve the asset at module level so it's ready before first render
+const resolvedAsset = Image.resolveAssetSource(TAB_LOGO);
+
+// Pre-load the image into native memory at module load time.
+// This ensures the image is decoded and cached BEFORE the component ever mounts,
+// so even on re-mount after navigation there is zero flicker.
+Asset.fromModule(TAB_LOGO).downloadAsync().catch(() => {});
 
 export default function BottomNav({ onOrderPress, onTabPress, activeTab }: {
   onOrderPress?: () => void;
@@ -84,7 +93,13 @@ export default function BottomNav({ onOrderPress, onTabPress, activeTab }: {
           >
             <TouchableOpacity style={styles.fab} onPress={handleOrderPress} activeOpacity={0.85}>
               <Animated.View style={[styles.fabIconWrap, { transform: [{ rotate: spin }] }]}>
-                <Image source={TAB_LOGO} style={styles.fabIcon} resizeMode="cover" />
+                <Image
+                  source={resolvedAsset}
+                  style={styles.fabIcon}
+                  resizeMode="cover"
+                  fadeDuration={0}
+                  defaultSource={TAB_LOGO}
+                />
               </Animated.View>
             </TouchableOpacity>
           </LinearGradient>
@@ -186,17 +201,10 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     borderRadius: screenWidth < 380 ? 37 : 41,
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    backgroundColor: "transparent",
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 2,
-    borderColor: "rgba(255, 255, 255, 0.3)",
-    shadowColor: "#FFFFFF",
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 20,
-    elevation: 20,
-    backdropFilter: "blur(10px)",
+    overflow: "hidden",
   },
   fabIconWrap: {
     width: screenWidth < 380 ? 70 : 78,
