@@ -1,21 +1,23 @@
 import { Feather, Ionicons } from "@expo/vector-icons";
-import { Asset } from "expo-asset";
-import { LinearGradient } from "expo-linear-gradient";
 import { useRef } from "react";
 import { Animated, Dimensions, Image, StyleSheet, TouchableOpacity, View } from "react-native";
 
 const { width: screenWidth } = Dimensions.get('window');
 
-// Bundled asset - same pattern as gallery fallback (require). Never from Firebase.
+// Bundled asset — loaded exactly like gallery fallback images in HomeScreen.
+// Just require() — no resolveAssetSource, no Asset.fromModule, no URI.
 const TAB_LOGO = require('../../assets/images/icon_booking_tab.png');
 
-// Pre-resolve the asset at module level so it's ready before first render
-const resolvedAsset = Image.resolveAssetSource(TAB_LOGO);
-
-// Pre-load the image into native memory at module load time.
-// This ensures the image is decoded and cached BEFORE the component ever mounts,
-// so even on re-mount after navigation there is zero flicker.
-Asset.fromModule(TAB_LOGO).downloadAsync().catch(() => {});
+// Warm the native image cache once, at module-load time (runs once per JS
+// process lifetime, never on re-render). This ensures the image is decoded
+// before BottomNav first mounts, eliminating the first-render flicker.
+// Uses only react-native's Image — no new dependencies, no native build needed.
+(function warmFabImage() {
+  try {
+    const uri = Image.resolveAssetSource(TAB_LOGO)?.uri;
+    if (uri) Image.prefetch(uri).catch(() => { /* silent – image still loads normally */ });
+  } catch (_) { /* silent */ }
+})();
 
 export default function BottomNav({ onOrderPress, onTabPress, activeTab }: {
   onOrderPress?: () => void;
@@ -45,33 +47,7 @@ export default function BottomNav({ onOrderPress, onTabPress, activeTab }: {
   });
   return (
     <View style={styles.wrapper}>
-      <View style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        height: 24,
-        zIndex: 101,
-        borderTopLeftRadius: 0,
-        borderTopRightRadius: 0,
-        backgroundColor: 'rgba(0,0,0,0.91)',
-      }} pointerEvents="none">
-        <View style={{
-          flex: 1,
-          backgroundColor: 'rgba(0,0,0,0.91)',
-          borderTopLeftRadius: 0,
-          borderTopRightRadius: 0,
-          overflow: 'hidden',
-        }}>
-          <View style={{
-            flex: 1,
-            backgroundColor: 'rgba(0,0,0,0.91)',
-            opacity: 1,
-            borderTopLeftRadius: 0,
-            borderTopRightRadius: 0,
-          }} />
-        </View>
-      </View>
+      <View style={styles.topBleed} pointerEvents="none" />
       <View style={styles.navBar}>
         {/* Left side - Home and Shop */}
         <View style={styles.leftSide}>
@@ -85,24 +61,18 @@ export default function BottomNav({ onOrderPress, onTabPress, activeTab }: {
 
         {/* Center FAB (Order) - properly centered */}
         <View style={styles.centerFab}>
-          <LinearGradient
-            colors={['rgba(255, 255, 255, 0.2)', 'rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.2)']}
-            style={styles.fabGradient}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-          >
+          <View style={styles.fabGradient}>
             <TouchableOpacity style={styles.fab} onPress={handleOrderPress} activeOpacity={0.85}>
               <Animated.View style={[styles.fabIconWrap, { transform: [{ rotate: spin }] }]}>
                 <Image
-                  source={resolvedAsset}
+                  source={TAB_LOGO}
                   style={styles.fabIcon}
                   resizeMode="cover"
                   fadeDuration={0}
-                  defaultSource={TAB_LOGO}
                 />
               </Animated.View>
             </TouchableOpacity>
-          </LinearGradient>
+          </View>
         </View>
 
         {/* Right side - Profile and Settings */}
@@ -170,27 +140,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     marginTop: 0, // ensure icons are at the top
   },
-  fabWrapper: {
-    position: "absolute",
-    left: "50%",
-    top: -36, // half of FAB height (72/2)
-    transform: [{ translateX: -36 }],
-    zIndex: 10,
-    shadowColor: "#3b82f6",
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 16,
-    elevation: 10,
-    pointerEvents: "box-none",
-    alignItems: "center",
-    justifyContent: "center",
+  topBleed: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 24,
+    zIndex: 101,
+    backgroundColor: 'rgba(0,0,0,0.91)',
   },
   fabGradient: {
     width: screenWidth < 380 ? 78 : 86,
     height: screenWidth < 380 ? 78 : 86,
     borderRadius: screenWidth < 380 ? 39 : 43,
     padding: 2,
-    transform: [{ translateY: -12 }],
+    transform: [{ translateY: -20 }],
     shadowColor: "#FFFFFF",
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.9,

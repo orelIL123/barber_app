@@ -937,17 +937,23 @@ export const checkPhoneUserExists = async (phoneNumber: string): Promise<{ exist
   }
 };
 
-// Function specifically for password reset flow
+// Function specifically for password reset flow (uses Cloud Function - user is not logged in)
 export const checkUserExistsForPasswordReset = async (phoneNumber: string): Promise<{ exists: boolean; userId?: string; email?: string }> => {
   try {
-    const userCheck = await checkPhoneUserExists(phoneNumber.trim());
+    const checkFn = httpsCallable<{ phoneNumber: string }, { exists: boolean; uid?: string; email?: string }>(functions, 'checkUserExistsForLogin');
+    const result = await checkFn({ phoneNumber: phoneNumber.trim() });
+    const data = (result.data as any) || {};
     return {
-      exists: userCheck.exists,
-      userId: userCheck.uid,
-      email: userCheck.email
+      exists: data.exists ?? false,
+      userId: data.uid,
+      email: data.email,
     };
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error checking user for password reset:', error);
+    if (error?.code === 'functions/not-found') {
+      const userCheck = await checkPhoneUserExists(phoneNumber.trim());
+      return { exists: userCheck.exists, userId: userCheck.uid, email: userCheck.email };
+    }
     return { exists: false };
   }
 };
@@ -1022,8 +1028,25 @@ export const loginWithPhoneAndPassword = async (phoneNumber: string, password: s
     console.log(`🔐 Phone number: ${phoneNumber}`);
     console.log(`🔐 Password length: ${password.length}`);
 
-    // First, check if user exists in database
-    const userCheck = await checkPhoneUserExists(phoneNumber);
+    // Use Cloud Function for user check - Firestore rules block unauthenticated reads on users collection
+    let userCheck: { exists: boolean; hasPassword: boolean; uid?: string; isAdmin?: boolean; email?: string };
+    try {
+      const checkFn = httpsCallable<{ phoneNumber: string }, { exists: boolean; hasPassword?: boolean; uid?: string; isAdmin?: boolean; email?: string }>(functions, 'checkUserExistsForLogin');
+      const result = await checkFn({ phoneNumber });
+      userCheck = {
+        exists: (result.data as any)?.exists ?? false,
+        hasPassword: (result.data as any)?.hasPassword ?? false,
+        uid: (result.data as any)?.uid,
+        isAdmin: (result.data as any)?.isAdmin,
+        email: (result.data as any)?.email,
+      };
+    } catch (cfError: any) {
+      console.error('❌ Cloud Function checkUserExistsForLogin error:', cfError);
+      if (cfError?.code === 'functions/not-found') {
+        throw new Error('שירות ההתחברות אינו זמין. אנא צור קשר עם התמיכה או נסה שוב מאוחר יותר.');
+      }
+      throw cfError;
+    }
     console.log(`📞 User check result:`, JSON.stringify(userCheck, null, 2));
 
     if (!userCheck.exists) {
@@ -3751,13 +3774,16 @@ export const sendAppointmentReminder = async (appointmentId: string) => {
       
       // Send reminder to admin (based on admin settings)
       try {
-        let adminReminderType: '1h' | '15m' | 'whenStarting' | null = null;
-        
+        let adminReminderType: '24h' | '1h' | '15m' | 'whenStarting' | null = null;
+
         // Check reminders in order from closest to furthest (same logic as customer)
         if (minutesUntilAppointment <= 15 && minutesUntilAppointment > 0 && hoursUntilAppointment < 1) {
           adminReminderType = '15m';
         } else if (hoursUntilAppointment <= 1 && minutesUntilAppointment > 15) {
           adminReminderType = '1h';
+        } else if (hoursUntilAppointment <= 24 && hoursUntilAppointment > 1) {
+          // 24h Firestore reminder fires when hoursUntilAppointment ≈ 24
+          adminReminderType = '24h';
         } else if (minutesUntilAppointment <= 0 && minutesUntilAppointment > -60) {
           adminReminderType = 'whenStarting';
         }
@@ -4265,7 +4291,7 @@ export const sendSystemUpdateNotification = async (updateDetails: string) => {
 };
 
 // Send notification about appointment reminder to admin (with timing check)
-export const sendAppointmentReminderToAdmin = async (appointmentId: string, reminderType: '1h' | '15m' | 'whenStarting') => {
+export const sendAppointmentReminderToAdmin = async (appointmentId: string, reminderType: '24h' | '1h' | '15m' | 'whenStarting') => {
   try {
     const appointmentDoc = await getDoc(doc(db, 'appointments', appointmentId));
     if (!appointmentDoc.exists()) {
@@ -4294,8 +4320,10 @@ export const sendAppointmentReminderToAdmin = async (appointmentId: string, remi
     // Determine message based on reminder type
     let title = 'תזכורת לתור! ⏰';
     let message = '';
-    
-    if (reminderType === '1h') {
+
+    if (reminderType === '24h') {
+      message = `תור של ${customerName} מחר ב-${appointmentDate.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}`;
+    } else if (reminderType === '1h') {
       message = `תור של ${customerName} בעוד שעה ב-${appointmentDate.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}`;
     } else if (reminderType === '15m') {
       message = `תור של ${customerName} בעוד 10 דקות ב-${appointmentDate.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}`;
