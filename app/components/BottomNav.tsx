@@ -1,23 +1,15 @@
 import { Feather, Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import { useRef } from "react";
-import { Animated, Dimensions, Image, StyleSheet, TouchableOpacity, View } from "react-native";
+import { Animated, Dimensions, StyleSheet, TouchableOpacity, View } from "react-native";
+import Svg, { Path } from "react-native-svg";
 
 const { width: screenWidth } = Dimensions.get('window');
-
-// Bundled asset — loaded exactly like gallery fallback images in HomeScreen.
-// Just require() — no resolveAssetSource, no Asset.fromModule, no URI.
-const TAB_LOGO = require('../../assets/images/icon_booking_tab.png');
-
-// Warm the native image cache once, at module-load time (runs once per JS
-// process lifetime, never on re-render). This ensures the image is decoded
-// before BottomNav first mounts, eliminating the first-render flicker.
-// Uses only react-native's Image — no new dependencies, no native build needed.
-(function warmFabImage() {
-  try {
-    const uri = Image.resolveAssetSource(TAB_LOGO)?.uri;
-    if (uri) Image.prefetch(uri).catch(() => { /* silent – image still loads normally */ });
-  } catch (_) { /* silent */ }
-})();
+const TAB_HEIGHT = 80;
+const FAB_RADIUS = screenWidth < 380 ? 39 : 43;
+const FAB_MARGIN = 8;
+const CENTER_WIDTH = (FAB_RADIUS + FAB_MARGIN) * 2.2;
 
 export default function BottomNav({ onOrderPress, onTabPress, activeTab }: {
   onOrderPress?: () => void;
@@ -27,17 +19,13 @@ export default function BottomNav({ onOrderPress, onTabPress, activeTab }: {
   const spinValue = useRef(new Animated.Value(0)).current;
 
   const handleOrderPress = () => {
-    // Start spinning animation
     Animated.timing(spinValue, {
       toValue: 1,
       duration: 800,
       useNativeDriver: true,
     }).start(() => {
-      // Reset animation value for next tap
       spinValue.setValue(0);
     });
-    
-    // Call the original onOrderPress
     onOrderPress?.();
   };
 
@@ -45,11 +33,35 @@ export default function BottomNav({ onOrderPress, onTabPress, activeTab }: {
     inputRange: [0, 1],
     outputRange: ['0deg', '360deg'],
   });
+
+  // SVG curved background — same as fast app
+  const center = screenWidth / 2;
+  const curveStart = center - CENTER_WIDTH / 2;
+  const curveEnd = center + CENTER_WIDTH / 2;
+  const curveDepth = FAB_RADIUS + 10;
+
+  const d = `
+    M0,0
+    L${curveStart},0
+    C${curveStart + CENTER_WIDTH * 0.2},0 ${center - CENTER_WIDTH * 0.2},${curveDepth} ${center},${curveDepth}
+    C${center + CENTER_WIDTH * 0.2},${curveDepth} ${curveEnd - CENTER_WIDTH * 0.2},0 ${curveEnd},0
+    L${screenWidth},0
+    L${screenWidth},${TAB_HEIGHT + 50}
+    L0,${TAB_HEIGHT + 50}
+    Z
+  `;
+
   return (
     <View style={styles.wrapper}>
-      <View style={styles.topBleed} pointerEvents="none" />
+      {/* SVG curved background */}
+      <View style={styles.svgContainer}>
+        <Svg width={screenWidth} height={TAB_HEIGHT + 50} style={styles.svg}>
+          <Path d={d} fill="#000000" />
+        </Svg>
+      </View>
+
       <View style={styles.navBar}>
-        {/* Left side - Home and Shop */}
+        {/* Left side */}
         <View style={styles.leftSide}>
           <TouchableOpacity style={styles.iconBtn} onPress={() => onTabPress && onTabPress('home')}>
             <Ionicons name="home" size={26} color={activeTab === 'home' ? "#3b82f6" : "#ccc"} />
@@ -59,23 +71,29 @@ export default function BottomNav({ onOrderPress, onTabPress, activeTab }: {
           </TouchableOpacity>
         </View>
 
-        {/* Center FAB (Order) - properly centered */}
+        {/* Center FAB — exact structure from fast app */}
         <View style={styles.centerFab}>
-          <View style={styles.fabGradient}>
+          <LinearGradient
+            colors={['rgba(255, 255, 255, 0.2)', 'rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.2)']}
+            style={styles.fabGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
             <TouchableOpacity style={styles.fab} onPress={handleOrderPress} activeOpacity={0.85}>
-              <Animated.View style={[styles.fabIconWrap, { transform: [{ rotate: spin }] }]}>
+              <Animated.View style={[styles.fabIcon, { transform: [{ rotate: spin }] }]}>
                 <Image
-                  source={TAB_LOGO}
+                  source={require("../../assets/images/icon_booking_tab.png")}
                   style={styles.fabIcon}
-                  resizeMode="cover"
-                  fadeDuration={0}
+                  contentFit="cover"
+                  transition={0}
+                  cachePolicy="memory-disk"
                 />
               </Animated.View>
             </TouchableOpacity>
-          </View>
+          </LinearGradient>
         </View>
 
-        {/* Right side - Profile and Settings */}
+        {/* Right side */}
         <View style={styles.rightSide}>
           <TouchableOpacity style={styles.iconBtn} onPress={() => onTabPress && onTabPress('settings')}>
             <Ionicons name="settings" size={26} color={activeTab === 'settings' ? "#3b82f6" : "#ccc"} />
@@ -85,6 +103,7 @@ export default function BottomNav({ onOrderPress, onTabPress, activeTab }: {
           </TouchableOpacity>
         </View>
       </View>
+
       {/* Home indicator */}
       <View style={styles.homeIndicatorWrapper}>
         <View style={styles.homeIndicator} />
@@ -103,58 +122,62 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     zIndex: 100,
+    height: TAB_HEIGHT,
+  },
+  svgContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 0,
+  },
+  svg: {
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 5,
   },
   navBar: {
     flexDirection: "row",
-    backgroundColor: "rgba(0, 0, 0, 0.91)",
-    paddingTop: 0, // ultra thin
-    paddingBottom: 0, // ultra thin
+    backgroundColor: "transparent",
+    paddingTop: 15,
     paddingHorizontal: 20,
     alignItems: "flex-start",
     justifyContent: "space-between",
     width: "100%",
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
+    height: "100%",
     zIndex: 100,
   },
   leftSide: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 30, // מרווח שווה בין האייקונים
+    gap: 30,
     flex: 1,
     justifyContent: "flex-start",
+    paddingLeft: 10,
   },
   rightSide: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 30, // מרווח שווה בין האייקונים
+    gap: 30,
     flex: 1,
     justifyContent: "flex-end",
+    paddingRight: 10,
   },
   iconBtn: {
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 8,
     paddingHorizontal: 12,
-    marginTop: 0, // ensure icons are at the top
   },
-  topBleed: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 24,
-    zIndex: 101,
-    backgroundColor: 'rgba(0,0,0,0.91)',
-  },
+  // LinearGradient container — same dimensions + border glow as fast app
   fabGradient: {
     width: screenWidth < 380 ? 78 : 86,
     height: screenWidth < 380 ? 78 : 86,
     borderRadius: screenWidth < 380 ? 39 : 43,
     padding: 2,
-    transform: [{ translateY: -20 }],
     shadowColor: "#FFFFFF",
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.9,
@@ -165,47 +188,40 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     borderRadius: screenWidth < 380 ? 37 : 41,
-    backgroundColor: "transparent",
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
     alignItems: "center",
     justifyContent: "center",
-    overflow: "hidden",
-  },
-  fabIconWrap: {
-    width: screenWidth < 380 ? 70 : 78,
-    height: screenWidth < 380 ? 70 : 78,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  fabIcon: {
-    width: screenWidth < 380 ? 70 : 78,
-    height: screenWidth < 380 ? 70 : 78,
-    borderRadius: screenWidth < 380 ? 35 : 39,
+    borderWidth: 2,
+    borderColor: "rgba(255, 255, 255, 0.3)",
+    overflow: "hidden",  // clips the oversized image into a circle natively
     shadowColor: "#FFFFFF",
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.9,
-    shadowRadius: 25,
-    elevation: 25,
+    shadowOpacity: 0.8,
+    shadowRadius: 20,
+    elevation: 20,
   },
-  homeIndicatorWrapper: {
-    alignItems: "center",
-    width: "100%",
-    paddingVertical: 2,
-    backgroundColor: "transparent",
-    marginTop: 0, // remove extra margin
-  },
-  homeIndicator: {
-    width: 152,
-    height: 3, // was 5
-    backgroundColor: "#fff",
-    borderRadius: 999,
-    opacity: 0.5, // lighter
+  fabIcon: {
+    width: screenWidth < 380 ? 74 : 82,
+    height: screenWidth < 380 ? 74 : 82,
   },
   centerFab: {
-    flex: 0,
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    marginBottom: 0,
-    position: 'relative',
-    top: 0,
+    position: 'absolute',
+    top: -22,
+    left: screenWidth / 2 - (screenWidth < 380 ? 39 : 43),
+    zIndex: 101,
+  },
+  homeIndicatorWrapper: {
+    position: 'absolute',
+    bottom: 8,
+    alignItems: "center",
+    width: "100%",
+    zIndex: 102,
+  },
+  homeIndicator: {
+    width: 130,
+    height: 5,
+    backgroundColor: "#fff",
+    borderRadius: 100,
+    opacity: 0.3,
   },
 });

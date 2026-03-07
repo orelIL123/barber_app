@@ -9,7 +9,6 @@ import { onAuthStateChanged } from 'firebase/auth';
 import 'nativewind';
 import { useEffect } from 'react';
 import { I18nextProvider } from 'react-i18next';
-import { Alert } from 'react-native';
 import 'react-native-reanimated';
 import '../app/globals.css';
 import { auth } from '../config/firebase';
@@ -45,6 +44,7 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (loaded) {
+      // Hide splash as soon as fonts are loaded — HomeScreen will render with its own loading state
       SplashScreen.hideAsync().catch(() => {
         // ignore if already hidden
       });
@@ -111,31 +111,16 @@ export default function RootLayout() {
     return () => unsubscribe();
   }, []);
 
-  // Check for updates on app start
+  // Check for updates on app start — עדכון בכח בהפעלה (רק לעכשיו - להחזיר Alert בעתיד)
   useEffect(() => {
     async function checkForUpdates() {
       try {
-        // Only check for updates in production
         if (!__DEV__) {
           const update = await Updates.checkForUpdateAsync();
           if (update.isAvailable) {
-            Alert.alert(
-              'עדכון זמין',
-              'יש עדכון חדש לאפליקציה. האם ברצונך להוריד אותו עכשיו?',
-              [
-                {
-                  text: 'לא עכשיו',
-                  style: 'cancel',
-                },
-                {
-                  text: 'עדכן',
-                  onPress: async () => {
-                    await Updates.fetchUpdateAsync();
-                    await Updates.reloadAsync();
-                  },
-                },
-              ]
-            );
+            // עדכון אוטומטי: מושך ומפעיל מחדש בלי לשאול את המשתמש
+            await Updates.fetchUpdateAsync();
+            await Updates.reloadAsync();
           }
         }
       } catch (error) {

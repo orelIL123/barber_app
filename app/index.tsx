@@ -159,10 +159,11 @@ const preloadHomeData = async (): Promise<void> => {
         .slice(0, 6)
         .filter((url): url is string => typeof url === 'string' && url.startsWith('http'));
 
-      // Critical images: await so they are ready before HomeScreen mounts
-      await Promise.all(criticalUrls.map((url) => Image.prefetch(url).catch(() => false)));
-      // Gallery: fire-and-forget (lower priority)
-      Promise.all(galleryUrls.map((url) => Image.prefetch(url).catch(() => false))).catch(() => false);
+      // Prefetch all images in background — do NOT block navigation on this
+      Promise.all([
+        ...criticalUrls.map((url) => Image.prefetch(url).catch(() => false)),
+        ...galleryUrls.map((url) => Image.prefetch(url).catch(() => false)),
+      ]).catch(() => false);
     }
 
     // Save to cache (don't overwrite existing image cache with an empty payload).
@@ -229,38 +230,33 @@ export default function Index() {
   const router = useRouter();
 
   useEffect(() => {
-    let authStateChecked = false;
-    const SPLASH_MIN_MS = 2000; // Minimum 2 seconds for better UX (not too abrupt)
-
-    const checkAuthState = async (): Promise<'/(tabs)' | '/auth-choice'> => {
+    const checkAuthState = async () => {
       try {
-        await authManager.waitForInitialization();
-        if (authStateChecked) return '/(tabs)';
-        authStateChecked = true;
-
-        // Preload data in parallel (HomeScreen will wait for background image)
-        await Promise.all([
-          preloadHomeData(),
-          preloadBookingData(),
+        // Wait for Firebase auth, but cap at 3 seconds to avoid long splash
+        await Promise.race([
+          authManager.waitForInitialization(),
+          new Promise<void>(r => setTimeout(r, 3000)),
         ]);
 
+        // Fire preload in background — do NOT await before navigating
+        preloadHomeData();
+        preloadBookingData();
+
         const isAuthenticated = await authManager.isAuthenticated();
-        if (isAuthenticated) return '/(tabs)';
+        if (isAuthenticated) {
+          router.replace('/(tabs)');
+          return;
+        }
 
         const autoLoginSuccess = await authManager.attemptAutoLogin();
-        return autoLoginSuccess ? '/(tabs)' : '/auth-choice';
+        router.replace(autoLoginSuccess ? '/(tabs)' : '/auth-choice');
       } catch (error) {
         console.error('Error in auth check:', error);
-        return '/auth-choice';
+        router.replace('/auth-choice');
       }
     };
 
-    // Navigate after auth check + min splash time
-    // Actual splash hide happens in HomeScreen after background image loads
-    Promise.all([
-      checkAuthState(),
-      new Promise<void>(r => setTimeout(r, SPLASH_MIN_MS)),
-    ]).then(([route]) => router.replace(route as string));
+    checkAuthState();
   }, [router]);
 
   // Show custom splash - native splash will stay visible until HomeScreen image loads

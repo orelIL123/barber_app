@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.onAdminFlagChanged = exports.syncAdminClaims = exports.setAdminClaim = exports.updateEmailAndSendReset = exports.deleteUserAuth = exports.sendPushNotification = void 0;
+exports.onAdminFlagChanged = exports.syncAdminClaims = exports.setAdminClaim = exports.updateEmailAndSendReset = exports.deleteUserAuth = exports.checkUserExistsForLogin = exports.sendPushNotification = void 0;
 const expo_server_sdk_1 = require("expo-server-sdk");
 const admin = require("firebase-admin");
 const functions = require("firebase-functions");
@@ -57,6 +57,67 @@ exports.sendPushNotification = (0, https_1.onCall)({ secrets: [expoAccessToken] 
         console.error('❌ Error sending push:', error);
         throw new https_1.HttpsError('internal', error.message || 'Failed to send push');
     }
+});
+/**
+ * checkUserExistsForLogin — קריאה ללא אימות, לבדיקת התחברות.
+ * פותר את הבעיה: Firestore rules חוסמים קריאת users למשתמש לא מחובר.
+ * הפונקציה רצה עם Admin SDK ויכולה לקרוא את כל המסמכים.
+ *
+ * מחזירה: { exists, hasPassword, email?, uid?, isAdmin? }
+ */
+exports.checkUserExistsForLogin = functions.https.onCall(async (data, context) => {
+    const { phoneNumber } = data || {};
+    if (!phoneNumber || typeof phoneNumber !== 'string') {
+        throw new functions.https.HttpsError('invalid-argument', 'phoneNumber is required');
+    }
+    const cleanPhone = phoneNumber.replace(/[^0-9]/g, '');
+    const possiblePhones = [
+        phoneNumber,
+        `+972${cleanPhone.startsWith('0') ? cleanPhone.substring(1) : cleanPhone}`,
+        `972${cleanPhone.startsWith('0') ? cleanPhone.substring(1) : cleanPhone}`,
+        `0${cleanPhone.startsWith('972') ? cleanPhone.substring(3) : cleanPhone}`,
+        cleanPhone,
+    ];
+    const usersRef = admin.firestore().collection('users');
+    for (const phoneFormat of possiblePhones) {
+        const snapshot = await usersRef.where('phone', '==', phoneFormat).limit(1).get();
+        if (!snapshot.empty) {
+            const userDoc = snapshot.docs[0];
+            const userData = userDoc.data();
+            return {
+                exists: true,
+                hasPassword: userData.hasPassword || false,
+                uid: userDoc.id,
+                isAdmin: userData.isAdmin || false,
+                email: userData.email,
+            };
+        }
+    }
+    const possibleEmails = [
+        `972${cleanPhone.startsWith('0') ? cleanPhone.substring(1) : cleanPhone}@ronbarber.app`,
+        `${cleanPhone}@ronbarber.app`,
+        `${cleanPhone}@sms.barbershop.local`,
+        `972${cleanPhone.startsWith('0') ? cleanPhone.substring(1) : cleanPhone}@sms.barbershop.local`,
+        `${cleanPhone}@phonesign.local`,
+        `972${cleanPhone.startsWith('0') ? cleanPhone.substring(1) : cleanPhone}@phonesign.local`,
+        `${cleanPhone}@temp.turgi.com`,
+        `972${cleanPhone.startsWith('0') ? cleanPhone.substring(1) : cleanPhone}@temp.turgi.com`,
+    ];
+    for (const emailFormat of possibleEmails) {
+        const snapshot = await usersRef.where('email', '==', emailFormat).limit(1).get();
+        if (!snapshot.empty) {
+            const userDoc = snapshot.docs[0];
+            const userData = userDoc.data();
+            return {
+                exists: true,
+                hasPassword: userData.hasPassword || false,
+                uid: userDoc.id,
+                isAdmin: userData.isAdmin || false,
+                email: userData.email,
+            };
+        }
+    }
+    return { exists: false, hasPassword: false };
 });
 exports.deleteUserAuth = functions.https.onCall(async (data, context) => {
     var _a, _b;

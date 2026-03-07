@@ -14,7 +14,7 @@ export class SMS4FreeProvider implements MessageProvider {
     this.apiKey = cfg.apiKey || 'mgfwkoRBI';
     this.user = cfg.user || '0523985505';  // Connection number
     this.pass = cfg.pass || '73960779';
-    this.sender = cfg.sender || 'ToriX';  // Brand name
+    this.sender = cfg.sender || 'ToriX';
     this.enabled = cfg.enabled;
   }
 
@@ -28,12 +28,9 @@ export class SMS4FreeProvider implements MessageProvider {
     }
 
     try {
-      // Convert international format (+972xxxxxxxxx) back to Israeli local format (05xxxxxxxx)
-      // SMS4Free API expects Israeli local format
-      let recipient = params.to;
-      if (recipient.startsWith('+972')) {
-        recipient = '0' + recipient.substring(4);
-      }
+      // Convert to Israeli local format (05xxxxxxxx) - SMS4Free expects this
+      let recipient = params.to.replace(/\D/g, '').replace(/^972/, '0');
+      if (!recipient.startsWith('0')) recipient = '0' + recipient;
       
       // Ensure message is short (<70 characters in Hebrew) to avoid splitting
       const message = params.message.length > 70 ? params.message.substring(0, 67) + '...' : params.message;
@@ -62,8 +59,8 @@ export class SMS4FreeProvider implements MessageProvider {
 
       console.log('📱 ToriX SMS Response:', out);
 
-      if (typeof out?.status === 'number' && out.status > 0) {
-        return { success: true, messageId: String(out.status), provider: this.name };
+      if ((typeof out?.status === 'number' && out.status > 0) || out?.message === 'Succeeded') {
+        return { success: true, messageId: String(out.status || out.message), provider: this.name };
       }
       return { success: false, error: `${out?.status} - ${out?.message || 'unknown'}`, provider: this.name };
     } catch (e: any) {

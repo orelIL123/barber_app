@@ -58,7 +58,8 @@
           "photosPermission": "האפליקציה זקוקה לגישה לתמונות כדי להעלות תמונות לגלריה",
           "cameraPermission": "האפליקציה זקוקה לגישה למצלמה כדי לצלם תמונות"
         }
-      ]
+      ],
+      "expo-asset"
     ],
     "runtimeVersion": "1.6.0",
     "updates": {

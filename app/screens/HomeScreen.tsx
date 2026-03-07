@@ -294,9 +294,10 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
 
   useEffect(() => {
     if (!loading && backgroundImageLoaded) {
-      // Hide splash screen only once, when background image is fully loaded
+      // Hide splash screen only once
       if (!splashHiddenRef.current) {
         splashHiddenRef.current = true;
+        // Hide splash immediately — don't wait for remote images
         SplashScreen.hideAsync().catch(() => {});
       }
 
@@ -333,22 +334,32 @@ function HomeScreen({ onNavigate, isGuestMode = false }: HomeScreenProps) {
     }
   }, [loading, backgroundImageLoaded]);
 
-  const prevAtmosphereRef = useRef<string | null>(null);
+  // Seed ref with current value so returning from admin doesn't trigger a false "change"
+  const prevAtmosphereRef = useRef<string | null>(settingsImages.atmosphere || null);
   useEffect(() => {
     const newAtmosphere = settingsImages.atmosphere;
-    // Only reset when the URL actually changes to a different value
-    if (newAtmosphere !== prevAtmosphereRef.current) {
-      prevAtmosphereRef.current = newAtmosphere;
-      setAtmosphereImageError(false);
+    const prev = prevAtmosphereRef.current;
+
+    // Same URL (or both empty) — nothing changed, skip
+    if ((newAtmosphere || '') === (prev || '')) return;
+
+    prevAtmosphereRef.current = newAtmosphere;
+    setAtmosphereImageError(false);
+    if (newAtmosphere) {
+      // Real URL changed — wait for it to load
       setBackgroundImageLoaded(false);
+    } else {
+      // Switched to empty — will use local fallback, mark loaded
+      setBackgroundImageLoaded(true);
     }
   }, [settingsImages.atmosphere]);
 
-  // Safety: never stick on loader more than 8 seconds
+  // Safety: never stick on loader more than 2 seconds
   useEffect(() => {
-    const t = setTimeout(() => setBackgroundImageLoaded(true), 8000);
+    if (backgroundImageLoaded) return; // already loaded, no timer needed
+    const t = setTimeout(() => setBackgroundImageLoaded(true), 2000);
     return () => clearTimeout(t);
-  }, []);
+  }, [backgroundImageLoaded]);
 
   useEffect(() => {
     setAboutImageLoadFailed(false);

@@ -253,38 +253,31 @@ const AdminNotificationSettingsScreen: React.FC<AdminNotificationSettingsScreenP
       if (sendSMS) {
         try {
           const users = await getAllUsers();
-          // Filter out admin users to avoid sending SMS to admins
           const nonAdminUsersWithPhone = users.filter(user => !user.isAdmin && user.phone);
           
           console.log(`📱 Found ${nonAdminUsersWithPhone.length} non-admin users with phone numbers`);
           
+          const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+          const DELAY_BETWEEN_SMS = 2000; // 2 sec - למניעת rate limiting ב-SMS4Free
+          
           let smsSentCount = 0;
-          for (const user of nonAdminUsersWithPhone) {
+          for (let i = 0; i < nonAdminUsersWithPhone.length; i++) {
+            const user = nonAdminUsersWithPhone[i];
             try {
-              console.log(`📱 Sending SMS to ${user.phone}...`);
+              let phoneNumber = user.phone!.replace(/\D/g, '').replace(/^972/, '0');
+              if (!phoneNumber.startsWith('0')) phoneNumber = '0' + phoneNumber;
               
-              // Format phone number for SMS4Free (Israeli format)
-              let phoneNumber = user.phone!;
-              if (phoneNumber.startsWith('+972')) {
-                phoneNumber = '0' + phoneNumber.substring(4);
-              }
-              
-              // Create SMS message (keep it short for SMS4Free)
               const smsMessage = `${broadcastTitle}\n${broadcastMessage}`;
               const shortMessage = smsMessage.length > 70 ? smsMessage.substring(0, 67) + '...' : smsMessage;
               
-              console.log(`📱 Formatted phone: ${phoneNumber}, Message: ${shortMessage}`);
-              
               const result = await sendSms(phoneNumber, shortMessage);
-              console.log(`📱 SMS result for ${user.phone}:`, result);
+              if (result.success) smsSentCount++;
+              else console.error(`SMS failed for ${user.phone}:`, result.error);
               
-              if (result.success) {
-                smsSentCount++;
-              } else {
-                console.error(`SMS failed for ${user.phone}:`, result.error);
-              }
+              if (i < nonAdminUsersWithPhone.length - 1) await delay(DELAY_BETWEEN_SMS);
             } catch (error) {
               console.error(`Failed to send SMS to ${user.phone}:`, error);
+              await delay(DELAY_BETWEEN_SMS);
             }
           }
           

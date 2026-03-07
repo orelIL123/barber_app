@@ -1,30 +1,27 @@
-import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Dimensions,
-    Image,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  Alert,
+  Dimensions,
+  Image,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import {
-    Appointment,
-    cancelAppointment,
-    createUserProfileFromAuth,
-    getUserAppointments,
-    getUserProfile,
-    logoutUser,
-    onAuthStateChange,
-    updateUserProfile,
-    UserProfile
+  Appointment,
+  cancelAppointment,
+  createUserProfileFromAuth,
+  getUserAppointments,
+  getUserProfile,
+  logoutUser,
+  onAuthStateChange,
+  updateUserProfile,
+  UserProfile
 } from '../../services/firebase';
-import { NeonButton } from '../components/NeonButton';
 import { ScissorsLoader } from '../components/ScissorsLoader';
 import ToastMessage from '../components/ToastMessage';
 import TopNav from '../components/TopNav';
@@ -43,17 +40,8 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate, onBack }) => 
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [editMode, setEditMode] = useState(false);
-  const [tab, setTab] = useState<'login' | 'register'>('login');
-  const [authMethod, setAuthMethod] = useState<'email' | 'phone'>('phone');
-  const [step, setStep] = useState<'input' | 'otp'>('input');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [phone, setPhone] = useState('');
-  const [verificationCode, setVerificationCode] = useState('');
-  const [verificationId, setVerificationId] = useState('');
-  const [phoneUserExists, setPhoneUserExists] = useState(false);
-  const [phoneUserHasPassword, setPhoneUserHasPassword] = useState(false);
   const [toast, setToast] = useState({ visible: false, message: '', type: 'success' as 'success' | 'error' });
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
@@ -91,69 +79,11 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate, onBack }) => 
     return unsubscribe;
   }, []);
 
-  const checkPhoneUser = async (phoneNumber: string) => {
-    try {
-      // Import the function from firebase service
-      const { checkPhoneUserExists } = await import('../../services/firebase');
-      const result = await checkPhoneUserExists(phoneNumber);
-      setPhoneUserExists(result.exists);
-      setPhoneUserHasPassword(result.hasPassword);
-    } catch (error) {
-      console.error('Error checking phone user:', error);
-      setPhoneUserExists(false);
-      setPhoneUserHasPassword(false);
-    }
-  };
-
-  const handleLogin = async () => {
-    if (authMethod === 'phone') {
-      if (phoneUserExists && phoneUserHasPassword) {
-        // User exists with password - use phone+password login
-        try {
-          const { loginWithPhoneAndPassword } = await import('../../services/firebase');
-          await loginWithPhoneAndPassword(phone, password);
-          showToast('התחברת בהצלחה!', 'success');
-          // The auth state change will handle navigation
-        } catch (error) {
-          console.error('Phone login error:', error);
-          showToast('פרטי הכניסה שגויים', 'error');
-        }
-      } else {
-        // New user or no password - send SMS verification
-        try {
-          const { sendSMSVerification } = await import('../../services/firebase');
-          const result = await sendSMSVerification(phone);
-          setVerificationId(result.verificationId);
-          setStep('otp');
-          showToast('קוד אימות נשלח לטלפון', 'success');
-        } catch (error) {
-          console.error('SMS verification error:', error);
-          showToast('שגיאה בשליחת קוד אימות', 'error');
-        }
-      }
-    } else {
-      // Email login - navigate to dedicated login screen
+  useEffect(() => {
+    if (!loading && !user) {
       onNavigate('auth-choice');
     }
-  };
-
-  const handleRegister = async () => {
-    // Navigate to new register screen
-    onNavigate('auth-choice');
-  };
-
-  const handleVerifyCode = async () => {
-    try {
-      const { verifySMSCode } = await import('../../services/firebase');
-      await verifySMSCode(verificationId, verificationCode);
-      showToast('קוד האימות נבדק...', 'success');
-      // The auth state change will handle navigation
-    } catch (error) {
-      console.error('Phone verification error:', error);
-      showToast('קוד האימות שגוי', 'error');
-    }
-  };
-
+  }, [loading, user, onNavigate]);
 
   const handleLogout = async () => {
     try {
@@ -270,292 +200,8 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate, onBack }) => 
   if (!user) {
     return (
       <SafeAreaView style={styles.container}>
-        <TopNav 
-          title="התחברות" 
-          onBellPress={() => {}} 
-          onMenuPress={() => {}}
-          showBackButton={false}
-        />
-        <View style={styles.flexGrow}>
-          {/* Top Tabs */}
-          <View style={styles.tabBar}>
-            <TouchableOpacity onPress={() => setTab('login')} style={[styles.tab, tab === 'login' && styles.activeTab]}>
-              {tab === 'login' && (
-                <LinearGradient
-                  colors={['#333333', '#1a1a1a', '#000000']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.tabGradient}
-                />
-              )}
-              <Text style={[styles.tabText, tab === 'login' && styles.activeTabText]}>התחברות</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setTab('register')} style={[styles.tab, tab === 'register' && styles.activeTab]}>
-              {tab === 'register' && (
-                <LinearGradient
-                  colors={['#333333', '#1a1a1a', '#000000']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.tabGradient}
-                />
-              )}
-              <Text style={[styles.tabText, tab === 'register' && styles.activeTabText]}>הרשמה</Text>
-            </TouchableOpacity>
-          </View>
-          {/* White half-sheet for form */}
-          <View style={styles.sheet}>
-            {tab === 'login' ? (
-              <View style={styles.form}>
-                {/* Auth Method Selection */}
-                <View style={styles.authMethodContainer}>
-                  <TouchableOpacity
-                    style={[styles.authMethodButton, authMethod === 'phone' && styles.activeAuthMethod]}
-                    onPress={() => {
-                      setAuthMethod('phone');
-                      setStep('input');
-                    }}
-                  >
-                    <Text style={[styles.authMethodText, authMethod === 'phone' && styles.activeAuthMethodText]}>
-                      📱 טלפון
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.authMethodButton, authMethod === 'email' && styles.activeAuthMethod]}
-                    onPress={() => {
-                      setAuthMethod('email');
-                      setStep('input');
-                    }}
-                  >
-                    <Text style={[styles.authMethodText, authMethod === 'email' && styles.activeAuthMethodText]}>
-                      ✉️ אימייל
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-                
-                {step === 'input' ? (
-                  <>
-                    {authMethod === 'phone' ? (
-                      <>
-                        <View style={styles.inputContainer}>
-                          <Text style={styles.inputLabel}>מספר טלפון</Text>
-                          <TextInput 
-                            style={styles.input} 
-                            placeholder="+972-50-123-4567" 
-                            value={phone} 
-                            onChangeText={(text) => {
-                              setPhone(text);
-                              if (text.length > 10) checkPhoneUser(text);
-                            }}
-                            keyboardType="phone-pad" 
-                          />
-                          {phoneUserExists && (
-                            <Text style={styles.helperText}>
-                              {phoneUserHasPassword ? '✅ משתמש קיים - הזן סיסמה' : 'ℹ️ משתמש קיים - יישלח SMS'}
-                            </Text>
-                          )}
-                        </View>
-                        
-                        {/* Show password field if user exists and has password */}
-                        {phoneUserExists && phoneUserHasPassword && (
-                          <View style={styles.inputContainer}>
-                            <Text style={styles.inputLabel}>סיסמה</Text>
-                            <TextInput 
-                              style={styles.input} 
-                              placeholder="הזן סיסמה" 
-                              value={password} 
-                              onChangeText={setPassword} 
-                              secureTextEntry 
-                            />
-                          </View>
-                        )}
-                      </>
-                    ) : (
-                      <>
-                        <View style={styles.inputContainer}>
-                          <Text style={styles.inputLabel}>כתובת אימייל</Text>
-                          <TextInput 
-                            style={styles.input} 
-                            placeholder="example@email.com" 
-                            value={email} 
-                            onChangeText={setEmail} 
-                            autoCapitalize="none" 
-                            keyboardType="email-address" 
-                          />
-                        </View>
-                        <View style={styles.inputContainer}>
-                          <Text style={styles.inputLabel}>סיסמה</Text>
-                          <TextInput 
-                            style={styles.input} 
-                            placeholder="הזן סיסמה" 
-                            value={password} 
-                            onChangeText={setPassword} 
-                            secureTextEntry 
-                          />
-                        </View>
-                      </>
-                    )}
-                    <NeonButton 
-                      title={
-                        authMethod === 'phone' 
-                          ? (phoneUserExists && phoneUserHasPassword ? 'התחבר' : 'שלח קוד אימות')
-                          : 'התחברות'
-                      } 
-                      onPress={handleLogin} 
-                      disabled={loading} 
-                      {...(loading ? { textStyle: { opacity: 0.5 }, children: <ActivityIndicator color="#fff" /> } : {})}
-                    />
-                  </>
-                ) : (
-                  <>
-                    <View style={styles.inputContainer}>
-                      <Text style={styles.inputLabel}>קוד אימות (נשלח לטלפון)</Text>
-                      <TextInput 
-                        style={styles.input} 
-                        placeholder="הזן קוד בן 6 ספרות" 
-                        value={verificationCode} 
-                        onChangeText={setVerificationCode} 
-                        keyboardType="number-pad" 
-                        maxLength={6}
-                      />
-                    </View>
-                    <NeonButton 
-                      title="אמת קוד" 
-                      onPress={handleVerifyCode} 
-                      disabled={loading} 
-                      {...(loading ? { textStyle: { opacity: 0.5 }, children: <ActivityIndicator color="#fff" /> } : {})}
-                    />
-                    <TouchableOpacity 
-                      style={styles.backButton} 
-                      onPress={() => setStep('input')}
-                    >
-                      <Text style={styles.backButtonText}>חזור</Text>
-                    </TouchableOpacity>
-                  </>
-                )}
-              </View>
-            ) : (
-              <View style={styles.form}>
-                {/* Auth Method Selection */}
-                <View style={styles.authMethodContainer}>
-                  <TouchableOpacity
-                    style={[styles.authMethodButton, authMethod === 'phone' && styles.activeAuthMethod]}
-                    onPress={() => {
-                      setAuthMethod('phone');
-                      setStep('input');
-                    }}
-                  >
-                    <Text style={[styles.authMethodText, authMethod === 'phone' && styles.activeAuthMethodText]}>
-                      📱 טלפון
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.authMethodButton, authMethod === 'email' && styles.activeAuthMethod]}
-                    onPress={() => {
-                      setAuthMethod('email');
-                      setStep('input');
-                    }}
-                  >
-                    <Text style={[styles.authMethodText, authMethod === 'email' && styles.activeAuthMethodText]}>
-                      ✉️ אימייל
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-                
-                {step === 'input' ? (
-                  <>
-                    <View style={styles.inputContainer}>
-                      <Text style={styles.inputLabel}>שם מלא</Text>
-                      <TextInput 
-                        style={styles.input} 
-                        placeholder="הזן שם מלא" 
-                        value={displayName} 
-                        onChangeText={setDisplayName} 
-                      />
-                    </View>
-                    
-                    {authMethod === 'phone' ? (
-                      <View style={styles.inputContainer}>
-                        <Text style={styles.inputLabel}>מספר טלפון</Text>
-                        <TextInput 
-                          style={styles.input} 
-                          placeholder="+972-50-123-4567" 
-                          value={phone} 
-                          onChangeText={setPhone} 
-                          keyboardType="phone-pad" 
-                        />
-                      </View>
-                    ) : (
-                      <>
-                        <View style={styles.inputContainer}>
-                          <Text style={styles.inputLabel}>כתובת אימייל</Text>
-                          <TextInput 
-                            style={styles.input} 
-                            placeholder="example@email.com" 
-                            value={email} 
-                            onChangeText={setEmail} 
-                            autoCapitalize="none" 
-                            keyboardType="email-address" 
-                          />
-                        </View>
-                        <View style={styles.inputContainer}>
-                          <Text style={styles.inputLabel}>מספר טלפון (אופציונלי)</Text>
-                          <TextInput 
-                            style={styles.input} 
-                            placeholder="+972-50-123-4567" 
-                            value={phone} 
-                            onChangeText={setPhone} 
-                            keyboardType="phone-pad" 
-                          />
-                        </View>
-                        <View style={styles.inputContainer}>
-                          <Text style={styles.inputLabel}>סיסמה</Text>
-                          <TextInput 
-                            style={styles.input} 
-                            placeholder="הזן סיסמה (לפחות 6 תווים)" 
-                            value={password} 
-                            onChangeText={setPassword} 
-                            secureTextEntry 
-                          />
-                        </View>
-                      </>
-                    )}
-                    <NeonButton 
-                      title={authMethod === 'phone' ? 'שלח קוד אימות' : 'הרשמה'} 
-                      onPress={handleRegister} 
-                      disabled={loading} 
-                      {...(loading ? { textStyle: { opacity: 0.5 }, children: <ActivityIndicator color="#fff" /> } : {})}
-                    />
-                  </>
-                ) : (
-                  <>
-                    <View style={styles.inputContainer}>
-                      <Text style={styles.inputLabel}>קוד אימות (נשלח לטלפון)</Text>
-                      <TextInput 
-                        style={styles.input} 
-                        placeholder="הזן קוד בן 6 ספרות" 
-                        value={verificationCode} 
-                        onChangeText={setVerificationCode} 
-                        keyboardType="number-pad" 
-                        maxLength={6}
-                      />
-                    </View>
-                    <NeonButton 
-                      title="אמת קוד והירשם" 
-                      onPress={handleVerifyCode} 
-                      disabled={loading} 
-                      {...(loading ? { textStyle: { opacity: 0.5 }, children: <ActivityIndicator color="#fff" /> } : {})}
-                    />
-                    <TouchableOpacity 
-                      style={styles.backButton} 
-                      onPress={() => setStep('input')}
-                    >
-                      <Text style={styles.backButtonText}>חזור</Text>
-                    </TouchableOpacity>
-                  </>
-                )}
-              </View>
-            )}
-          </View>
+        <View style={styles.loadingContainer}>
+          <ScissorsLoader size={60} color="#007bff" accessibilityLabel="טוען" />
         </View>
       </SafeAreaView>
     );
@@ -750,27 +396,6 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigate, onBack }) => 
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#181828' },
-  flexGrow: { flex: 1 },
-  tabBar: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', backgroundColor: 'transparent', marginTop: 24, marginBottom: 0, zIndex: 2 },
-  tab: { flex: 1, alignItems: 'center', paddingVertical: 16, position: 'relative' },
-  activeTab: { },
-  tabGradient: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, borderRadius: 16, zIndex: -1 },
-  tabText: { fontSize: 18, color: '#888', fontWeight: '600', zIndex: 1 },
-  activeTabText: { color: '#fff', fontWeight: 'bold' },
-  sheet: { flex: 1, backgroundColor: '#fff', borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 24, marginTop: 0, shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 8 },
-  form: { marginTop: 16 },
-  inputContainer: { marginBottom: 16 },
-  inputLabel: { 
-    fontSize: 16, 
-    fontWeight: 'bold', 
-    color: '#333', 
-    marginBottom: 8, 
-    textAlign: 'right' 
-  },
-  input: { backgroundColor: '#f3f3f3', borderRadius: 12, padding: 16, fontSize: 16, borderWidth: 1, borderColor: '#eee' },
-  orText: { textAlign: 'center', color: '#aaa', marginBottom: 8, marginTop: 8 },
-  errorText: { color: '#f00', textAlign: 'center', marginTop: 8 },
-  successText: { color: '#0a0', textAlign: 'center', marginTop: 8 },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -782,46 +407,6 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingBottom: 100,
-  },
-  authContainer: {
-    padding: 20,
-    alignItems: 'center',
-    marginTop: 50,
-  },
-  welcomeText: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#222',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  subtitleText: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 40,
-    textAlign: 'center',
-  },
-  authButton: {
-    backgroundColor: '#000',
-    paddingHorizontal: 40,
-    paddingVertical: 15,
-    borderRadius: 12,
-    marginBottom: 16,
-    minWidth: 200,
-  },
-  registerButton: {
-    backgroundColor: '#fff',
-    borderWidth: 2,
-    borderColor: '#000',
-  },
-  authButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-  registerButtonText: {
-    color: '#000',
   },
   profileHeader: {
     backgroundColor: '#fff',
@@ -1164,57 +749,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     textAlign: 'center',
-  },
-  authMethodContainer: {
-    flexDirection: 'row',
-    marginBottom: 20,
-    borderRadius: 12,
-    backgroundColor: '#f0f0f0',
-    padding: 4,
-  },
-  authMethodButton: {
-    flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginHorizontal: 2,
-  },
-  activeAuthMethod: {
-    backgroundColor: '#007bff',
-    shadowColor: '#007bff',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  authMethodText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#666',
-  },
-  activeAuthMethodText: {
-    color: '#fff',
-  },
-  helperText: {
-    fontSize: 12,
-    color: '#007bff',
-    marginTop: 4,
-    textAlign: 'right',
-  },
-  backButton: {
-    backgroundColor: '#f8f9fa',
-    borderWidth: 1,
-    borderColor: '#ddd',
-    paddingVertical: 12,
-    borderRadius: 8,
-    marginTop: 12,
-    alignItems: 'center',
-  },
-  backButtonText: {
-    color: '#666',
-    fontSize: 16,
-    fontWeight: '500',
   },
 });
 
