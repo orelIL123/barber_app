@@ -1045,6 +1045,16 @@ export const loginWithPhoneAndPassword = async (phoneNumber: string, password: s
       if (cfError?.code === 'functions/not-found') {
         throw new Error('שירות ההתחברות אינו זמין. אנא צור קשר עם התמיכה או נסה שוב מאוחר יותר.');
       }
+      if (
+        cfError?.code === 'functions/deadline-exceeded' ||
+        cfError?.code === 'functions/unavailable' ||
+        cfError?.code === 'functions/internal' ||
+        cfError?.message?.includes('network') ||
+        cfError?.message?.includes('timeout') ||
+        cfError?.message?.includes('DEADLINE_EXCEEDED')
+      ) {
+        throw new Error('בעיית חיבור לאינטרנט. אנא בדוק את החיבור שלך ונסה שוב.');
+      }
       throw cfError;
     }
     console.log(`📞 User check result:`, JSON.stringify(userCheck, null, 2));

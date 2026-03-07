@@ -232,10 +232,10 @@ export default function Index() {
   useEffect(() => {
     const checkAuthState = async () => {
       try {
-        // Wait for Firebase auth, but cap at 3 seconds to avoid long splash
+        // Wait for Firebase auth, but cap at 8 seconds to handle slow networks
         await Promise.race([
           authManager.waitForInitialization(),
-          new Promise<void>(r => setTimeout(r, 3000)),
+          new Promise<void>(r => setTimeout(r, 8000)),
         ]);
 
         // Fire preload in background — do NOT await before navigating

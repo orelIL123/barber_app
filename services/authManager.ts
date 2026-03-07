@@ -226,14 +226,20 @@ export class AuthManager {
   // בדיקה אם משתמש מחובר
   async isAuthenticated(): Promise<boolean> {
     try {
-      // בדיקה ראשונה - Firebase current user
+      // בדיקה ראשונה - Firebase current user (מקור האמת)
       if (this.currentUser) {
         return true;
       }
 
-      // בדיקה שנייה - cached auth state
+      // אם Firebase כבר אותחל ואמר שאין משתמש — לא לסמוך על cache מיושן
+      if (this.isInitialized) {
+        return false;
+      }
+
+      // Firebase עדיין לא אותחל — cache יכול לשמש כ-fallback זמני
       const authState = await CacheUtils.getAuthState();
       if (authState && (authState as any).isAuthenticated) {
+        console.log('⚠️ AuthManager: Using cached auth state (Firebase not yet initialized)');
         return true;
       }
 
