@@ -1,10 +1,5 @@
 import { getApp, getApps, initializeApp } from 'firebase/app';
-import {
-    Auth,
-    browserLocalPersistence,
-    getAuth,
-    setPersistence
-} from 'firebase/auth';
+import { Auth, getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getFunctions } from 'firebase/functions';
 import { getStorage } from 'firebase/storage';
@@ -30,13 +25,9 @@ Object.entries(firebaseConfig).forEach(([key, value]) => {
 // Initialize Firebase
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
-// Initialize Firebase Auth
+// Reuse the auth instance that was already initialized with React Native persistence
+// in config/firebase.ts (used by services/). Do NOT call initializeAuth again here.
 export const auth: Auth = getAuth(app);
-
-// Set persistence for React Native
-setPersistence(auth, browserLocalPersistence).catch((error) => {
-  console.error('Error setting auth persistence:', error);
-});
 export const db = getFirestore(app);
 export const storage = getStorage(app);
 export const functions = getFunctions(app);
