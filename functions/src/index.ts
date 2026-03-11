@@ -302,6 +302,194 @@ export const syncAdminClaims = functions.https.onCall(async (_data, context) => 
   }
 });
 
+// ──────────────────────────────────────────────
+//  Helper: send Expo push to all admin users
+// ──────────────────────────────────────────────
+
+async function sendPushToAdmins(
+  title: string,
+  body: string,
+  data: Record<string, unknown>,
+  accessToken: string
+): Promise<void> {
+  const usersSnap = await admin.firestore()
+    .collection('users')
+    .where('isAdmin', '==', true)
+    .get();
+
+  const tokens: string[] = [];
+  const adminUids: string[] = [];
+
+  usersSnap.forEach((doc) => {
+    const d = doc.data();
+    const token: string | undefined = d.pushToken ?? d.expoPushToken;
+    if (token && token.startsWith('ExponentPushToken[')) {
+      tokens.push(token);
+      adminUids.push(doc.id);
+    }
+  });
+
+  if (tokens.length === 0) {
+    console.log('onNewAppointment/onNewUser: no admin push tokens found');
+    return;
+  }
+
+  const expo = new Expo({ accessToken });
+  const messages: ExpoPushMessage[] = tokens.map((to) => ({
+    to,
+    sound: 'default' as const,
+    title,
+    body,
+    data,
+  }));
+
+  const chunks = expo.chunkPushNotifications(messages);
+  for (const chunk of chunks) {
+    try {
+      const tickets = await expo.sendPushNotificationsAsync(chunk);
+      tickets.forEach((ticket) => {
+        if (ticket.status === 'error') {
+          console.error('Push ticket error:', ticket.message, ticket.details);
+        }
+      });
+    } catch (err) {
+      console.error('Error sending push chunk:', err);
+    }
+  }
+
+  // Save notification to each admin's inbox
+  const batch = admin.firestore().batch();
+  adminUids.forEach((uid) => {
+    const ref = admin.firestore().collection('notifications').doc();
+    batch.set(ref, {
+      userId: uid,
+      title,
+      body,
+      data,
+      read: false,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  });
+  await batch.commit();
+}
+
+// ──────────────────────────────────────────────
+//  onNewAppointment — notify admin when a customer books
+// ──────────────────────────────────────────────
+
+export const onNewAppointment = functions
+  .runWith({ secrets: ['EXPO_ACCESS_TOKEN'] })
+  .firestore.document('appointments/{appointmentId}')
+  .onCreate(async (snap, context) => {
+    try {
+      const appointment = snap.data();
+      const appointmentId = context.params.appointmentId;
+
+      // Read admin notification settings
+      const settingsDoc = await admin.firestore()
+        .collection('adminSettings')
+        .doc('notifications')
+        .get();
+      const settings = settingsDoc.exists ? settingsDoc.data() : {};
+      const enabled = settings?.newAppointmentBooked ?? true;
+
+      if (!enabled) {
+        console.log('onNewAppointment: newAppointmentBooked disabled, skipping');
+        return;
+      }
+
+      // Resolve customer name
+      let customerName = 'לקוח';
+      const userId: string = appointment.userId || '';
+      if (userId && userId !== 'manual-client') {
+        try {
+          const userDoc = await admin.firestore().collection('users').doc(userId).get();
+          if (userDoc.exists) {
+            customerName = userDoc.data()?.displayName || 'לקוח';
+          }
+        } catch (_) { /* ignore */ }
+      } else if (appointment.clientName) {
+        customerName = appointment.clientName;
+      }
+
+      // Format date/time
+      let dateStr = '';
+      let timeStr = '';
+      try {
+        const dateVal = appointment.date;
+        const asDate = typeof dateVal?.toDate === 'function' ? dateVal.toDate() : new Date(dateVal);
+        dateStr = asDate.toLocaleDateString('he-IL');
+        timeStr = asDate.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+      } catch (_) { /* ignore */ }
+
+      const title = 'תור חדש! 📅';
+      const body = `${customerName} קבע תור ל-${dateStr} ב-${timeStr}`;
+
+      const accessToken = process.env.EXPO_ACCESS_TOKEN || '';
+      if (!accessToken) {
+        console.error('onNewAppointment: EXPO_ACCESS_TOKEN secret not available');
+        return;
+      }
+
+      await sendPushToAdmins(title, body, { appointmentId }, accessToken);
+      console.log(`✅ onNewAppointment: admin push sent for appointment ${appointmentId}`);
+    } catch (error) {
+      console.error('❌ onNewAppointment error:', error);
+    }
+  });
+
+// ──────────────────────────────────────────────
+//  onNewUser — notify admin when a new user registers
+// ──────────────────────────────────────────────
+
+export const onNewUser = functions
+  .runWith({ secrets: ['EXPO_ACCESS_TOKEN'] })
+  .firestore.document('users/{userId}')
+  .onCreate(async (snap, context) => {
+    try {
+      const userData = snap.data();
+      const userId = context.params.userId;
+
+      // Skip admin users registering themselves
+      if (userData.isAdmin) {
+        console.log('onNewUser: skipping admin user');
+        return;
+      }
+
+      // Read admin notification settings
+      const settingsDoc = await admin.firestore()
+        .collection('adminSettings')
+        .doc('notifications')
+        .get();
+      const settings = settingsDoc.exists ? settingsDoc.data() : {};
+      const enabled = settings?.newUserRegistered ?? true;
+
+      if (!enabled) {
+        console.log('onNewUser: newUserRegistered disabled, skipping');
+        return;
+      }
+
+      const displayName: string = userData.displayName || 'משתמש חדש';
+      const phoneNumber: string = userData.phone || '';
+
+      const title = 'משתמש חדש נרשם! 🎉';
+      const body = phoneNumber
+        ? `${displayName} נרשם לאפליקציה עם מספר ${phoneNumber}`
+        : `${displayName} נרשם לאפליקציה`;
+
+      const accessToken = process.env.EXPO_ACCESS_TOKEN || '';
+      if (!accessToken) {
+        console.error('onNewUser: EXPO_ACCESS_TOKEN secret not available');
+        return;
+      }
+
+      await sendPushToAdmins(title, body, { type: 'new_user', userId, userName: displayName, phoneNumber }, accessToken);
+      console.log(`✅ onNewUser: admin push sent for new user ${userId}`);
+    } catch (error) {
+      console.error('❌ onNewUser error:', error);
+    }
+  });
+
 /**
  * onAdminFlagChanged — Firestore trigger.
  * When a user document's isAdmin field changes to true, automatically set the claim.

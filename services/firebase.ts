@@ -669,18 +669,7 @@ export const registerUserWithPhone = async (phoneNumber: string, displayName: st
       await AsyncStorage.removeItem(`verification_${verificationId}`);
       console.log('🧹 Verification data cleaned up after successful registration');
 
-      // Send notification to admins about new user registration
-      try {
-        await sendNotificationToAdmin(
-          'משתמש חדש נרשם! 🎉',
-          `${displayName} נרשם לאפליקציה עם מספר ${phoneNumber}`,
-          { type: 'new_user', userName: displayName, phoneNumber: phoneNumber }
-        );
-        console.log('✅ Admin notification sent for new user registration');
-      } catch (error) {
-        console.error('❌ Error sending admin notification:', error);
-        // Don't fail registration if notification fails
-      }
+      // Admin notification for new user is handled by the onNewUser Cloud Function trigger
 
       // Return the Firebase Auth user object
       return user;
@@ -705,17 +694,7 @@ export const registerUserWithPhone = async (phoneNumber: string, displayName: st
       await setDoc(doc(db, 'users', mockUserId), userProfile);
       console.log('✅ Mock user registered successfully');
 
-      // Send notification to admins about new user registration
-      try {
-        await sendNotificationToAdmin(
-          'משתמש חדש נרשם! 🎉',
-          `${displayName} נרשם לאפליקציה עם מספר ${phoneNumber}`
-        );
-        console.log('✅ Admin notification sent for new mock user registration');
-      } catch (error) {
-        console.error('❌ Error sending admin notification:', error);
-        // Don't fail registration if notification fails
-      }
+      // Admin notification for new user is handled by the onNewUser Cloud Function trigger
 
       return {
         uid: mockUserId,
@@ -750,17 +729,7 @@ export const registerUserWithPhone = async (phoneNumber: string, displayName: st
     // Save auth data for persistence
     await saveAuthDataAfterLogin(user);
 
-    // Send notification to admins about new user registration
-    try {
-      await sendNotificationToAdmin(
-        'משתמש חדש נרשם! 🎉',
-        `${displayName} נרשם לאפליקציה עם מספר ${phoneNumber}`
-      );
-      console.log('✅ Admin notification sent for new Firebase user registration');
-    } catch (error) {
-      console.error('❌ Error sending admin notification:', error);
-      // Don't fail registration if notification fails
-    }
+    // Admin notification for new user is handled by the onNewUser Cloud Function trigger
     
     return user;
   } catch (error) {
@@ -1548,38 +1517,7 @@ export const createAppointment = async (appointmentData: Omit<Appointment, 'id' 
       console.log('⏭️ Skipping user notification for manual client');
     }
     
-    // Send notification to admin about new appointment
-    try {
-      const dateVal: any = appointmentData.date as any;
-      const asDate = typeof dateVal?.toDate === 'function' ? dateVal.toDate() : new Date(dateVal);
-      const dateStr = asDate.toLocaleDateString('he-IL');
-      const timeStr = asDate.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
-      
-      // Get customer name for better admin notification
-      let customerName = 'לקוח';
-      if (appointmentData.userId === 'manual-client' && (appointmentData as any).clientName) {
-        // Use manual client name if available
-        customerName = (appointmentData as any).clientName;
-      } else if (appointmentData.userId !== 'manual-client') {
-        try {
-          const customerDoc = await getDoc(doc(db, 'users', appointmentData.userId));
-          if (customerDoc.exists()) {
-            customerName = customerDoc.data().displayName || 'לקוח';
-          }
-        } catch (e) {
-          console.log('Could not fetch customer name');
-        }
-      }
-      
-      await sendNotificationToAdmin(
-        'תור חדש! 📅', 
-        `${customerName} קבע תור ל-${dateStr} ב-${timeStr}`, 
-        { appointmentId: docRef.id }
-      );
-      console.log('✅ Admin notification sent for new appointment');
-    } catch (adminNotificationError) {
-      console.log('❌ Failed to send admin notification:', adminNotificationError);
-    }
+    // Admin notification for new appointment is handled by the onNewAppointment Cloud Function trigger
     
     // Schedule reminders: LOCAL (device) + Firestore (for Push to customer + admin)
     // Skip for manual clients - no user to send reminders to
